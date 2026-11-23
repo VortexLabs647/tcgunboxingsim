@@ -72,3 +72,6 @@ Within each tier, cheaper cards are more common: normalized weight is (lowest va
 ## Common streaks
 
 Each pull is independent and uses the selected mode’s published tier probabilities. For the $1 Starter profile, Common chances are 60% Normal, 80% High, 90% Max and 85% Ultra. The rarity-color animation does not select or change the card; the pull is saved when the pack is purchased. Repeated Commons can occur with these odds.
+
+
+Accounts/mobile update: Gamble is now 90% Common / 10% Grail for every pack, overriding any earlier 50/50 description. Wild remains disabled in Gamble.
