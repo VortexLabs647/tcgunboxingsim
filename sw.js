@@ -1,5 +1,5 @@
-const VERSION='tcg-unboxing-sim-v30';
-const SHELL=['./','./index.html','./styles.css?v=30','./engine.js?v=30','./app.js?v=30','./catalog.json?v=30','./manifest.webmanifest','./assets/icon.svg','./assets/icon-192.png','./assets/icon-512.png'];
+const VERSION='tcg-unboxing-sim-flat-v31';
+const SHELL=['./','./index.html','./styles.css?v=31','./engine.js?v=31','./app.js?v=31','./catalog.json?v=31','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('tcg-unboxing-sim-')&&k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;e.respondWith((async()=>{const c=await caches.open(VERSION);if(e.request.mode==='navigate'){try{const r=await fetch(e.request);if(r.ok)await c.put(e.request,r.clone());return r;}catch{return await c.match(e.request)||await c.match('./index.html');}}const cached=await c.match(e.request);if(cached)return cached;const r=await fetch(e.request);if(r.ok)await c.put(e.request,r.clone());return r;})());});
