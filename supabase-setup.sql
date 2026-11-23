@@ -6,7 +6,7 @@ create table if not exists public.game_saves (
  updated_at timestamptz not null default now()
 );
 alter table public.game_saves enable row level security;
-revoke all on public.game_saves from anon;
+revoke all on public.game_saves from public, anon, authenticated;
 grant select, insert, update, delete on public.game_saves to authenticated;
 drop policy if exists own_saves on public.game_saves;
 create policy own_saves on public.game_saves for all to authenticated
