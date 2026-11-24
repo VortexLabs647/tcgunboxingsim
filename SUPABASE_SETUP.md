@@ -4,7 +4,7 @@ The game is prepared for Supabase. It does not include a preconfigured backend. 
 
 ## 1. Create your project
 
-Go to https://supabase.com/dashboard and create a project. Store your database password privately. Under Authentication, enable the Email provider and keep email confirmation enabled. Set the minimum password length to 12 characters to match the game.
+Go to https://supabase.com/dashboard and create a project. Store your database password privately. Under Authentication, enable the Email provider and keep email confirmation enabled. Set the minimum password length to 6 characters to match the game.
 
 ## 2. Set the website URLs
 
