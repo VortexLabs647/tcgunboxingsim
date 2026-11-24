@@ -33,8 +33,44 @@ function packPool(p){return E.pools(catalog,p,mode);}
 function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" style="--foil:${p.color};--foil-alt:${c.color}"><div class="pack-seal top"><i></i></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div><div class="pack-seal bottom"><i></i></div></div>`;}
 function packRipArt(p){return `<div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(p)}</div><div class="seal-track" aria-hidden="true"><i class="seal-trail"></i><span class="seal-spark">${icon('star')}${Array.from({length:6},(_,i)=>`<i style="--sx:${[-12,8,-7,11,-15,5][i]}px;--sy:${[-9,-12,12,8,3,-4][i]}px;--delay:${-i*.09}s"></i>`).join('')}</span></div></div>`;}
 
-function packsView(){const c=E.categories[selectedCategory],p=selectedPack();return `<div class="pack-room" style="--foil:${p.color}">${moneyDecor()}${packRoomHeading()}${categories(selectedCategory,'category')}<section class="carousel-shell" style="--foil:${p.color}" aria-label="Choose a pack edition"><div class="pack-carousel" id="packCarousel" tabindex="0" aria-label="Scrollable pack selector">${packs.filter(p=>p.category===selectedCategory).map(p=>`<button class="pack-choice ${p.index===selectedIndex?'selected':''}" style="--foil:${p.color}" data-action="choose-pack" data-id="${p.index}" aria-pressed="${p.index===selectedIndex}" aria-label="${c.name} ${p.name}, ${money(p.price)}">${packArt(p)}<span class="pack-cost"><b>${p.name}</b><strong>${money(p.price,true)}</strong></span></button>`).join('')}</div><div class="carousel-controls"><button data-action="previous-pack" aria-label="Previous pack">Previous</button><input type="range" id="packRange" aria-label="Selected pack" min="0" max="8" value="${selectedIndex}"><button data-action="next-pack" aria-label="Next pack">Next</button></div></section><section class="pack-panel" id="packPanel">${packPanel()}</section><details class="contents-details"><summary>What’s inside <span>View cards & rarities</span></summary><div class="section-heading"><h2>THE ${c.name.toUpperCase()} COLLECTION</h2><button class="text-link" data-action="view-category">View collection</button></div><div id="insideLineup"></div></details>${collectionSpotlight()}</div>`;}
-function packPanel(){const p=selectedPack(),groups=packPool(p),top=groups[5].at(-1),chances=E.odds(catalog,p,mode),possible=groups.filter((_,t)=>chances[t]>0).flat(),cost=p.price*quantity;return `<div class="selected-title"><h2>${E.categories[p.category].packLabel||E.categories[p.category].name} ${p.name} Pack</h2><span>ORIGINAL COLLECTIBLES</span></div><div class="pack-facts"><div><small>Min pull</small><strong>${money(Math.min(...possible.map(E.value)),true)}</strong></div><div><small>Top chase</small><strong class="chase-value">${money(E.value(top),true)}</strong></div><div><small>Per pack</small><strong>${money(p.price,true)}</strong></div></div><div class="buy-settings"><select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n>1?'s':''}</option>`).join('')}</select><div class="mode-tabs" role="group" aria-label="Rarity odds">${Object.keys(E.modes).map(k=>`<button data-action="mode" data-id="${k}" class="${mode===k?'active':''}" aria-pressed="${mode===k}">${k}</button>`).join('')}</div></div><button class="primary open-pack-button" data-action="${state.balance>=cost?'open':'wallet'}">${state.balance>=cost?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add funds · '+money(cost)} ${icon(state.balance>=cost?'bolt':'wallet')}</button>${simpleOdds(p,groups,chances)}`;}
+function packsView(){
+ const category=E.categories[selectedCategory],selected=selectedPack();
+ const editions=packs.filter(pack=>pack.category===selectedCategory);
+ return `<div class="pack-room" style="--foil:${selected.color}">
+   <header class="pack-room-heading"><h1>Open Packs</h1></header>
+   ${categories(selectedCategory,'category')}
+   <section class="carousel-shell" aria-label="Choose a pack edition">
+     <div class="pack-carousel" id="packCarousel" tabindex="0" aria-label="Scrollable pack selector">
+       ${editions.map(pack=>`<button class="pack-choice ${pack.index===selectedIndex?'selected':''}" style="--foil:${pack.color}" data-action="choose-pack" data-id="${pack.index}" aria-pressed="${pack.index===selectedIndex}" aria-label="${category.name} ${pack.name}, ${money(pack.price)}">
+         ${packArt(pack)}<span class="pack-cost"><b>${pack.name}</b><strong>${money(pack.price,true)}</strong></span>
+       </button>`).join('')}
+     </div>
+     <div class="carousel-controls">
+       <button data-action="previous-pack" aria-label="Previous pack">Previous</button>
+       <select id="packSelect" aria-label="Browse pack editions">${editions.map(pack=>`<option value="${pack.index}" ${pack.index===selectedIndex?'selected':''}>${pack.name} · ${money(pack.price,true)}</option>`).join('')}</select>
+       <button data-action="next-pack" aria-label="Next pack">Next</button>
+     </div>
+   </section>
+   <section class="pack-panel" id="packPanel" aria-label="Selected pack">${packPanel()}</section>
+   <details class="contents-details"><summary>What’s inside <span>View cards & rarities</span></summary><div class="section-heading"><h2>${category.name} collection</h2><button class="text-link" data-action="view-category">View collection</button></div><div id="insideLineup"></div></details>
+   ${collectionSpotlight()}
+ </div>`;
+}
+function packPanel(){
+ const pack=selectedPack(),groups=packPool(pack),chances=E.odds(catalog,pack,mode);
+ const possible=groups.filter((_,tier)=>chances[tier]>0).flat();
+ const values=possible.map(E.value),cost=pack.price*quantity,canOpen=state.balance>=cost;
+ return `<div class="selected-title"><h2>${E.categories[pack.category].name} ${pack.name} Pack</h2><span class="selected-price">${money(pack.price,true)}<small> per pack</small></span></div>
+   <div class="pack-facts">
+     <div><small>Minimum pull</small><strong>${money(Math.min(...values),true)}</strong></div>
+     <div><small>Top chase</small><strong class="chase-value">${money(Math.max(...values),true)}</strong></div>
+   </div>
+   <div class="pack-modes"><span id="packModeLabel">Odds mode</span><div class="mode-tabs" role="group" aria-labelledby="packModeLabel">${Object.keys(E.modes).map(k=>`<button data-action="mode" data-id="${k}" class="${mode===k?'active':''}" aria-pressed="${mode===k}">${k}</button>`).join('')}</div></div>
+   ${simpleOdds(pack,groups,chances)}
+   <div class="buy-settings"><select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n>1?'s':''}</option>`).join('')}</select>
+     <button class="primary open-pack-button" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
+   </div>`;
+}
 function scrollToPack(rail, choice, smooth = false) {
   // Use layout coordinates so the pack's visual scale does not shift its snap point.
   const left = choice.offsetLeft - (rail.clientWidth - choice.offsetWidth) / 2;
@@ -126,8 +162,7 @@ function selectPack(index, scroll = true) {
     choice.classList.toggle('selected', i === selectedIndex);
     choice.setAttribute('aria-pressed', String(i === selectedIndex));
   });
-  $('#packRange').value = selectedIndex;
-  $('.carousel-shell').style.setProperty('--foil', pack.color);
+  $('#packSelect').value = selectedIndex;
   $('.pack-room').style.setProperty('--foil', pack.color);
   updatePackPanel();
   refreshLineup();
@@ -220,12 +255,12 @@ case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Ent
 case 'delete-start':profileSections.add('delete');confirmAction='delete';render();$('.delete-details').scrollIntoView({block:'nearest'});break;
 case 'delete-confirm':{const claimed=state.referralClaimed;state=E.defaults();state.referralClaimed=claimed;selectedCategory='creatures';selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
 }});
-document.addEventListener('input',e=>{if(e.target.id==='packRange')selectPack(e.target.value);if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;limit=30;searchRender(e.target.id);}});
-document.addEventListener('change',e=>{if(e.target.id==='packQuantity'){quantity=Number(e.target.value);updatePackPanel();}if(e.target.id==='sort'){sort=e.target.value;render();}});
+document.addEventListener('input',e=>{if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;limit=30;searchRender(e.target.id);}});
+document.addEventListener('change',e=>{if(e.target.id==='packSelect')selectPack(e.target.value);if(e.target.id==='packQuantity'){quantity=Number(e.target.value);updatePackPanel();}if(e.target.id==='sort'){sort=e.target.value;render();}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();if(e.key==='Enter'&&e.target.id==='depositAmount')deposit();if(e.key==='Enter'&&e.target.id==='referralCode')redeemCode();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','wallet','leaderboard'].includes(target)){filter='all';go(target);}});
 window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=46');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs(catalog);try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;if(state.referralClaimed)localStorage.setItem(REFERRAL_KEY,'1');}catch{}state.settings={sound:true,haptics:true};selectedCategory=E.categories[state.preferences.category]?state.preferences.category:'creatures';selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','wallet','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&location.protocol==='https:'&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=47');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs(catalog);try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;if(state.referralClaimed)localStorage.setItem(REFERRAL_KEY,'1');}catch{}state.settings={sound:true,haptics:true};selectedCategory=E.categories[state.preferences.category]?state.preferences.category:'creatures';selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','wallet','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&location.protocol==='https:'&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 init();
 function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===8;}
 function updatePackPanel(){const open=$('.odds-details')?.open;$('#packPanel').innerHTML=packPanel();if(open)$('.odds-details').open=true;}
@@ -244,7 +279,7 @@ function refreshLineup(){const root=$('#insideLineup');if(root)root.innerHTML=$(
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;
  const row = Math.floor(item.artIndex / 4);
- const artwork = item.category === 'sneakers' ? item.image : item.image + '?v=46';
+ const artwork = item.image + '?v=46';
  return `<span class="original-card cartoon-card card--${item.category} ${extra}" data-finish="${escape(item.finish)}" role="img" aria-label="${escape(item.name+' · '+item.detail)}" style="--card-color:${E.rarityColors[item.tier]};--art:url('${escape(artwork)}');--art-x:${column*100/3}%;--art-y:${row*100/3}%">
    <span class="cartoon-card-head"><b>${escape(E.categories[item.category].name)}</b><i aria-hidden="true">✦</i></span>
    <span class="cartoon-card-art"></span>
@@ -261,8 +296,6 @@ function leaderboardView(){return `${heading('THE COLLECTOR RANKINGS','THE <em>L
 function leaderboardContent(){if(leaderboardError)return `<div class="content-card"><p>${escape(leaderboardError)}</p><button class="secondary" data-action="leaderboard-refresh">Try again</button></div>`;if(!leaderboardRows)return '<p class="rank-loading">Loading rankings…</p>';return `<div class="rank-columns">${[['opened','PACKS OPENED','packs_opened'],['spent','VIRTUAL MONEY SPENT','spent_cents']].map(([key,title,field])=>`<section class="content-card rank-board"><h2>${title}</h2>${leaderboardRows[key].length?`<table class="rank-table"><thead><tr><th>Rank</th><th>Collector</th><th>${key==='opened'?'Packs':'Virtual spent'}</th></tr></thead><tbody>${leaderboardRows[key].map((r,n)=>`<tr><td><span class="rank-place rank-${n+1}">${n+1}</span></td><td>${escape(r.display_name)}</td><td>${key==='spent'?money(Number(r[field])):Number(r[field]).toLocaleString('en-US')}</td></tr>`).join('')}</tbody></table>`:'<p class="rank-empty">No ranked collectors yet. Join to start the board.</p>'}</section>`).join('')}</div>`;}
 async function loadLeaderboard(force=false){if(leaderboardLoading||(!force&&Date.now()-leaderboardLoaded<15000))return;leaderboardLoading=true;leaderboardError='';const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const cfg=window.TCG_CLOUD_CONFIG;if(!window.TCGCloud?.configured)throw Error('Rankings are not connected yet.');const query='select=entry_id,display_name,packs_opened,spent_cents&limit=50&order=';const fetchBoard=async order=>{const r=await fetch(cfg.url+'/rest/v1/leaderboard_entries?'+query+order,{headers:{apikey:cfg.publishableKey},signal:controller.signal});if(!r.ok)throw Error('Rankings could not load. Please try again.');const rows=await r.json();if(!Array.isArray(rows))throw Error('Rankings could not load.');return rows;};const [opened,spent]=await Promise.all([fetchBoard('packs_opened.desc,spent_cents.desc,entry_id.asc'),fetchBoard('spent_cents.desc,packs_opened.desc,entry_id.asc')]);leaderboardRows={opened,spent};leaderboardLoaded=Date.now();}catch(e){leaderboardError=e.name==='AbortError'?'Rankings took too long to load. Please try again.':e.message;}finally{clearTimeout(timeout);leaderboardLoading=false;const target=$('#leaderboardTables');if(target)target.innerHTML=leaderboardContent();}}
 
-function moneyDecor(){return '<div class="lounge-lights" aria-hidden="true"><i></i><i></i><i></i></div>';}
-function packRoomHeading(){const featured=catalog.filter(i=>i.category===selectedCategory&&i.series&&i.id.includes('-expansion-')&&i.finish==='Gold Foil').slice(0,3);return `<div class="room-heading"><div class="room-title"><span class="room-kicker">THE COLLECTOR’S LOUNGE</span><h1>THE PACK <em>ROOM.</em></h1></div><div class="room-showcase" aria-hidden="true"><div class="showcase-orbit"></div>${featured.map((item,n)=>`<div class="showcase-card showcase-card-${n}">${cardImage(item)}</div>`).join('')}<div class="luxe-chip"><i></i><b>✦</b></div><div class="luxe-chip chip-back"><i></i><b>✦</b></div></div></div>`;}
 document.addEventListener('toggle',event=>{const id=event.target.dataset?.profileSection;if(id){if(event.target.open)profileSections.add(id);else profileSections.delete(id);}},true);
 window.addEventListener('pagehide',()=>{clearAnimation();stopWinMusic();});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){stopEffects();stopWinMusic();}});

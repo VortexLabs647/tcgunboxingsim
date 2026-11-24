@@ -1,6 +1,6 @@
 (function(root){
 'use strict';
-const categories={creatures:{name:'Creatures',packLabel:'CREATURES',icon:'creatures',color:'#bd89ff',prices:[100,200,500,1000,1500,2500,5000,7500,10000]},football:{name:'Football',icon:'football',color:'#55decb',prices:[100,200,500,1000,1500,2500,5000,7500,10000]},basketball:{name:'Basketball',icon:'basketball',color:'#ff9973',prices:[100,200,500,1000,1500,2500,5000,7500,10000]},sneakers:{name:'Sneakers',icon:'sneakers',color:'#70c4ff',prices:[100,200,500,1000,1500,2500,5000,7500,10000]}};
+const categories={creatures:{name:'Creatures',packLabel:'CREATURES',icon:'creatures',color:'#bd89ff',prices:[100,200,500,1000,1500,2500,5000,7500,10000]},football:{name:'Football',icon:'football',color:'#55decb',prices:[100,200,500,1000,1500,2500,5000,7500,10000]},basketball:{name:'Basketball',icon:'basketball',color:'#ff9973',prices:[100,200,500,1000,1500,2500,5000,7500,10000]}};
 const names=['Opal','Sapphire','Amethyst','Emerald','Ruby','Gold','Obsidian','Diamond','Sovereign'];
 const foilColors=['#fa3d7d','#3e8bff','#b052ff','#24dfad','#ff4c3d','#ffbf20','#5f63ff','#37d9ff','#ffb54a'];
 const rarityNames=['Common','Uncommon','Rare','Epic','Legendary','Grail'];
@@ -55,11 +55,56 @@ function redeemReferral(state,code){if(String(code).trim().toLowerCase()!=='ccco
 function canDeposit(state){return Number.isSafeInteger(state.balance)&&state.balance>=0&&state.balance<refillThreshold;}
 function deposit(state,raw){const amount=depositAmount(raw);if(!amount||!canDeposit(state))return 0;state.balance+=amount;state.deposited+=amount;return amount;}
 function defaults(){return {version:4,balance:0,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'creatures',packIndex:0}};}
-const legacyCategories={pokemon:'creatures',creatures:'creatures',wilds:'creatures',cosmic:'basketball',mechs:'football',relics:'sneakers',sneakers:'sneakers',football:'football',basketball:'basketball'};
+const legacyCategories={pokemon:'creatures',creatures:'creatures',wilds:'creatures',cosmic:'basketball',mechs:'football',football:'football',basketball:'basketball'};
 function resolveCategory(category){return categories[category]?category:legacyCategories[category]||'creatures';}
-function legacyItem(id,catalog,valueHint=0){const exact=catalog.find(i=>i.id===id);if(exact)return exact;const match=/^(pokemon|creatures|sneakers|football|basketball|wilds|cosmic|mechs|relics)-(\d+)$/.exec(id);if(!match)return null;const list=catalog.filter(i=>i.category===legacyCategories[match[1]]);if(!list.length)return null;if(valueHint>0)return list.reduce((best,i)=>Math.abs(value(i)-valueHint)<Math.abs(value(best)-valueHint)?i:best,list[0]);return list[(Number(match[2])-1)%list.length]||null;}
-function migrate(old,catalog){const s={...defaults(),...old,version:4,settings:{sound:true,haptics:true},preferences:{...defaults().preferences,...old.preferences}};s.preferences.category=resolveCategory(s.preferences.category);if(old.version===1){s.balance=Math.max(0,old.balance-100000);if(s.name==='Collector')s.name='';}s.vault=(s.vault||[]).flatMap(v=>{const item=legacyItem(v.itemId,catalog,v.value);if(!item)return [];return [{...v,itemId:item.id,value:v.value>0?v.value:value(item)}];});s.discovered=[...new Set((s.discovered||[]).map(id=>legacyItem(id,catalog)?.id).filter(Boolean))];s.best=Math.max(s.best||0,...s.vault.map(v=>v.value),0);s.history=[];return s;}
-function validSave(s,catalog){return s&&[1,2,3,4].includes(s.version)&&Number.isSafeInteger(s.balance)&&s.balance>=0&&s.balance<=1e14&&Array.isArray(s.vault)&&s.vault.length<50000&&s.vault.every(v=>typeof v.uid==='string'&&legacyItem(v.itemId,catalog,v.value)&&Number.isSafeInteger(v.value)&&v.value>=0&&v.value<=1e12&&Number.isInteger(v.tier)&&v.tier>=0&&v.tier<6)&&new Set(s.vault.map(v=>v.uid)).size===s.vault.length&&['opened','spent','sold','best','deposited'].every(k=>Number.isSafeInteger(s[k])&&s[k]>=0)&&Array.isArray(s.discovered)&&s.discovered.every(id=>legacyItem(id,catalog))&&typeof s.name==='string'&&s.name.length<=24&&Array.isArray(s.history)&&s.history.length<=150&&s.history.every(h=>typeof h.label==='string'&&Number.isSafeInteger(h.amount)&&!isNaN(Date.parse(h.date)));}
+function isRetiredCard(id){
+ return /^(?:sneakers-(?:expansion-)?|relics-)\d+$/.test(id);
+}
+function legacyItem(id,catalog,valueHint=0,tierHint){
+ const exact=catalog.find(item=>item.id===id);
+ if(exact)return exact;
+ if(isRetiredCard(id)){
+  // The expansion sets have matching editions, tiers, and values.
+  const counterpart=catalog.find(item=>item.id===id.replace(/^sneakers-expansion-/, 'creatures-expansion-'));
+  if(counterpart&&(!valueHint||tierHint===counterpart.tier))return counterpart;
+  const creatures=catalog.filter(item=>item.category==='creatures');
+  const sameTier=creatures.filter(item=>item.tier===tierHint);
+  const candidates=sameTier.length?sameTier:creatures;
+  if(valueHint>0)return candidates.reduce((best,item)=>!best||Math.abs(value(item)-valueHint)<Math.abs(value(best)-valueHint)?item:best,null);
+  const number=Number(id.split('-').at(-1));
+  return candidates[(number-1)%candidates.length]||null;
+ }
+ const match=/^(pokemon|creatures|football|basketball|wilds|cosmic|mechs)-(\d+)$/.exec(id);
+ if(!match)return null;
+ const list=catalog.filter(item=>item.category===legacyCategories[match[1]]);
+ if(!list.length)return null;
+ if(valueHint>0)return list.reduce((best,item)=>Math.abs(value(item)-valueHint)<Math.abs(value(best)-valueHint)?item:best,list[0]);
+ return list[(Number(match[2])-1)%list.length]||null;
+}
+function migrate(old,catalog){
+ const s={...defaults(),...old,version:4,settings:{sound:true,haptics:true},preferences:{...defaults().preferences,...old.preferences}};
+ const retiredPacks=/^(sneakers|relics)$/.test(s.preferences.category);
+ s.preferences.category=resolveCategory(s.preferences.category);
+ if(retiredPacks)s.preferences.packIndex=0;
+ if(old.version===1){s.balance=Math.max(0,old.balance-100000);if(s.name==='Collector')s.name='';}
+ const retiredDiscoveries=new Map();
+ s.vault=(s.vault||[]).flatMap(v=>{
+  const item=legacyItem(v.itemId,catalog,v.value,v.tier);
+  if(!item)return [];
+  const entry={...v,itemId:item.id,value:v.value>0?v.value:value(item)};
+  if(isRetiredCard(v.itemId)){
+   entry.originalItemId=v.itemId;
+   if(!retiredDiscoveries.has(v.itemId))retiredDiscoveries.set(v.itemId,new Set());
+   retiredDiscoveries.get(v.itemId).add(item.id);
+  }
+  return [entry];
+ });
+ s.discovered=[...new Set((s.discovered||[]).flatMap(id=>[...(retiredDiscoveries.get(id)||[legacyItem(id,catalog)?.id])]).filter(Boolean))];
+ s.best=Math.max(s.best||0,...s.vault.map(v=>v.value),0);
+ s.history=[];
+ return s;
+}
+function validSave(s,catalog){return s&&[1,2,3,4].includes(s.version)&&Number.isSafeInteger(s.balance)&&s.balance>=0&&s.balance<=1e14&&Array.isArray(s.vault)&&s.vault.length<50000&&s.vault.every(v=>typeof v.uid==='string'&&legacyItem(v.itemId,catalog,v.value,v.tier)&&Number.isSafeInteger(v.value)&&v.value>=0&&v.value<=1e12&&Number.isInteger(v.tier)&&v.tier>=0&&v.tier<6)&&new Set(s.vault.map(v=>v.uid)).size===s.vault.length&&['opened','spent','sold','best','deposited'].every(k=>Number.isSafeInteger(s[k])&&s[k]>=0)&&Array.isArray(s.discovered)&&s.discovered.every(id=>legacyItem(id,catalog))&&typeof s.name==='string'&&s.name.length<=24&&Array.isArray(s.history)&&s.history.length<=150&&s.history.every(h=>typeof h.label==='string'&&Number.isSafeInteger(h.amount)&&!isNaN(Date.parse(h.date)));}
 const wildChance=.1;
 function wildPull(catalog,pack,mode,rng){const pool=pools(catalog,pack,'Normal')[5].filter(i=>mode!=='Ultra'||value(i)<=pack.price*20);if(!pool.length)throw Error('No Grail cards available for Wild');const weights=itemWeights(pool);let pick=rng(),index=pool.length-1;for(let i=0;i<weights.length;i++){pick-=weights[i];if(pick<0){index=i;break;}}const item=pool[index];return {uid:uuid(),itemId:item.id,value:value(item),tier:5,packId:pack.id,mode,date:new Date().toISOString(),locked:false,wild:true};}
 function purchase(state,catalog,pack,mode,quantity,rng=random){if(![1,3,5].includes(quantity))throw Error('Invalid quantity');const cost=pack.price*quantity;if(state.balance<cost)return null;const wild=mode!=='Gamble'&&rng()<wildChance,pulls=Array.from({length:quantity},()=>wild?wildPull(catalog,pack,mode,rng):sample(catalog,pack,mode,rng));state.balance-=cost;state.spent+=cost;state.opened+=quantity;for(const p of pulls){state.vault.unshift(p);if(!state.discovered.includes(p.itemId))state.discovered.push(p.itemId);state.best=Math.max(state.best,p.value);}return {pulls,pack,mode,quantity,cost,sold:false,wild};}
