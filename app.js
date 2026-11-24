@@ -9,7 +9,7 @@ const KEY='tcg-unboxing-sim-v2';
 let leaderboardLoaded=0,leaderboardLoading=false,leaderboardRows=null,leaderboardError='';
 let effectsBus=null,effectSources=new Set(),effectsUntil=0,winSources=new Set(),winStopTimer=null;
 const profileSections=new Set();
-let carouselProgrammaticUntil=0;
+const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,balanceFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
 const SEAL_SWEEP_MS=1800,SPIN_MS=2400;
 const REFERRAL_KEY='tcg-cccollectables-claimed';
@@ -45,10 +45,11 @@ function packsView(){
          ${packArt(pack)}<span class="pack-cost"><b>${pack.name}</b><strong>${money(pack.price,true)}</strong></span>
        </button>`).join('')}
      </div>
+     <div class="pack-pagination" aria-hidden="true">${editions.map(pack=>`<span class="${pack.index===selectedIndex?'active':''}"></span>`).join('')}</div>
      <div class="carousel-controls">
-       <button data-action="previous-pack" aria-label="Previous pack">Previous</button>
+       <button data-action="previous-pack" aria-label="Previous pack">${icon('chevron')}<span>Previous</span></button>
        <select id="packSelect" aria-label="Browse pack editions">${editions.map(pack=>`<option value="${pack.index}" ${pack.index===selectedIndex?'selected':''}>${pack.name} · ${money(pack.price,true)}</option>`).join('')}</select>
-       <button data-action="next-pack" aria-label="Next pack">Next</button>
+       <button data-action="next-pack" aria-label="Next pack"><span>Next</span>${icon('chevron')}</button>
      </div>
    </section>
    <section class="pack-panel" id="packPanel" aria-label="Selected pack">${packPanel()}</section>
@@ -74,9 +75,8 @@ function packPanel(){
 function scrollToPack(rail, choice, smooth = false) {
   // Use layout coordinates so the pack's visual scale does not shift its snap point.
   const left = choice.offsetLeft - (rail.clientWidth - choice.offsetWidth) / 2;
-  const fullWidthSlide = Math.abs(rail.clientWidth - choice.offsetWidth) <= 1;
-  const animate = smooth && !fullWidthSlide && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  carouselProgrammaticUntil = performance.now() + (animate ? 700 : 250);
+  const animate = smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  programmaticPackScroll.add(rail);
   rail.scrollTo({ left, behavior: animate ? 'smooth' : 'instant' });
 }
 
@@ -89,9 +89,9 @@ function bindCarousel() {
 
   let drag = null;
   let dragged = false;
-  rail.addEventListener('wheel', () => { carouselProgrammaticUntil = 0; }, { passive: true });
+  rail.addEventListener('wheel', () => programmaticPackScroll.delete(rail), { passive: true });
   rail.addEventListener('pointerdown', event => {
-    carouselProgrammaticUntil = 0;
+    programmaticPackScroll.delete(rail);
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
     drag = { x: event.clientX, left: rail.scrollLeft };
     dragged = false;
@@ -120,26 +120,30 @@ function bindCarousel() {
       dragged = false;
     }
   }, true);
-  rail.addEventListener('scroll', () => {
-    if (performance.now() < carouselProgrammaticUntil) return;
-    clearTimeout(carouselTimer);
-    carouselTimer = setTimeout(() => {
-      if (view !== 'packs' || !rail.isConnected || drag || performance.now() < carouselProgrammaticUntil) return;
-      const middle = rail.scrollLeft + rail.clientWidth / 2;
-      let closest = 0;
-      let best = Infinity;
-      choices.forEach((choice, index) => {
-        const distance = Math.abs(choice.offsetLeft + choice.offsetWidth / 2 - middle);
-        if (distance < best) {
-          best = distance;
-          closest = index;
-        }
-      });
-      if (rail.scrollLeft <= 1) closest = 0;
-      else if (rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1) closest = choices.length - 1;
-      if (closest !== selectedIndex) selectPack(closest, false);
-    }, 180);
-  });
+  const settleSelection = () => {
+    if (view !== 'packs' || !rail.isConnected || drag || programmaticPackScroll.has(rail)) return;
+    const middle = rail.scrollLeft + rail.clientWidth / 2;
+    let closest = 0;
+    let best = Infinity;
+    choices.forEach((choice, index) => {
+      const distance = Math.abs(choice.offsetLeft + choice.offsetWidth / 2 - middle);
+      if (distance < best) {
+        best = distance;
+        closest = index;
+      }
+    });
+    if (rail.scrollLeft <= 1) closest = 0;
+    else if (rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1) closest = choices.length - 1;
+    if (closest !== selectedIndex) selectPack(closest, false);
+  };
+  if ('onscrollend' in rail) {
+    rail.addEventListener('scrollend', settleSelection);
+  } else {
+    rail.addEventListener('scroll', () => {
+      clearTimeout(carouselTimer);
+      carouselTimer = setTimeout(settleSelection, 160);
+    }, { passive: true });
+  }
   rail.addEventListener('keydown', event => {
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault();
@@ -162,6 +166,7 @@ function selectPack(index, scroll = true) {
     choice.classList.toggle('selected', i === selectedIndex);
     choice.setAttribute('aria-pressed', String(i === selectedIndex));
   });
+  $$('.pack-pagination span').forEach((dot, i) => dot.classList.toggle('active', i === selectedIndex));
   $('#packSelect').value = selectedIndex;
   $('.pack-room').style.setProperty('--foil', pack.color);
   updatePackPanel();
