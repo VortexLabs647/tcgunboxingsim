@@ -606,19 +606,74 @@ body[data-view="packs"]::before { background: none; }
   .pack-room .pack-choice .foil { --pack-height: clamp(161px, 25svh, 207px); }
 }
 
+.pack-pagination,
+.pack-room .carousel-controls button .icon { display: none; }
+
 @media (max-width: 650px), (max-width: 900px) and (hover: none) and (pointer: coarse) {
   .pack-room { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .pack-room .carousel-shell,
   .pack-room .pack-panel { grid-column: 1; }
   .pack-room > .category-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .pack-room .pack-carousel {
-    height: clamp(211px, 30svh, 262px);
-    min-height: 0;
-    padding-inline: 0;
-    gap: 0;
+  .pack-room .carousel-shell {
+    container-type: inline-size;
+    background: radial-gradient(ellipse at 50% 43%, #542ba5 0%, #302067 48%, #1c1438 88%);
   }
-  .pack-room .pack-choice { flex-basis: 100%; opacity: 1; gap: 10px; }
-  .pack-room .pack-choice .foil { --pack-height: clamp(150px, 22svh, 192px); }
+  .pack-room .pack-carousel {
+    --slide-width: min(73cqw, 320px);
+    --mobile-pack-height: min(88cqw, 370px, max(206px, 54svh));
+    height: calc(var(--mobile-pack-height) + 56px);
+    min-height: 0;
+    padding: 9px calc((100cqw - var(--slide-width)) / 2) 5px;
+    gap: 7px;
+  }
+  .pack-room .pack-choice {
+    flex-basis: var(--slide-width);
+    gap: 9px;
+    opacity: .77;
+    scroll-snap-align: center;
+  }
+  .pack-room .pack-choice.selected {
+    flex-basis: var(--slide-width);
+    opacity: 1;
+  }
+  .pack-room .pack-choice .foil { --pack-height: var(--mobile-pack-height); }
+  .pack-room .pack-choice.selected .foil {
+    filter: drop-shadow(0 0 13px color-mix(in srgb, var(--foil) 44%, transparent));
+  }
+  .pack-room .pack-pagination {
+    display: flex;
+    min-height: 14px;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 7px;
+  }
+  .pack-room .pack-pagination span {
+    width: 6px;
+    height: 6px;
+    border-radius: 4px;
+    background: #8065ad;
+  }
+  .pack-room .pack-pagination span.active {
+    width: 17px;
+    background: #e6c9ff;
+  }
+  .pack-room .carousel-controls {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    max-width: 360px;
+  }
+  .pack-room .carousel-controls button {
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+  .pack-room .carousel-controls button span { display: none; }
+  .pack-room .carousel-controls button .icon {
+    display: block;
+    width: 19px;
+    height: 19px;
+  }
+  .pack-room .carousel-controls button[data-action="previous-pack"] .icon { transform: rotate(180deg); }
   .pack-room .pack-panel { padding: 14px; }
   .pack-room .carousel-controls select,
   .pack-room .buy-settings select { font-size: 1rem; }
