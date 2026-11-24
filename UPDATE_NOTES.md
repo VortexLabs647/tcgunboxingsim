@@ -19,3 +19,11 @@ For a new Supabase project, run supabase-setup.sql, then leaderboard-setup.sql. 
 - Fixed mobile mode button spacing, long collectible names, price labels, collection descriptions, Profile controls and wrapped footer text. Checked 320px, 390px and 768px layouts in the browser with no horizontal page overflow or clipped pack controls.
 - Added 320 collectibles: 80 each for Creatures, Sneakers, Football and Basketball. Four new collections include 64 new original illustrations and five finishes each. Total catalog: 771. Existing card IDs and saved vault values are preserved.
 - Updated offline cache and Android 1.2.1 (version code 4) with the same expanded catalog and artwork.
+
+
+## Casino Royale theme (v41)
+- Replaced the purple/black palette throughout the game with emerald felt, champagne gold and ruby lacquer.
+- Added marquee lighting, layered gold rails, a felt pack table and illuminated pack stands.
+- Restyled the navigation, opening controls, vault, collection, wallet, Profile, rankings and reveal screens in the same palette.
+- Retained the responsive layout, current collectibles, pack prices and odds.
+- Updated the offline cache and Android 1.2.2 (version code 5).
