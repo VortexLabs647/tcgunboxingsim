@@ -67,10 +67,10 @@ function packPanel(){
      <div><small>Top chase</small><strong class="chase-value">${money(Math.max(...values),true)}</strong></div>
    </div>
    <div class="pack-modes"><span id="packModeLabel">Odds mode</span><div class="mode-tabs" role="group" aria-labelledby="packModeLabel">${Object.keys(E.modes).map(k=>`<button data-action="mode" data-id="${k}" class="${mode===k?'active':''}" aria-pressed="${mode===k}">${k}</button>`).join('')}</div></div>
-   ${simpleOdds(pack,groups,chances)}
    <div class="buy-settings"><select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n>1?'s':''}</option>`).join('')}</select>
      <button class="primary open-pack-button" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
-   </div>`;
+   </div>
+   ${simpleOdds(pack,groups,chances)}`;
 }
 function scrollToPack(rail, choice, smooth = false) {
   // Use layout coordinates so the pack's visual scale does not shift its snap point.
