@@ -36,3 +36,9 @@ For a new Supabase project, run supabase-setup.sql, then leaderboard-setup.sql. 
 - Corrected automatic carousel scrolling so choosing the last pack preserves the intended selection.
 - Simplified View odds into rarity names and per-card percentages. Displayed overall percentages include the Wild roll; base odds and card values remain available under Values & detailed odds. Actual drawing probabilities are unchanged.
 - Updated Android 1.2.3 (version code 6) and the offline cache.
+
+
+## Preserve authored colors on mobile (v43)
+- Added an early color-scheme meta tag and explicit CSS opt-out from browser automatic darkening. The neon colors stay authored in CSS; this does not turn the game into a light background theme.
+- Explicitly disabled algorithmic and Force Dark rendering in the Android WebView.
+- Refreshed stylesheet cache URLs and Android 1.2.4 (version code 7). Existing progress is retained.
