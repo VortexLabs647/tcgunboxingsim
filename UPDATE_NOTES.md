@@ -11,3 +11,11 @@ For a new Supabase project, run supabase-setup.sql, then leaderboard-setup.sql. 
 - Keep collector name and sign-in visible; move stats, leaderboard, APK download, referral and about information into expandable sections.
 - Remove the category symbol medallion from pack artwork.
 - Android 1.2.0 includes the current game as a fallback for unavailable website HTTPS. It retains the same app ID, signing certificate and game storage origin, and has no address bar.
+
+
+## Pack lounge and collection expansion (v40)
+- Removed the About the game Profile section.
+- Replaced basic money ornaments with a card showcase, detailed casino chips, foil treatments, gold opening controls and a smoked-glass pack room.
+- Fixed mobile mode button spacing, long collectible names, price labels, collection descriptions, Profile controls and wrapped footer text. Checked 320px, 390px and 768px layouts in the browser with no horizontal page overflow or clipped pack controls.
+- Added 320 collectibles: 80 each for Creatures, Sneakers, Football and Basketball. Four new collections include 64 new original illustrations and five finishes each. Total catalog: 771. Existing card IDs and saved vault values are preserved.
+- Updated offline cache and Android 1.2.1 (version code 4) with the same expanded catalog and artwork.
