@@ -724,3 +724,202 @@ body[data-view="packs"]::before { background: none; }
   .pack-room .carousel-controls select,
   .pack-room .buy-settings select { font-size: 1rem; }
 }
+
+/* Midnight chrome and a softer spotlight keep the packs at the center of the room. */
+:root {
+  --chrome-panel: #171523;
+  --chrome-line: #d7c8ff2b;
+  --chrome-gold: #ffe9b2;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 85% 0%, #211333 0%, transparent 48%),
+    linear-gradient(168deg, #0e0d1b 8%, #17112b 65%, #100d20);
+}
+
+body::before { background: none; }
+.ambient { opacity: .55; }
+
+.topbar {
+  background: #0d0d19f5;
+  border-color: var(--chrome-line);
+  box-shadow: 0 8px 22px #05040d33;
+}
+
+.header-wallet {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: auto;
+  padding: 4px 4px 4px 13px;
+  border: 1px solid #9c81cc73;
+  border-radius: 15px;
+  background: linear-gradient(150deg, #29223b, #171522);
+  box-shadow: inset 0 1px #ffffff10;
+}
+
+.header-wallet .balance { margin: 0; }
+.header-wallet .balance small { margin: 0 0 1px; color: #dbd0e8; }
+.header-wallet .balance strong {
+  color: #fff6ef;
+  font-weight: 800;
+  text-shadow: none;
+}
+
+.header-wallet .deposit {
+  min-height: 35px;
+  padding: 5px 12px;
+  border: 1px solid #cba9ff91;
+  border-radius: 10px;
+  background: linear-gradient(155deg, #7242b8, #44276d);
+  color: #fff7ff;
+}
+
+.topbar .brand-sub { color: #ff9edf; }
+.topbar .nav-link.active {
+  background: #bd91ff1a;
+  box-shadow: inset 0 -2px #d194ff;
+  color: #fcf1ff;
+}
+
+.bottom-nav {
+  background: #0e0e1bee;
+  border-color: var(--chrome-line);
+  box-shadow: 0 -9px 30px #07061265;
+}
+
+.bottom-nav .nav-link { color: #c3b8d5; }
+
+.bottom-nav .nav-link.active {
+  background: #a780e91a;
+  border-radius: 9px;
+  box-shadow: inset 0 -2px #d49bff;
+  color: #eed8ff;
+}
+
+.pack-room > .category-tabs button {
+  border-color: var(--chrome-line);
+  background: #1c192b;
+}
+
+.pack-room > .category-tabs button.active {
+  border-color: #c3a0ffac;
+  background: #322041;
+}
+
+.pack-room .carousel-shell {
+  border-color: var(--chrome-line);
+  background:
+    radial-gradient(ellipse at 47% 48%, color-mix(in srgb, var(--foil) 22%, #322651), transparent 68%),
+    #12101f;
+  box-shadow: 0 14px 30px #06040d44;
+}
+
+.pack-room .pack-panel,
+.pack-room .contents-details,
+.pack-room .collection-teaser {
+  border-color: var(--chrome-line);
+  background: linear-gradient(148deg, #211933, var(--chrome-panel) 78%);
+}
+
+.pack-room .pack-facts > div {
+  border-color: var(--chrome-line);
+  background: #fff2;
+}
+
+.pack-room .pack-facts strong { font-variant-numeric: tabular-nums; }
+.pack-room .pack-facts .chase-value { color: var(--chrome-gold) !important; }
+
+.pack-room .carousel-controls button,
+.pack-room .carousel-controls select,
+.pack-room .buy-settings select {
+  background-color: #201a30;
+  border-color: var(--chrome-line);
+}
+
+.pack-room .buy-settings { margin-top: 12px; }
+
+.pack-room .buy-settings .open-pack-button {
+  min-height: 48px;
+  border: 1px solid #fff2da;
+  border-radius: 11px;
+  background: linear-gradient(108deg, #ffdbb4 0%, #fff2d3 43%, #edbde9 75%, #d8c5ff 100%);
+  box-shadow: inset 0 1px #fff9, 0 4px 16px #c78be43d;
+  color: #2b163b;
+  font-weight: 800;
+}
+
+.pack-room .buy-settings .open-pack-button:hover {
+  box-shadow: inset 0 1px #fffc, 0 5px 19px #dfabff67;
+}
+
+.pack-room .simple-odds { margin: 8px 0 0; }
+
+@media (max-width: 650px), (max-width: 900px) and (hover: none) and (pointer: coarse) {
+  .pack-room { gap: 8px; }
+
+  .pack-room .pack-room-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    padding: 0;
+  }
+
+  .topbar .brand { margin-right: 0; }
+  .header-wallet { gap: 7px; padding-left: 11px; }
+
+  .header-wallet .deposit {
+    width: 33px;
+    min-height: 33px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .pack-room > .category-tabs button {
+    min-height: 38px;
+    border-radius: 9px;
+  }
+
+  .pack-room .carousel-shell {
+    margin-inline: -10px;
+    border: 0;
+    border-radius: 0;
+    background: radial-gradient(ellipse at 50% 44%, color-mix(in srgb, var(--foil) 24%, #3b295d) 0%, #201638 49%, transparent 78%);
+    box-shadow: none;
+  }
+
+  .pack-room .pack-carousel {
+    --mobile-pack-height: min(84cqw, 370px, max(206px, 54svh));
+    height: calc(var(--mobile-pack-height) + 18px);
+  }
+
+  .pack-room .pack-choice .pack-cost { display: none; }
+  .pack-room .pack-pagination { margin-bottom: 4px; }
+  .pack-room .carousel-controls { padding-bottom: 2px; }
+  .pack-room .carousel-controls button,
+  .pack-room .carousel-controls select { min-height: 38px; }
+
+  .pack-room .pack-panel { padding: 13px 14px; }
+  .pack-room .selected-title { margin-bottom: 2px; }
+  .pack-room .selected-title h2 { margin: 0; }
+  .pack-room .selected-title .selected-price { display: none; }
+
+  .pack-room .pack-facts {
+    padding: 7px 0;
+    margin: 4px 0 5px;
+  }
+
+  .pack-room .pack-facts > div { padding: 5px 7px; }
+  .pack-room .pack-modes > span { margin-bottom: 4px; }
+  .pack-room .mode-tabs button { min-height: 36px; }
+  .pack-room .buy-settings { margin-top: 8px; }
+  .pack-room .simple-odds { margin-top: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pack-room .pack-choice { transition: none; }
+}
