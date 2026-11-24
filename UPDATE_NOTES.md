@@ -42,3 +42,6 @@ For a new Supabase project, run supabase-setup.sql, then leaderboard-setup.sql. 
 - Added an early color-scheme meta tag and explicit CSS opt-out from browser automatic darkening. The neon colors stay authored in CSS; this does not turn the game into a light background theme.
 - Explicitly disabled algorithmic and Force Dark rendering in the Android WebView.
 - Refreshed stylesheet cache URLs and Android 1.2.4 (version code 7). Existing progress is retained.
+
+## Stormstripe-inspired colors (v44)
+- Matched the reference palette with deeper violets, hot pink controls, brighter pack foil, cyan edges and vivid yellow accents. Grail reveals use an electric blue frame and gold rays.

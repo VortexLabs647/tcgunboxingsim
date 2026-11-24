@@ -66,3 +66,169 @@ main{max-width:1380px;padding-top:14px}.pack-room{display:grid;grid-template-col
 
 /* Keep the authored palette intact in browsers that auto-darken websites. */
 :root{color-scheme:only light}select option{background:#2e1c55;color:#fff4d6}
+
+/* The Stormstripe reference pairs ultraviolet shadows with bright foil edges. */
+:root {
+  --bg: #15072d;
+  --panel: #31095b;
+  --text: #fff9ff;
+  --muted: #ded0fb;
+  --gold: #fff255;
+  --neon-pink: #ff2cc8;
+  --neon-blue: #37daff;
+  --neon-violet: #ad53ff;
+  --neon-ink: #18072f;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 95% 19%, #c400bb69, transparent 47%),
+    radial-gradient(ellipse at 7% 42%, #3023c373, transparent 45%),
+    linear-gradient(155deg, #130724, #210942 58%, #140726);
+}
+
+.topbar, .bottom-nav {
+  background: linear-gradient(112deg, #240b46, #17072e 57%, #380d58);
+  border-color: #b947ec;
+}
+
+.brand-gem {
+  color: #fff;
+  background: linear-gradient(135deg, #ff76f1, #bc0e9b 48%, #6908a6);
+  filter: drop-shadow(0 0 8px #ff35c999);
+}
+
+.brand-sub { color: #ff8ae2; }
+.balance strong { color: #7ff7ff; }
+.topbar .nav-link.active, .bottom-nav .nav-link.active {
+  color: #fff5ff;
+  background: linear-gradient(135deg, #722090, #4a0a6c);
+  box-shadow: inset 0 0 0 1px #ff6cde, 0 0 13px #ff26ca66;
+}
+
+.room-heading {
+  background:
+    radial-gradient(ellipse at 90% 53%, #ff4edf9e, transparent 44%),
+    radial-gradient(ellipse at 72% 68%, #1b63dcbb, transparent 50%),
+    linear-gradient(112deg, #301366 4%, #561089 59%, #520b60);
+  border-color: #ff68df;
+  box-shadow: inset 0 0 0 3px #2b0e4b, inset 0 0 16px #ff73f250, 0 0 18px #d324dc49;
+}
+
+.room-heading:before { opacity: .95; }
+.room-heading h1 em {
+  color: var(--gold);
+  text-shadow: 0 2px #783784, 0 0 18px #ffe63466;
+}
+
+.room-showcase .cartoon-card {
+  border-color: var(--neon-blue);
+  box-shadow: inset 0 0 0 2px #ffe57185, 0 0 0 1px #0a37f1, 0 0 13px #27bfffcc;
+}
+
+.category-tabs button.active {
+  background: linear-gradient(135deg, #9c26cb, #651484);
+  border-color: #ff85e8;
+  color: #fff9ff;
+  box-shadow: inset 0 0 12px #f43cd958, 0 0 12px #ff35c651;
+}
+.category-tabs button.active .icon { color: #fff079; }
+
+.carousel-shell {
+  background:
+    radial-gradient(ellipse at 48% 46%, #482ac8 0%, transparent 73%),
+    linear-gradient(125deg, #4e0e8d, #271772 58%, #67127b);
+  border-color: #a86bff;
+  box-shadow: inset 0 0 0 3px #29104e, inset 0 0 20px #b34bff53, 0 0 16px #763aff52;
+}
+.carousel-shell:before {
+  background:
+    repeating-linear-gradient(0deg, #ffffff07 0 1px, transparent 1px 5px),
+    radial-gradient(ellipse at 50% 78%, #238cff61, transparent 70%);
+}
+.carousel-shell:after {
+  border-color: #6de5ff9c;
+  box-shadow: 0 0 10px #41d7fb80, inset 0 0 9px #459eff55;
+}
+.pack-choice { opacity: .96; }
+.foil-body {
+  background:
+    linear-gradient(112deg, transparent 14%, #ffffff36 25%, transparent 35% 65%, #ffffff26 77%, transparent 83%),
+    radial-gradient(ellipse at center, #261150 25%, transparent 79%),
+    linear-gradient(150deg, var(--foil), #260f54 36%, #1c1040 62%, var(--foil) 90%, var(--foil-alt));
+  border-inline-color: color-mix(in srgb, var(--foil) 52%, white);
+}
+.pack-choice .foil {
+  filter: drop-shadow(0 7px 8px #0c062d99)
+          drop-shadow(0 0 5px color-mix(in srgb, var(--foil) 55%, transparent));
+}
+.pack-choice.selected .foil {
+  filter: drop-shadow(0 7px 8px #0c062d99)
+          drop-shadow(0 0 9px color-mix(in srgb, var(--foil) 80%, transparent));
+}
+.pack-choice.selected .pack-cost, .deposit {
+  background: linear-gradient(130deg, #fffab2, #ffeb37 60%, #ffcd4a);
+  border-color: #fff6a4;
+  color: #2f1039;
+}
+.pack-choice.selected .pack-cost strong { color: #2f1039; }
+.carousel-controls input { accent-color: var(--neon-blue); }
+
+.pack-panel, .contents-details, .collection-teaser, .content-card, .stat {
+  background: linear-gradient(135deg, #45167a, #2e1054 58%, #3c1269);
+  border-color: #a15ce8;
+}
+.selected-title h2 { color: #fff7ec; }
+.pack-facts .chase-value { color: var(--gold) !important; }
+.mode-tabs button.active {
+  background: linear-gradient(135deg, #8526c8, #541696);
+  color: #fff6ba;
+  border-color: #ed7bff;
+}
+.mode-tabs button[data-id="Gamble"] {
+  background: #63205e;
+  border-color: #c24b9b;
+}
+.mode-tabs button[data-id="Gamble"].active {
+  background: #8c126d;
+  border-color: #ff8bdd;
+}
+.primary, .open-pack-button {
+  background: linear-gradient(110deg, #920d80, #ae0b8b 52%, #8114b4);
+  border-color: #ff86e3;
+  color: #fff;
+  box-shadow: inset 0 1px #ffb6e788, inset 0 0 12px #ff4de966,
+              0 0 12px #fc32c152;
+}
+.primary:hover, .open-pack-button:hover {
+  box-shadow: inset 0 0 16px #ff4de988, 0 0 18px #fc32c189;
+}
+
+.opening-screen {
+  background: radial-gradient(ellipse at 50% 45%, #4226b9, #481073 48%, #1f0a3e 83%);
+  border-color: var(--neon-violet);
+}
+.results-screen h1 em { color: var(--gold); }
+.grail-result {
+  background:
+    radial-gradient(ellipse at 50% 47%, #2439a4 0%, #3b1691 31%, transparent 74%),
+    linear-gradient(135deg, #430b76, #200a49 53%, #621063);
+  border-color: #ffd65b;
+}
+.grail-result:before {
+  background: repeating-conic-gradient(
+    from 12deg, transparent 0 14deg, #ff49ca35 16deg 18deg,
+    transparent 20deg 28deg, #ffc14347 30deg 31deg, transparent 33deg 45deg
+  );
+  animation: none;
+}
+.grail-result .result[data-tier="5"] .cartoon-card {
+  border-color: #66eeff;
+  box-shadow: inset 0 0 0 2px #ffdf6b, 0 0 0 1px #2175ff, 0 0 19px #27caffac;
+}
+
+@media (max-width: 650px) {
+  .topbar, .bottom-nav { border-color: #ab4fdb; }
+  .room-heading { box-shadow: inset 0 0 0 3px #2b0e4b, inset 0 0 14px #ff73f244; }
+  .bottom-nav .nav-link.active { box-shadow: inset 0 0 0 1px #ff6cde; }
+}
