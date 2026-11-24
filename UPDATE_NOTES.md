@@ -27,3 +27,12 @@ For a new Supabase project, run supabase-setup.sql, then leaderboard-setup.sql. 
 - Restyled the navigation, opening controls, vault, collection, wallet, Profile, rankings and reveal screens in the same palette.
 - Retained the responsive layout, current collectibles, pack prices and odds.
 - Updated the offline cache and Android 1.2.2 (version code 5).
+
+
+## Compact neon layout and simpler odds (v42)
+- Brightened the app with violet, cyan, pink and luminous gold surfaces.
+- Moved pack controls alongside the carousel on desktop and removed the empty leading carousel space. Added a compact desktop collection spotlight.
+- Made wrapper typography scale with pack width, removed tiny card labels inside pack artwork, shortened the wrapper category label, and paired each pack name with its price.
+- Corrected automatic carousel scrolling so choosing the last pack preserves the intended selection.
+- Simplified View odds into rarity names and per-card percentages. Displayed overall percentages include the Wild roll; base odds and card values remain available under Values & detailed odds. Actual drawing probabilities are unchanged.
+- Updated Android 1.2.3 (version code 6) and the offline cache.
