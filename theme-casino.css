@@ -232,3 +232,64 @@ body {
   .room-heading { box-shadow: inset 0 0 0 3px #2b0e4b, inset 0 0 14px #ff73f244; }
   .bottom-nav .nav-link.active { box-shadow: inset 0 0 0 1px #ff6cde; }
 }
+
+/* The game supplies the same dark canvas and vivid artwork in either device theme. */
+@media (prefers-color-scheme: dark) {
+  :root { color-scheme: only dark; }
+}
+
+@media (max-width: 650px), (max-width: 900px) and (hover: none) and (pointer: coarse) {
+  .pack-carousel {
+    gap: 0;
+    padding-inline: 0;
+    overscroll-behavior-inline: contain;
+  }
+
+  .pack-choice, .pack-choice.selected {
+    flex: 0 0 100%;
+    min-width: 0;
+    padding-inline: 12px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    transform: none;
+    opacity: 1;
+  }
+
+  .pack-choice .foil, .pack-choice.selected .foil {
+    transform: none;
+    filter: none;
+  }
+
+  .pack-choice .pack-cost, .pack-choice.selected .pack-cost {
+    max-width: 100%;
+    font-size: 13px;
+  }
+
+  .pack-choice.selected:before {
+    left: calc(50% - 64px);
+    right: calc(50% - 64px);
+  }
+
+  .foil-shine, .reveal-shade {
+    display: none;
+  }
+
+  .foil-body {
+    background: linear-gradient(145deg, var(--foil) 0%, #200d53 34%, #24105e 63%, var(--foil-alt) 100%);
+    box-shadow: inset 0 0 0 1px #ffffff75, inset 0 0 9px color-mix(in srgb, var(--foil) 65%, transparent);
+  }
+
+  .pack-seal {
+    background:
+      repeating-linear-gradient(90deg, #ffffff29 0 1px, transparent 1px 3px),
+      linear-gradient(90deg, var(--foil), #fef0ff 52%, var(--foil));
+  }
+
+  .pack-choice.selected .pack-cost, .deposit {
+    background: #ffec43;
+  }
+
+  .open-pack-button {
+    background: linear-gradient(110deg, #a20c88, #c014a9 62%, #8b19d6);
+  }
+}

@@ -35,8 +35,105 @@ function packRipArt(p){return `<div class="tear-pack"><div class="tear-layer foi
 
 function packsView(){const c=E.categories[selectedCategory],p=selectedPack();return `<div class="pack-room" style="--foil:${p.color}">${moneyDecor()}${packRoomHeading()}${categories(selectedCategory,'category')}<section class="carousel-shell" style="--foil:${p.color}" aria-label="Choose a pack edition"><div class="pack-carousel" id="packCarousel" tabindex="0" aria-label="Scrollable pack selector">${packs.filter(p=>p.category===selectedCategory).map(p=>`<button class="pack-choice ${p.index===selectedIndex?'selected':''}" style="--foil:${p.color}" data-action="choose-pack" data-id="${p.index}" aria-pressed="${p.index===selectedIndex}" aria-label="${c.name} ${p.name}, ${money(p.price)}">${packArt(p)}<span class="pack-cost"><b>${p.name}</b><strong>${money(p.price,true)}</strong></span></button>`).join('')}</div><div class="carousel-controls"><button data-action="previous-pack" aria-label="Previous pack">Previous</button><input type="range" id="packRange" aria-label="Selected pack" min="0" max="8" value="${selectedIndex}"><button data-action="next-pack" aria-label="Next pack">Next</button></div></section><section class="pack-panel" id="packPanel">${packPanel()}</section><details class="contents-details"><summary>What’s inside <span>View cards & rarities</span></summary><div class="section-heading"><h2>THE ${c.name.toUpperCase()} COLLECTION</h2><button class="text-link" data-action="view-category">View collection</button></div><div id="insideLineup"></div></details>${collectionSpotlight()}</div>`;}
 function packPanel(){const p=selectedPack(),groups=packPool(p),top=groups[5].at(-1),chances=E.odds(catalog,p,mode),possible=groups.filter((_,t)=>chances[t]>0).flat(),cost=p.price*quantity;return `<div class="selected-title"><h2>${E.categories[p.category].packLabel||E.categories[p.category].name} ${p.name} Pack</h2><span>ORIGINAL COLLECTIBLES</span></div><div class="pack-facts"><div><small>Min pull</small><strong>${money(Math.min(...possible.map(E.value)),true)}</strong></div><div><small>Top chase</small><strong class="chase-value">${money(E.value(top),true)}</strong></div><div><small>Per pack</small><strong>${money(p.price,true)}</strong></div></div><div class="buy-settings"><select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n>1?'s':''}</option>`).join('')}</select><div class="mode-tabs" role="group" aria-label="Rarity odds">${Object.keys(E.modes).map(k=>`<button data-action="mode" data-id="${k}" class="${mode===k?'active':''}" aria-pressed="${mode===k}">${k}</button>`).join('')}</div></div><button class="primary open-pack-button" data-action="${state.balance>=cost?'open':'wallet'}">${state.balance>=cost?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add funds · '+money(cost)} ${icon(state.balance>=cost?'bolt':'wallet')}</button>${simpleOdds(p,groups,chances)}`;}
-function bindCarousel(){const rail=$('#packCarousel');if(!rail)return;const choices=$$('.pack-choice',rail),center=el=>rail.scrollLeft+el.getBoundingClientRect().left-rail.getBoundingClientRect().left-(rail.clientWidth-el.offsetWidth)/2;carouselProgrammaticUntil=performance.now()+700;rail.scrollLeft=center(choices[selectedIndex]);let drag=null,dragged=false;rail.addEventListener('wheel',()=>{carouselProgrammaticUntil=0;},{passive:true});rail.addEventListener('pointerdown',e=>{carouselProgrammaticUntil=0;if(e.pointerType!=='mouse'||e.button!==0)return;drag={x:e.clientX,left:rail.scrollLeft};dragged=false;});rail.addEventListener('pointermove',e=>{if(!drag)return;const delta=e.clientX-drag.x;if(Math.abs(delta)>8){dragged=true;rail.classList.add('dragging');rail.scrollLeft=drag.left-delta;}});const end=()=>{drag=null;rail.classList.remove('dragging');setTimeout(()=>dragged=false,0);};rail.addEventListener('pointerup',end);rail.addEventListener('pointerleave',end);rail.addEventListener('pointercancel',end);rail.addEventListener('click',e=>{if(dragged){e.preventDefault();e.stopPropagation();dragged=false;}},true);rail.addEventListener('scroll',()=>{clearTimeout(carouselTimer);carouselTimer=setTimeout(()=>{if(view!=='packs'||drag||performance.now()<carouselProgrammaticUntil)return;const middle=rail.getBoundingClientRect().left+rail.clientWidth/2;let closest=selectedIndex,best=Infinity;choices.forEach((el,i)=>{const r=el.getBoundingClientRect(),distance=Math.abs(r.left+r.width/2-middle);if(distance<best){best=distance;closest=i;}});if(rail.scrollLeft<=1)closest=0;else if(rail.scrollLeft>=rail.scrollWidth-rail.clientWidth-1)closest=choices.length-1;if(closest!==selectedIndex)selectPack(closest,false);},180);});rail.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();selectPack(selectedIndex+(e.key==='ArrowRight'?1:-1));}});updateCarouselControls();}
-function selectPack(index,scroll=true){const before=selectedIndex;selectedIndex=Math.max(0,Math.min(8,Number(index)));if(before!==selectedIndex)sound('tick');save();const p=selectedPack();$$('.pack-choice').forEach((el,i)=>{el.classList.toggle('selected',i===selectedIndex);el.setAttribute('aria-pressed',String(i===selectedIndex));});$('#packRange').value=selectedIndex;$('.carousel-shell').style.setProperty('--foil',p.color);$('.pack-room').style.setProperty('--foil',p.color);updatePackPanel();refreshLineup();updateCarouselControls();if(scroll){carouselProgrammaticUntil=performance.now()+700;const rail=$('#packCarousel'),el=$$('.pack-choice',rail)[selectedIndex],left=rail.scrollLeft+el.getBoundingClientRect().left-rail.getBoundingClientRect().left-(rail.clientWidth-el.offsetWidth)/2;rail.scrollTo({left,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}}
+function scrollToPack(rail, choice, smooth = false) {
+  // Use layout coordinates so the pack's visual scale does not shift its snap point.
+  const left = choice.offsetLeft - (rail.clientWidth - choice.offsetWidth) / 2;
+  const fullWidthSlide = Math.abs(rail.clientWidth - choice.offsetWidth) <= 1;
+  const animate = smooth && !fullWidthSlide && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  carouselProgrammaticUntil = performance.now() + (animate ? 700 : 250);
+  rail.scrollTo({ left, behavior: animate ? 'smooth' : 'instant' });
+}
+
+function bindCarousel() {
+  const rail = $('#packCarousel');
+  if (!rail) return;
+  clearTimeout(carouselTimer);
+  const choices = $$('.pack-choice', rail);
+  scrollToPack(rail, choices[selectedIndex]);
+
+  let drag = null;
+  let dragged = false;
+  rail.addEventListener('wheel', () => { carouselProgrammaticUntil = 0; }, { passive: true });
+  rail.addEventListener('pointerdown', event => {
+    carouselProgrammaticUntil = 0;
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    drag = { x: event.clientX, left: rail.scrollLeft };
+    dragged = false;
+  });
+  rail.addEventListener('pointermove', event => {
+    if (!drag) return;
+    const delta = event.clientX - drag.x;
+    if (Math.abs(delta) > 8) {
+      dragged = true;
+      rail.classList.add('dragging');
+      rail.scrollLeft = drag.left - delta;
+    }
+  });
+  const endDrag = () => {
+    drag = null;
+    rail.classList.remove('dragging');
+    setTimeout(() => { dragged = false; }, 0);
+  };
+  for (const event of ['pointerup', 'pointerleave', 'pointercancel']) {
+    rail.addEventListener(event, endDrag);
+  }
+  rail.addEventListener('click', event => {
+    if (dragged) {
+      event.preventDefault();
+      event.stopPropagation();
+      dragged = false;
+    }
+  }, true);
+  rail.addEventListener('scroll', () => {
+    if (performance.now() < carouselProgrammaticUntil) return;
+    clearTimeout(carouselTimer);
+    carouselTimer = setTimeout(() => {
+      if (view !== 'packs' || !rail.isConnected || drag || performance.now() < carouselProgrammaticUntil) return;
+      const middle = rail.scrollLeft + rail.clientWidth / 2;
+      let closest = 0;
+      let best = Infinity;
+      choices.forEach((choice, index) => {
+        const distance = Math.abs(choice.offsetLeft + choice.offsetWidth / 2 - middle);
+        if (distance < best) {
+          best = distance;
+          closest = index;
+        }
+      });
+      if (rail.scrollLeft <= 1) closest = 0;
+      else if (rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1) closest = choices.length - 1;
+      if (closest !== selectedIndex) selectPack(closest, false);
+    }, 180);
+  });
+  rail.addEventListener('keydown', event => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      selectPack(selectedIndex + (event.key === 'ArrowRight' ? 1 : -1));
+    }
+  });
+  updateCarouselControls();
+}
+
+function selectPack(index, scroll = true) {
+  const before = selectedIndex;
+  selectedIndex = Math.max(0, Math.min(8, Number(index)));
+  if (before !== selectedIndex) sound('tick');
+  save();
+
+  const pack = selectedPack();
+  const rail = $('#packCarousel');
+  const choices = $$('.pack-choice', rail);
+  choices.forEach((choice, i) => {
+    choice.classList.toggle('selected', i === selectedIndex);
+    choice.setAttribute('aria-pressed', String(i === selectedIndex));
+  });
+  $('#packRange').value = selectedIndex;
+  $('.carousel-shell').style.setProperty('--foil', pack.color);
+  $('.pack-room').style.setProperty('--foil', pack.color);
+  updatePackPanel();
+  refreshLineup();
+  updateCarouselControls();
+  if (scroll) scrollToPack(rail, choices[selectedIndex], true);
+}
 function itemCard(item,own=null,tierOverride=null,itemChance=null){const tier=tierOverride??own?.tier??item.tier,value=own?.value??E.value(item);return `<article class="item-card" style="--rarity:${E.rarityColors[tier]}"><button class="item-button" data-action="item" data-id="${item.id}" ${own?`data-uid="${own.uid}"`:''}><div class="item-visual ${item.category}">${cardImage(item)}${own?.locked?'<span class="item-badge">FAVORITE</span>':state.discovered.includes(item.id)?'<span class="item-badge">COLLECTED</span>':''}</div><div class="item-copy"><span class="rarity">${E.rarityNames[tier]}</span><h3>${escape(item.name)}</h3><p>${escape(item.detail)}</p><div class="item-value"><strong>${money(value)}</strong><small>${itemChance===null?"Virtual value":chance(itemChance)+" chance"}</small></div></div></button>${own?`<div class="item-actions"><button data-action="sell" data-id="${own.uid}" ${own.locked?'disabled':''}>Sell</button><button data-action="favorite" data-id="${own.uid}">${own.locked?'Unfavorite':'Favorite'}</button></div>`:''}</article>`;}
 function stats(values){return `<div class="stats">${values.map(([label,value])=>`<div class="stat"><small>${label}</small><strong>${value}</strong></div>`).join('')}</div>`;}
 function empty(title,description,button=true){return `<div class="empty">${icon('vault')}<h2>${title}</h2><p>${description}</p>${button?'<button class="primary" data-action="packs">Explore packs</button>':''}</div>`;}
@@ -44,7 +141,7 @@ function vaultView(){let owned=state.vault.filter(v=>byId[v.itemId]&&(filter==='
 function collectionView(){const list=catalog.filter(i=>(filter==='all'||i.category===filter)&&i.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>Number(b.id.includes('-expansion-'))-Number(a.id.includes('-expansion-')));return `${heading('THE COLLECTOR INDEX','THE <em>COLLECTION.</em>')}${categories(filter,'filter',true)}<div class="toolbar"><div class="search">${icon('search')}<input id="collectionSearch" value="${escape(search)}" placeholder="Search original cards" aria-label="Search collection"></div></div><div class="item-grid">${list.slice(0,limit).map(i=>itemCard(i)).join('')}</div>${!list.length?empty('NO MATCHES.','Try another name or category.',false):''}${list.length>limit?'<div class="load-more"><button class="secondary" data-action="more">Show more</button></div>':''}`;}
 function walletView(){const allowed=E.canDeposit(state);return `${heading('YOUR WALLET','FUND YOUR <em>NEXT PACK.</em>')}<div class="wallet-layout"><section class="content-card"><div class="wallet-balance"><small>CURRENT BALANCE</small><strong>${money(state.balance)}</strong></div><h2>${allowed?'ADD VIRTUAL FUNDS':'DEPOSIT LOCKED'}</h2><p class="deposit-rule">Maximum $10 per deposit. Deposits unlock when your balance is below $1.00.</p><label class="field-label" for="depositAmount">Amount · up to $10</label><div class="money-input"><span>$</span><input type="number" id="depositAmount" min="0.01" max="10" step="0.01" inputmode="decimal" value="10" aria-label="Custom deposit amount" ${allowed?'':'disabled'}></div><button class="primary full" data-action="confirm-deposit" ${allowed?'':'disabled'}>${allowed?'Add virtual funds':'Balance must be below $1'} ${icon('plus')}</button><p class="small-note">Free simulator currency. No payments or cashouts.</p>${feedback?`<p class="inline-feedback" role="status">${escape(feedback)}</p>`:''}<button class="secondary full" data-action="packs">Back to packs</button></section><section class="content-card referral-card">${referralForm()}</section></div>`;}
 function profileSection(id,label,content){return `<details class="profile-fold content-card" data-profile-section="${id}" ${profileSections.has(id)?'open':''}><summary>${label}<span aria-hidden="true">+</span></summary><div class="profile-fold-body">${content}</div></details>`;}
-function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>PROFILE.</em></h1></div><div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Virtual spent',money(state.spent)],['Best pull',money(state.best)]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('android','Download Android app','<p>Play on the website or install the Android app.</p><a class="primary full apk-download" href="TCG_Unboxing_Sim.apk?v=8" download="TCG_Unboxing_Sim.apk">Download APK</a><small>Android 8+ · iPhone and iPad: use the website</small>')}${profileSection('referral','Referral code',referralForm())}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. The referral reward stays used.</p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
+function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>PROFILE.</em></h1></div><div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Virtual spent',money(state.spent)],['Best pull',money(state.best)]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('android','Download Android app','<p>Play on the website or install the Android app.</p><a class="primary full apk-download" href="TCG_Unboxing_Sim.apk?v=9" download="TCG_Unboxing_Sim.apk">Download APK</a><small>Android 8+ · iPhone and iPad: use the website</small>')}${profileSection('referral','Referral code',referralForm())}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. The referral reward stays used.</p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
 
 function itemView(){const item=byId[detailId];if(!item)return empty('CARD NOT FOUND.','Choose another collectible.');const own=state.vault.find(v=>v.uid===detailUid),value=own?.value??E.value(item);return `<button class="secondary back-button" data-action="back-item">Back to ${previousView==='packs'?'packs':previousView==='vault'?'vault':'collection'}</button><div class="detail-page"><div class="detail-image ${item.category}">${cardImage(item)}</div><div class="detail-content"><div class="eyebrow">${E.categories[item.category].name} · ${escape(item.number)}</div><h1>${escape(item.name)}</h1><p>${escape(item.lore)}</p><div class="detail-price">${money(value)}</div><p class="price-definition">${own?'Vault value':'Virtual collectible value'}</p>${own?`<button class="primary full" data-action="sell-detail" data-id="${own.uid}" ${own.locked?'disabled':''}>${own.locked?'Favorited':'Sell · '+money(value)}</button>`:''}<p class="price-reference">Original cartoon collectible. Values are fictional simulator currency and are not market prices.</p><span class="sim-label">ORIGINAL ART · VIRTUAL CURRENCY</span></div></div>`;}
 function haptic(pattern=20){if(navigator.vibrate)navigator.vibrate(pattern);}
@@ -128,7 +225,7 @@ document.addEventListener('change',e=>{if(e.target.id==='packQuantity'){quantity
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();if(e.key==='Enter'&&e.target.id==='depositAmount')deposit();if(e.key==='Enter'&&e.target.id==='referralCode')redeemCode();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','wallet','leaderboard'].includes(target)){filter='all';go(target);}});
 window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=44');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs(catalog);try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;if(state.referralClaimed)localStorage.setItem(REFERRAL_KEY,'1');}catch{}state.settings={sound:true,haptics:true};selectedCategory=E.categories[state.preferences.category]?state.preferences.category:'creatures';selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','wallet','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&location.protocol==='https:'&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=45');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs(catalog);try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;if(state.referralClaimed)localStorage.setItem(REFERRAL_KEY,'1');}catch{}state.settings={sound:true,haptics:true};selectedCategory=E.categories[state.preferences.category]?state.preferences.category:'creatures';selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','wallet','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&location.protocol==='https:'&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 init();
 function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===8;}
 function updatePackPanel(){const open=$('.odds-details')?.open;$('#packPanel').innerHTML=packPanel();if(open)$('.odds-details').open=true;}

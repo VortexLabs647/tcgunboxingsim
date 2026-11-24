@@ -45,3 +45,7 @@ For a new Supabase project, run supabase-setup.sql, then leaderboard-setup.sql. 
 
 ## Stormstripe-inspired colors (v44)
 - Matched the reference palette with deeper violets, hot pink controls, brighter pack foil, cyan edges and vivid yellow accents. Grail reveals use an electric blue frame and gold rays.
+
+## Phone carousel and foil colors (v45)
+- On phones, swipe through one full pack at a time. Mobile pack wrapping uses flat artwork and simpler foil effects.
+- Declare the game's authored dark palette for dark device preferences.
