@@ -293,3 +293,83 @@ body {
     background: linear-gradient(110deg, #a20c88, #c014a9 62%, #8b19d6);
   }
 }
+
+/* The creature cards use illustrated, warm foil frames. */
+.cartoon-card.card--creatures {
+  --card-edge: color-mix(in srgb, var(--card-color) 52%, #ffe291);
+  border-color: var(--card-edge);
+  background: linear-gradient(145deg, #fff4bc, var(--card-edge) 45%, #cba05b 100%);
+  box-shadow: inset 0 0 0 1px #704629a6, 0 6px 14px #0006;
+  color: #251835;
+}
+
+.card--creatures .cartoon-card-head i { color: #5b376b; }
+.card--creatures .cartoon-card-art {
+  border: 1px solid #644564;
+  border-radius: 6px;
+}
+
+.card--creatures .cartoon-card-name {
+  font-family: "DM Sans", Arial, sans-serif;
+  font-weight: 900;
+  text-transform: none;
+  text-shadow: none;
+}
+
+.card--creatures .cartoon-card-edition { color: #40234e; }
+
+/* Sports cards pair action photos with an angled, metallic nameplate. */
+.cartoon-card:is(.card--football, .card--basketball) {
+  --sport-accent: #53dfd2;
+  border-radius: 8px;
+  border-color: color-mix(in srgb, var(--card-color) 70%, #edfaff);
+  background: linear-gradient(145deg, #596b7a 0%, #1e2634 18%, #0e1721 68%, #617182);
+  box-shadow: inset 0 0 0 1px #f2fbff70, 0 6px 14px #0007;
+}
+
+.cartoon-card.card--basketball { --sport-accent: #ffab76; }
+
+:is(.card--football, .card--basketball) .cartoon-card-head {
+  color: #fff;
+  letter-spacing: .1em;
+}
+
+:is(.card--football, .card--basketball) .cartoon-card-head i { color: var(--sport-accent); }
+
+:is(.card--football, .card--basketball) .cartoon-card-art {
+  border: 1px solid #dce7ed9c;
+  border-radius: 3px;
+}
+
+:is(.card--football, .card--basketball) .cartoon-card-name {
+  padding: 5% 5% 4%;
+  border-top: 1px solid var(--sport-accent);
+  background: linear-gradient(108deg, #111923 0% 72%, #394859 72% 80%, #172330 80%);
+  color: #fff;
+  font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(6px, 9cqw, 23px);
+  letter-spacing: .025em;
+}
+
+:is(.card--football, .card--basketball) .cartoon-card-edition { color: #d9e5ed; }
+:is(.card--football, .card--basketball) .cartoon-card-foil { opacity: .4; }
+
+.cartoon-card:is(.card--creatures, .card--football, .card--basketball) .cartoon-card-name,
+.cartoon-card:is(.card--creatures, .card--football, .card--basketball) .cartoon-card-edition {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cartoon-card:is(.card--creatures, .card--football, .card--basketball)[data-finish="Gold Foil"] {
+  border-color: #fff195;
+}
+
+.cartoon-card:is(.card--creatures, .card--football, .card--basketball)[data-finish="Supernova"] {
+  border-color: #f1b5ff;
+  box-shadow: inset 0 0 0 1px #fff9, 0 0 9px #e78dff8c;
+}
+
+:is(.card--football, .card--basketball)[data-finish="Gold Foil"] .cartoon-card-name {
+  border-top-color: #ffe289;
+}
