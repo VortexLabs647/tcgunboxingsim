@@ -151,12 +151,69 @@ body {
   box-shadow: 0 0 10px #41d7fb80, inset 0 0 9px #459eff55;
 }
 .pack-choice { opacity: .96; }
-.foil-body {
+.foil {
+  --foil-color: color-mix(in srgb, var(--foil) 72%, #800bff);
+  --foil-light: color-mix(in srgb, var(--foil-color) 34%, #fff0ff);
+  --foil-dark: color-mix(in srgb, var(--foil-color) 32%, #170530);
+}
+
+.foil .foil-body {
+  border-color: transparent;
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 98.6% 13%, 99.5% 38%, 98.9% 69%, 100% 100%,
+                     0 100%, 1.3% 77%, .6% 51%, 1.6% 19%);
   background:
-    linear-gradient(112deg, transparent 14%, #ffffff36 25%, transparent 35% 65%, #ffffff26 77%, transparent 83%),
-    radial-gradient(ellipse at center, #261150 25%, transparent 79%),
-    linear-gradient(150deg, var(--foil), #260f54 36%, #1c1040 62%, var(--foil) 90%, var(--foil-alt));
-  border-inline-color: color-mix(in srgb, var(--foil) 52%, white);
+    linear-gradient(90deg, var(--foil-light), var(--foil-color) 1.7%, #28084a 3%, transparent 7% 93%, #21083d 97%, var(--foil-color) 98.5%, var(--foil-light)),
+    radial-gradient(ellipse at 17% 2%, color-mix(in srgb, var(--foil-color) 78%, transparent), transparent 45%),
+    radial-gradient(ellipse at 86% 96%, color-mix(in srgb, var(--foil-alt) 42%, #6321d6), transparent 46%),
+    linear-gradient(126deg, #260b52 3%, #39147c 24%, #170a36 52%, #2d125d 78%, var(--foil-dark));
+  box-shadow: inset 0 0 10px #09021e9c;
+}
+
+.foil-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(177deg, #240433e8 0%, #fbdefa15 16%, var(--foil-light) 22%, var(--foil-color) 27%, #1b063fa6 43%, transparent 76%) top / 100% 10% no-repeat,
+    linear-gradient(5deg, #18052dd9 0%, #eed3ffa6 16%, var(--foil-color) 22%, #26084880 37%, transparent 74%) bottom / 100% 12% no-repeat,
+    linear-gradient(33deg, transparent 38%, #19083299 42%, var(--foil-light) 48%, #f6d7ff3b 51%, transparent 56%) top left / 44% 16% no-repeat,
+    linear-gradient(-29deg, transparent 37%, #09031e99 42%, var(--foil-light) 47%, #f9e6ff29 51%, transparent 56%) top right / 43% 14% no-repeat,
+    linear-gradient(146deg, transparent 42%, #14062d9e 46%, var(--foil-light) 49%, #ffdcff1f 54%, transparent 60%) bottom left / 41% 16% no-repeat,
+    linear-gradient(-141deg, transparent 42%, #170429a8 47%, var(--foil-light) 50%, #f7dfff38 53%, transparent 59%) bottom right / 44% 16% no-repeat;
+}
+
+.foil .foil-body::after {
+  inset: 3% 1.2%;
+  border: 0;
+  background:
+    linear-gradient(97deg, var(--foil-light), #b78bfc44 38%, transparent 80%) left center / 1.3% 93% no-repeat,
+    linear-gradient(278deg, var(--foil-light), #bf8eff38 64%, transparent 85%) right center / 1.3% 91% no-repeat;
+  opacity: .72;
+}
+
+.pack-seal:is(.top, .bottom) {
+  border-radius: 0;
+  clip-path: polygon(0 11%, 3% 0, 6% 11%, 9% 0, 12% 11%, 15% 0, 18% 11%, 21% 0,
+    24% 11%, 27% 0, 30% 11%, 33% 0, 36% 11%, 39% 0, 42% 11%, 45% 0,
+    48% 11%, 51% 0, 54% 11%, 57% 0, 60% 11%, 63% 0, 66% 11%, 69% 0,
+    72% 11%, 75% 0, 78% 11%, 81% 0, 84% 11%, 87% 0, 90% 11%, 93% 0,
+    96% 11%, 100% 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(0deg, #21052d 0%, var(--foil-color) 10%, transparent 24% 60%, #10041e61 80%, #ffe7ff84 97%),
+    repeating-linear-gradient(90deg, #fff5 0 1px, #16032433 1px 2px, transparent 2px 3.2px),
+    linear-gradient(97deg, var(--foil-dark), var(--foil-color) 10%, var(--foil-light) 26%, var(--foil-color) 36%, var(--foil-dark) 57%, var(--foil-light) 76%, var(--foil-color) 88%, var(--foil-dark));
+  box-shadow: inset 0 -1px var(--foil-light);
+}
+
+.pack-seal i {
+  left: 1%;
+  right: 1%;
+  top: 66%;
+  background: var(--foil-light);
+  box-shadow: 0 1px 3px var(--foil-color);
+  opacity: .66;
 }
 .pack-choice .foil {
   filter: drop-shadow(0 7px 8px #0c062d99)
@@ -272,17 +329,6 @@ body {
 
   .foil-shine, .reveal-shade {
     display: none;
-  }
-
-  .foil-body {
-    background: linear-gradient(145deg, var(--foil) 0%, #200d53 34%, #24105e 63%, var(--foil-alt) 100%);
-    box-shadow: inset 0 0 0 1px #ffffff75, inset 0 0 9px color-mix(in srgb, var(--foil) 65%, transparent);
-  }
-
-  .pack-seal {
-    background:
-      repeating-linear-gradient(90deg, #ffffff29 0 1px, transparent 1px 3px),
-      linear-gradient(90deg, var(--foil), #fef0ff 52%, var(--foil));
   }
 
   .pack-choice.selected .pack-cost, .deposit {
