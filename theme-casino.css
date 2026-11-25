@@ -933,9 +933,11 @@ body::before { background: none; }
 }
 
 .foil .foil-body {
+  --foil-print: color-mix(in srgb, var(--foil) 37%, #fff0bd);
+  --foil-outline: color-mix(in srgb, var(--foil) 19%, #251134);
   background:
-    radial-gradient(ellipse at 14% 8%, color-mix(in srgb, var(--foil-color) 36%, transparent), transparent 45%),
-    linear-gradient(148deg, transparent 56%, color-mix(in srgb, var(--foil-color) 10%, transparent) 57%, color-mix(in srgb, var(--foil-color) 56%, transparent) 100%),
+    radial-gradient(ellipse at 5% 16%, color-mix(in srgb, var(--foil) 64%, transparent), transparent 48%),
+    radial-gradient(ellipse at 92% 83%, color-mix(in srgb, var(--foil) 66%, transparent), transparent 48%),
     url("pack-foil-texture.webp") center / 100% 100% no-repeat,
     var(--foil-dark);
   box-shadow: inset 0 1px 4px #fcddff9c, inset 0 -2px 5px #070316a8;
@@ -943,14 +945,68 @@ body::before { background: none; }
 
 .foil-body::before {
   background:
-    linear-gradient(180deg, #16051ec9, #f6cfff62 15%, transparent 74%) top / 100% 8% no-repeat,
-    linear-gradient(0deg, #16051ecc, #f6cfff72 22%, transparent 77%) bottom / 100% 8% no-repeat;
+    radial-gradient(ellipse at center, transparent 62%, var(--foil-print) 64% 67%, transparent 69%) center 8% / 94% 28% no-repeat,
+    radial-gradient(ellipse at center, transparent 62%, var(--foil-print) 64% 67%, transparent 69%) center 96% / 95% 23% no-repeat,
+    linear-gradient(180deg, #16051ea1, #f6cfff6f 15%, transparent 74%) top / 100% 8% no-repeat,
+    linear-gradient(0deg, #16051eab, #f6cfff80 22%, transparent 77%) bottom / 100% 8% no-repeat;
 }
 
 .foil .foil-body::after {
   inset: 0;
   background: linear-gradient(90deg, #fff8, transparent 2.5% 97.5%, #fff8);
   opacity: .32;
+}
+
+.foil .foil-logo,
+.foil .foil-logo span,
+.foil .foil-title,
+.foil .foil-category {
+  font-family: var(--display-font);
+  font-weight: 700;
+  color: #fff0cf;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 1.55cqw var(--foil-outline);
+  text-shadow: 0 .8cqw 0 var(--foil-outline);
+}
+
+.foil .foil-logo { top: 7%; font-size: 25cqw; letter-spacing: -.4cqw; }
+.foil .foil-logo span { font-size: 5.7cqw; letter-spacing: .43cqw; }
+.foil .foil-title { bottom: 8.5%; font-size: 12.6cqw; letter-spacing: 0; overflow: visible; }
+.foil .foil-category { bottom: 3%; font-size: 6.3cqw; letter-spacing: .37cqw; }
+
+.foil .foil-art { inset: 30% 8% 22%; }
+
+.foil .foil-art .cartoon-card {
+  padding: 1.25cqw;
+  border: .45cqw solid var(--foil-outline);
+  border-radius: 2.2cqw;
+  background: linear-gradient(150deg, #fff3cc, var(--foil-print) 78%, #fff3dc);
+  box-shadow: inset 0 0 0 .45cqw #fff7d4;
+}
+
+.foil .foil-art .cartoon-card-art {
+  border: .4cqw solid var(--foil-outline);
+  border-radius: 1.3cqw;
+}
+
+.foil .foil-art .cartoon-card-foil { display: none; }
+
+.foil-crest {
+  position: absolute;
+  z-index: 2;
+  inset: auto 32% 14.5%;
+  height: 10.5%;
+  pointer-events: none;
+  background: linear-gradient(135deg, #fff5db, var(--foil-print) 43%, #e8cfff 63%, var(--foil) 90%);
+  clip-path: polygon(0 75%, 12% 54%, 12% 30%, 33% 52%, 39% 29%, 50% 0, 61% 29%,
+    67% 52%, 88% 30%, 88% 54%, 100% 75%, 83% 100%, 17% 100%);
+}
+
+.pack-seal:is(.top, .bottom) {
+  background:
+    linear-gradient(0deg, #270f3d 0%, var(--foil-color) 11%, transparent 26% 66%, #492f5c6e 78%, #ffebfcaa 97%),
+    repeating-linear-gradient(90deg, #fff8 0 1px, #29103c44 1px 2px, transparent 2px 4px),
+    linear-gradient(98deg, var(--foil-color), var(--foil-light) 23%, var(--foil-color) 42%, var(--foil-light) 70%, var(--foil-color));
 }
 
 .pack-showcase {
@@ -2089,4 +2145,59 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 
 .pack-room .pack-showcase .selected-title h2 {
   font-size: clamp(1.12rem, 5.2vw, 1.65rem);
+}
+
+/* The wrapper slips away as the card rises, then the final half-turn exposes the artwork. */
+.charging .rip-pack {
+  animation: foil-slip var(--tear-time) cubic-bezier(.34,.04,.65,.94) both;
+}
+
+.charging .foil-shell .pack-seal.top {
+  animation: foil-strip var(--tear-time) ease-out both;
+}
+
+@keyframes foil-slip {
+  0% { transform: translateY(0); opacity: 1; }
+  30% { transform: translateY(2%) rotate(-2deg); opacity: 1; }
+  100% { transform: translateY(28%) rotate(8deg) scale(.94); opacity: 0; }
+}
+
+@keyframes foil-strip {
+  0% { transform: translate(0,0); opacity: 1; }
+  100% { transform: translate(33%,-180%) rotate(-17deg); opacity: 0; }
+}
+
+.opening-stage .spin-card { transform-style: preserve-3d; }
+
+.opening-stage .spin-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(.6px);
+}
+
+.opening-stage .spin-face-reverse { transform: rotateY(180deg) translateZ(.6px); }
+.face-up .spin-face:not(.spin-face-reverse) .spin-face-design { visibility: visible; }
+
+.spinning .opening-stage .spin-card {
+  animation: collector-card-turn var(--spin-time) both;
+}
+
+@keyframes collector-card-turn {
+  0% {
+    transform: perspective(880px) translateY(20%) scale(.84) rotateY(0deg) rotateZ(-7deg);
+    animation-timing-function: cubic-bezier(.18,.56,.52,1);
+  }
+  33% {
+    transform: perspective(880px) translateY(0) scale(1) rotateY(360deg) rotateZ(3deg);
+    animation-timing-function: linear;
+  }
+  65% {
+    transform: perspective(880px) rotateY(690deg) rotateZ(-2deg);
+    animation-timing-function: cubic-bezier(.28,.32,.46,1);
+  }
+  79% {
+    transform: perspective(880px) rotateY(810deg) rotateZ(-1deg);
+    animation-timing-function: cubic-bezier(.16,.6,.45,1);
+  }
+  100% { transform: perspective(880px) rotateY(900deg); }
 }
