@@ -83,12 +83,14 @@ function packPanel(){
      <div><small>Top chase</small><strong class="chase-value">${money(max,true)}</strong></div>
    </div>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
-     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
-     <button data-action="pack-details" data-id="options" aria-haspopup="dialog">Options <small>${mode} · ${quantity} pack${quantity===1?'':'s'}</small></button>
-     <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
+     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">${icon('chart')}<span>Odds</span></button>
+     <button data-action="pack-details" data-id="options" aria-haspopup="dialog">${icon('adjust')}<span>Options <small>${mode} · ${quantity} pack${quantity===1?'':'s'}</small></span></button>
+     <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">${icon('card')}<span>Cards</span></button>
    </div>
-   <button class="primary open-pack-button pack-open-action" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add virtual funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
-   <p class="pack-sim-note">Free virtual currency · No cashouts</p>`;
+   <div class="pack-action-dock">
+     <button class="primary open-pack-button pack-open-action" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add virtual funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
+     <p class="pack-sim-note">Free virtual currency · No cashouts</p>
+   </div>`;
 }
 
 function packOddsRange(pack){
