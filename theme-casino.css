@@ -2044,17 +2044,67 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 :is(.primary, .account-buttons .primary):enabled:not(:where(.pack-open-action, .pack-dialog-actions button)),
 a.primary { color: #2d1940; }
 
+/* Use each control's accent for its rim, shadow, and focus ring. */
 :is(.primary, .account-buttons .primary, .secondary, .account-buttons .secondary,
-    .pack-room > .category-tabs button, .pack-room .carousel-controls > button:enabled,
+    .category-tabs button, .pack-room .carousel-controls > button,
     .pack-room .pack-showcase .pack-quick-links button, .topbar .header-wallet .deposit,
-    body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active,
     .pack-room .pack-open-action[data-action], .pack-dialog header button,
-    .pack-dialog-body .pack-odds-modes .mode-tabs button.active,
-    .pack-dialog-body .pack-odds-modes .mode-tabs button[data-id="Gamble"].active,
-    .pack-dialog .pack-dialog-actions .primary):not(:disabled) {
+    .pack-dialog-body .mode-tabs button.active, .pack-dialog .pack-dialog-actions .primary,
+    .account-tabs button, .tier-nav button, .skip-button):not(:disabled) {
   border: 1px solid var(--button-edge, #bd92ed);
-  background: linear-gradient(180deg, var(--button-light, #7042a1), var(--button-color, #492d78));
-  box-shadow: inset 0 1px #fff5, inset 0 -2px #190d2c38, 0 2px #11091e;
+  background:
+    linear-gradient(150deg, #ffffff26, transparent 42%),
+    linear-gradient(180deg, var(--button-light, #7042a1), var(--button-color, #492d78));
+}
+
+:is(.primary, .secondary, .category-tabs button, .pack-room .carousel-controls > button,
+    .pack-room .pack-showcase .pack-quick-links button, .topbar .header-wallet .deposit,
+    .topbar .user-button, :is(.topbar, .bottom-nav) .nav-link.active,
+    .pack-dialog header button, .pack-dialog-body .mode-tabs button, .account-tabs button,
+    .tier-nav button, .item-actions button, .skip-button, .receipt button,
+    .profile-fold > summary):not(:disabled) {
+  box-shadow: inset 0 1px #fff7, inset 0 -2px #190d2c38, 0 2px #11091e,
+    0 0 11px color-mix(in srgb, var(--button-glow, var(--button-edge, #bd92ed)) var(--button-halo, 29%), transparent);
+}
+
+:is(.collection-tabs button.active, .account-tabs button.active, .pack-options-controls .mode-tabs button.active) {
+  --button-light: #f5ddff;
+  --button-color: #d9b3f2;
+  --button-edge: #ffeaff;
+  color: #2f1a49;
+}
+
+.pack-room [data-action="open"] { --button-glow: #ffc05d; }
+.pack-room [data-action="wallet"].pack-open-action { --button-glow: #f486c6; }
+.pack-room .pack-quick-links [data-id="options"] { --button-glow: #67c7ff; }
+.pack-room .pack-quick-links [data-id="cards"] { --button-glow: #f58fcb; }
+[data-action="favorite"] { --button-glow: #ff9bd0; }
+:is([data-action="sell"], [data-action="sell-detail"], [data-action="sell-result"]) { --button-glow: #fbd082; }
+:is([data-action="keep-result"], [data-action="leaderboard-refresh"]) { --button-glow: #7dd9fa; }
+
+:is(.topbar, .bottom-nav) .nav-link.active {
+  box-shadow: inset 0 0 0 1px #e3c6ff8c, inset 0 1px #fff7,
+    0 0 10px color-mix(in srgb, var(--button-glow, var(--button-edge, #bd92ed)) var(--button-halo, 29%), transparent);
+}
+
+body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active {
+  background: linear-gradient(145deg, var(--button-light), var(--button-color));
+}
+
+@media (hover: hover) {
+  :is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):hover { --button-halo: 47%; }
+}
+
+:is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):focus-visible {
+  --button-halo: 55%;
+  outline: 2px solid var(--button-glow, #f0ddff);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  :is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):focus-visible {
+    outline-color: Highlight;
+  }
 }
 
 .pack-choice.selected .foil {
