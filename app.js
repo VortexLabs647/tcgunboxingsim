@@ -80,20 +80,13 @@ function packValueRange(pack,oddsMode=mode){
  return {min:Math.min(...values),max:Math.max(...values)};
 }
 function packPanel(){
- const pack=selectedPack(),{min,max}=packValueRange(pack);
+ const pack=selectedPack();
  const cost=pack.price*quantity,canOpen=state.balance>=cost;
  return `<div class="selected-title"><h2>${E.categories[pack.category].name} ${pack.name} Pack</h2><span class="selected-price">${money(pack.price,true)}<small> per pack</small></span></div>
-   <div class="pack-value-summary" role="group" aria-labelledby="packValuesLabel">
-     <p id="packValuesLabel">Virtual card values</p>
-     <div class="pack-facts">
-       <div><small>Minimum pull</small><strong>${money(min,true)}</strong></div>
-       <div><small>Highest possible pull</small><strong class="chase-value">${money(max,true)}</strong></div>
-     </div>
-   </div>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
-     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">${icon('chart')}<span>Odds</span></button>
-     <button data-action="pack-details" data-id="options" aria-haspopup="dialog">${icon('adjust')}<span>Options <small>${mode} · ${quantity} pack${quantity===1?'':'s'}</small></span></button>
-     <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">${icon('card')}<span>Cards</span></button>
+     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
+     <button data-action="pack-details" data-id="options" aria-haspopup="dialog">Options</button>
+     <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
    </div>
    <div class="pack-action-dock">
      <button class="primary open-pack-button pack-open-action" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add virtual funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
@@ -418,9 +411,9 @@ function packOdds(pack,oddsMode){
      <div><span>${E.rarityNames[tier]} <small>${range(tier===5?[...values,...wildValues]:values)}</small></span><strong>${chance(percent,2)}</strong></div>
      <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]} chance"></progress>
    </li>`).join('')}</ul>
-   <dl class="pack-odds-range" aria-label="Virtual value per card">
-     <div><dt>Min. virtual value</dt><dd>${money(min,true)}</dd></div>
-     <div><dt>Max. virtual value</dt><dd>${money(max,true)}</dd></div>
+   <dl class="pack-odds-range" aria-label="Virtual card values">
+     <div><dt>Minimum virtual value</dt><dd>${money(min,true)}</dd></div>
+     <div><dt>Maximum virtual value</dt><dd>${money(max,true)}</dd></div>
    </dl>
    <p class="odds-note">${wild?'Wild: 1 in 10 openings makes every card a Grail. This is included above.':'Wild is off in Gamble mode. Each card is a separate draw.'}</p>
    <details class="odds-extra"><summary>Values & detailed odds</summary>
