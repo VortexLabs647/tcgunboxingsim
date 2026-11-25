@@ -50,10 +50,11 @@ function packsView(){
          ${packArt(pack)}<span class="pack-cost"><b>${pack.name}</b><strong>${money(pack.price,true)}</strong></span>
        </button>`).join('')}
      </div>
-     <div class="pack-pagination" aria-hidden="true">${editions.map(pack=>`<span class="${pack.index===selectedIndex?'active':''}"></span>`).join('')}</div>
      <div class="carousel-controls">
        <button data-action="previous-pack" aria-label="Previous pack">${icon('chevron')}<span>Previous</span></button>
-       <select id="packSelect" aria-label="Browse pack editions">${editions.map(pack=>`<option value="${pack.index}" ${pack.index===selectedIndex?'selected':''}>${pack.name} · ${money(pack.price,true)}</option>`).join('')}</select>
+       <div class="pack-pagination" role="group" aria-label="Pack editions">
+         ${editions.map(pack=>`<button type="button" data-action="choose-pack" data-id="${pack.index}" style="--edition-color:${pack.color}" aria-pressed="${pack.index===selectedIndex}" aria-label="${pack.name}, ${money(pack.price,true)}" title="${pack.name} · ${money(pack.price,true)}"></button>`).join('')}
+       </div>
        <button data-action="next-pack" aria-label="Next pack"><span>Next</span>${icon('chevron')}</button>
      </div>
    </section>
@@ -206,8 +207,9 @@ function selectPack(index, scroll = true) {
     choice.classList.toggle('selected', i === selectedIndex);
     choice.setAttribute('aria-pressed', String(i === selectedIndex));
   });
-  $$('.pack-pagination span').forEach((dot, i) => dot.classList.toggle('active', i === selectedIndex));
-  $('#packSelect').value = selectedIndex;
+  $$('.pack-pagination button').forEach((dot, i) => {
+    dot.setAttribute('aria-pressed', String(i === selectedIndex));
+  });
   $('.pack-room').style.setProperty('--foil', pack.color);
   updatePackPanel();
   updateCarouselControls();
@@ -301,7 +303,7 @@ case 'delete-start':profileSections.add('delete');confirmAction='delete';render(
 case 'delete-confirm':{const claimed=state.referralClaimed;state=E.defaults();state.referralClaimed=claimed;selectedCategory='creatures';selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
 }});
 document.addEventListener('input',e=>{if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;limit=30;searchRender(e.target.id);}});
-document.addEventListener('change',e=>{if(e.target.id==='packSelect')selectPack(e.target.value);if(e.target.id==='packQuantity'){quantity=Number(e.target.value);updatePackPanel();}if(e.target.id==='sort'){sort=e.target.value;render();}});
+document.addEventListener('change',e=>{if(e.target.id==='packQuantity'){quantity=Number(e.target.value);updatePackPanel();}if(e.target.id==='sort'){sort=e.target.value;render();}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();if(e.key==='Enter'&&e.target.id==='depositAmount')deposit();if(e.key==='Enter'&&e.target.id==='referralCode')redeemCode();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','wallet','leaderboard'].includes(target)){filter='all';go(target);}});
 window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
