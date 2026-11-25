@@ -12,6 +12,9 @@ const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,balanceFrame=0,wheelAudioFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
 const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
+// Match short, frequency-weighted listening levels across the game's sound cues.
+const CUE_GAIN = {tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, cash:4.9, credit:4.6, vault:6.1, hit:3.3};
+const WIN_MUSIC_GAIN = .56;
 const REFERRAL_KEY='tcg-cccollectables-claimed';
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedCategory='creatures',selectedIndex=0,mode='Normal',quantity=1,search='',filter='all',sort='recent',limit=30,detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -262,7 +265,7 @@ function sound(kind){
   if((kind==='tick'||kind==='click')&&now<effectsUntil)return;
   stopEffects();
   effectsBus=audioCtx.createGain();
-  effectsBus.gain.value=2.3;
+  effectsBus.gain.value=CUE_GAIN[kind]??1;
   effectsBus.connect(audioCtx.destination);
   effectsUntil=now+({tick:.055,click:.08,'pack-crinkle':.155,rip:.35,wheel:.037,land:.46,cash:.48,credit:.37,vault:.25,hit:.5}[kind]||.5);
 
@@ -289,8 +292,8 @@ function sound(kind){
     tone(620,.025,.04,.012);
     break;
    case 'wheel':
-    tone(310,0,.025,.038,'triangle',155);
-    tone(2280,0,.018,.013,'triangle',1300);
+    tone(310,0,.034,.022,'triangle',155);
+    tone(2280,0,.026,.018,'triangle',1300);
     break;
    case 'land':
     tone(200,0,.075,.04,'triangle',102);
@@ -472,7 +475,7 @@ function trackEffect(source){effectSources.add(source);source.onended=()=>effect
 function stopEffects(){for(const source of effectSources){try{source.stop();source.disconnect();}catch{}}effectSources.clear();if(effectsBus){try{effectsBus.disconnect();}catch{}effectsBus=null;}effectsUntil=0;}
 function stopWinMusic(){clearTimeout(winStopTimer);for(const source of winSources){try{source.stop();source.disconnect();}catch{}}winSources.clear();if(winMusicGain){try{winMusicGain.disconnect();}catch{}winMusicGain=null;}}
 
-function playWinMusic(){stopEffects();try{audioCtx??=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});stopWinMusic();const now=audioCtx.currentTime,beat=60/128,bus=audioCtx.createGain();winMusicGain=bus;bus.gain.setValueAtTime(.14,now);bus.gain.setTargetAtTime(0,now+4.5,.18);bus.connect(audioCtx.destination);const note=(midi,start,length,volume=.12,type='triangle')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);g.gain.setValueAtTime(.001,now+start);g.gain.exponentialRampToValueAtTime(volume,now+start+.018);g.gain.exponentialRampToValueAtTime(.001,now+start+length);o.connect(g);g.connect(bus);winSources.add(o);o.onended=()=>winSources.delete(o);o.start(now+start);o.stop(now+start+length+.03);};const chords=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]];chords.forEach((chord,b)=>{chord.forEach(m=>note(m,b*beat*2,beat*1.85,.075,'sine'));note(chord[0]-12,b*beat*2,beat*1.7,.17,'sine');});[72,76,79,84,83,79,76,79,81,84,88,86,84,79,83,84].forEach((m,i)=>note(m,i*beat/2,beat*.46,.15,'triangle'));[72,76,79,84].forEach(m=>note(m,beat*8,1.05,.09,'sine'));winStopTimer=setTimeout(()=>{bus.disconnect();if(winMusicGain===bus)winMusicGain=null;},5500);}catch{}}
+function playWinMusic(){stopEffects();try{audioCtx??=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});stopWinMusic();const now=audioCtx.currentTime,beat=60/128,bus=audioCtx.createGain();winMusicGain=bus;bus.gain.setValueAtTime(WIN_MUSIC_GAIN,now);bus.gain.setTargetAtTime(0,now+4.5,.18);bus.connect(audioCtx.destination);const note=(midi,start,length,volume=.12,type='triangle')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);g.gain.setValueAtTime(.001,now+start);g.gain.exponentialRampToValueAtTime(volume,now+start+.018);g.gain.exponentialRampToValueAtTime(.001,now+start+length);o.connect(g);g.connect(bus);winSources.add(o);o.onended=()=>winSources.delete(o);o.start(now+start);o.stop(now+start+length+.03);};const chords=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]];chords.forEach((chord,b)=>{chord.forEach(m=>note(m,b*beat*2,beat*1.85,.075,'sine'));note(chord[0]-12,b*beat*2,beat*1.7,.17,'sine');});[72,76,79,84,83,79,76,79,81,84,88,86,84,79,83,84].forEach((m,i)=>note(m,i*beat/2,beat*.46,.15,'triangle'));[72,76,79,84].forEach(m=>note(m,beat*8,1.05,.09,'sine'));winStopTimer=setTimeout(()=>{bus.disconnect();if(winMusicGain===bus)winMusicGain=null;},5500);}catch{}}
 
 function resultTitle(){if(pending.wild)return 'WILD <em>GRAILS.</em>';const best=Math.max(...pending.pulls.map(p=>p.tier)),total=pending.pulls.reduce((s,p)=>s+p.value,0);return best===5?'A GRAIL <em>UNBOXED.</em>':total>pending.cost?'THAT’S A <em>WIN.</em>':'YOUR LATEST <em>PULL.</em>';}
 function resultsView(){const best=Math.max(...pending.pulls.map(p=>p.tier)),total=pending.pulls.reduce((s,p)=>s+p.value,0),profit=total-pending.cost;return `<section class="results-screen ${profit>0?'winning':''}${best===5?' grail-result':''}" style="--rarity:${E.rarityColors[best]}"><div class="reveal-shade" aria-hidden="true"></div><div class="eyebrow">${pending.wild?'WILD · ALL GRAIL · ':''}${pending.quantity} ${pending.quantity>1?'COLLECTIBLES':'COLLECTIBLE'} REVEALED${pending.quantity>1?' · SWIPE TO SEE EACH PULL':''}</div><h1>${resultTitle()}</h1><div class="result-grid" aria-label="Revealed collectibles" tabindex="0">${pending.pulls.map((pull,i)=>{const item=byId[pull.itemId];return `<article class="result ${item.category}" data-tier="${pull.tier}" style="--rarity:${E.rarityColors[pull.tier]};--delay:${i*.02}s"><span class="rarity">${E.rarityNames[pull.tier]}</span><div class="result-image">${cardImage(item)}</div><h3>${escape(item.name)}</h3><p>${escape(item.detail)}</p><div class="result-value">${money(pull.value)}</div><span class="result-edition">${escape(item.finish).toUpperCase()} · ${escape(item.number)}</span></article>`;}).join('')}</div><div class="result-summary"><span>Cost ${money(pending.cost)}</span><span>Value ${money(total)}</span><strong class="${profit>=0?'positive':'negative'}">${profit>=0?'Profit +':'Net '}${money(profit)}</strong></div><div class="result-actions"><button class="primary" data-action="sell-result">Sell ${pending.quantity>1?'all ':''}· ${money(total)}</button><button class="secondary" data-action="keep-result">Vault ${pending.quantity>1?'all':'item'}</button><button class="text-link" data-action="packs">Choose another pack</button></div>${profit>0||best>=4?`<div class="particles" aria-hidden="true">${Array.from({length:40},(_,i)=>`<i style="--x:${(E.random()-.5)*900}px;--y:${(E.random()-.4)*700}px;--rot:${E.random()*800}deg;--color:${E.rarityColors[i%6]};--delay:${i*.015}s"></i>`).join('')}</div>`:''}</section>`;}
