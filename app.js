@@ -26,10 +26,14 @@ function log(label,amount,kind){state.history.unshift({label,amount,kind,date:ne
 function nav(){const links=[['packs','grid','Packs'],['vault','vault','Vault'],['collection','card','Collection'],['leaderboard','star','Ranks'],['profile','user','Profile']];const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===view?'active':''}" ${key===view?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');$('#desktopNav').innerHTML=html;$('#bottomNav').innerHTML=html;}
 function clearAnimation(){stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
 function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','wallet','leaderboard','opening','item'].includes(next)?next:'packs';search='';limit=30;confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
-function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='wallet'?walletView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs'){bindCarousel();$('.contents-details')?.addEventListener('toggle',refreshLineup);}}
+function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='wallet'?walletView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${icon('star')}${kicker}</div><h1>${title}</h1></div></div>`;}
 function categories(current,action,all=false){return `<div class="category-tabs ${all?'collection-tabs':''}" role="group" aria-label="Collectible category">${all?`<button style="--cat:#d8b9ef" data-action="${action}" data-id="all" class="${current==='all'?'active':''}" aria-pressed="${current==='all'}">All items</button>`:''}${Object.entries(E.categories).map(([id,c])=>`<button style="--cat:${c.color}" data-action="${action}" data-id="${id}" class="${current===id?'active':''}" aria-pressed="${current===id}">${icon(c.icon)}${c.name}</button>`).join('')}</div>`;}
 function packPool(p){return E.pools(catalog,p,mode);}
+function wildCards(pack){
+ if(mode==='Gamble')return [];
+ return E.pools(catalog,pack,'Normal')[5].filter(item=>mode!=='Ultra'||E.value(item)<=pack.price*20);
+}
 function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" style="--foil:${p.color};--foil-alt:${c.color}"><div class="pack-seal top"><i></i></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div><div class="pack-seal bottom"><i></i></div></div>`;}
 function packRipArt(p){return `<div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(p)}</div><div class="seal-track" aria-hidden="true"><i class="seal-trail"></i><span class="seal-spark">${icon('star')}${Array.from({length:6},(_,i)=>`<i style="--sx:${[-12,8,-7,11,-15,5][i]}px;--sy:${[-9,-12,12,8,3,-4][i]}px;--delay:${-i*.09}s"></i>`).join('')}</span></div></div>`;}
 
@@ -55,30 +59,59 @@ function packsView(){
    </section>
    <section class="pack-panel" id="packPanel" aria-label="Selected pack">${packPanel()}</section>
    </div>
-   <details class="contents-details"><summary>What’s inside <span>View cards & rarities</span></summary><div class="section-heading"><h2>${category.name} collection</h2><button class="text-link" data-action="view-category">View collection</button></div><div id="insideLineup"></div></details>
    ${collectionSpotlight()}
+   <dialog id="packDetails" class="pack-dialog" aria-labelledby="packDetailsTitle">
+     <header><h2 id="packDetailsTitle"></h2><form method="dialog"><button aria-label="Close pack details" autofocus>${icon('close')}</button></form></header>
+     <div id="packDetailsBody" class="pack-dialog-body"></div>
+   </dialog>
  </div>`;
 }
 function packPanel(){
  const pack=selectedPack(),groups=packPool(pack),chances=E.odds(catalog,pack,mode);
  const possible=groups.filter((_,tier)=>chances[tier]>0).flat();
- const values=possible.map(E.value),cost=pack.price*quantity,canOpen=state.balance>=cost;
+ const values=[...possible,...wildCards(pack)].map(E.value),cost=pack.price*quantity,canOpen=state.balance>=cost;
  return `<div class="selected-title"><h2>${E.categories[pack.category].name} ${pack.name} Pack</h2><span class="selected-price">${money(pack.price,true)}<small> per pack</small></span></div>
    <div class="pack-facts">
      <div><small>Minimum pull</small><strong>${money(Math.min(...values),true)}</strong></div>
      <div><small>Top chase</small><strong class="chase-value">${money(Math.max(...values),true)}</strong></div>
    </div>
-   <button class="primary open-pack-button pack-open-action" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
-   <details class="pack-options">
-     <summary><span>Pack options</span><small>${mode} · ${quantity} pack${quantity===1?'':'s'}</small></summary>
-     <div class="pack-options-controls">
-       <label for="packQuantity">Quantity</label>
-       <select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n===1?'':'s'}</option>`).join('')}</select>
-       <div class="pack-modes"><span id="packModeLabel">Odds mode</span><div class="mode-tabs" role="group" aria-labelledby="packModeLabel">${Object.keys(E.modes).map(k=>`<button data-action="mode" data-id="${k}" class="${mode===k?'active':''}" aria-pressed="${mode===k}">${k}</button>`).join('')}</div></div>
-     </div>
-   </details>
-   ${simpleOdds(pack,groups,chances)}`;
+   <div class="pack-quick-links" role="group" aria-label="Pack details">
+     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
+     <button data-action="pack-details" data-id="options" aria-haspopup="dialog">Options <small>${mode} · ${quantity} pack${quantity===1?'':'s'}</small></button>
+     <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
+   </div>
+   <button class="primary open-pack-button pack-open-action" data-action="${canOpen?'open':'wallet'}">${canOpen?'Open '+quantity+' pack'+(quantity>1?'s':'')+' · '+money(cost):'Add virtual funds · '+money(cost)} ${icon(canOpen?'bolt':'wallet')}</button>
+   <p class="pack-sim-note">Free virtual currency · No cashouts</p>`;
 }
+
+function packModeControls(){
+ return `<div class="mode-tabs" role="group" aria-label="Odds mode">${Object.keys(E.modes).map(key=>`<button data-action="mode" data-id="${key}" class="${mode===key?'active':''}" aria-pressed="${mode===key}">${key}</button>`).join('')}</div>`;
+}
+
+function openPackDetails(kind){
+ const dialog=$('#packDetails'), pack=selectedPack();
+ const title=$('#packDetailsTitle',dialog), content=$('#packDetailsBody',dialog);
+ if(kind==='options'){
+  title.textContent='Pack options';
+  content.innerHTML=`<div class="pack-options-controls"><label for="packQuantity">Quantity</label>
+    <select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n===1?'':'s'}</option>`).join('')}</select>
+    <div class="pack-modes"><span>Odds mode</span>${packModeControls()}</div></div>`;
+ }else if(kind==='odds'){
+  title.textContent='Pack odds';
+  content.innerHTML=`<p class="pack-dialog-pack">${E.categories[pack.category].name} ${pack.name} Pack</p>
+    ${packModeControls()}
+    <div id="packOddsBody">${packOdds(pack)}</div>`;
+ }else if(kind==='cards'){
+  title.textContent='Cards in this pack';
+  content.innerHTML=`<div class="section-heading"><h3>${E.categories[pack.category].name} collection</h3><button class="text-link" data-action="view-category">View collection</button></div>
+    ${insideLineup()}`;
+ }else return;
+ dialog.addEventListener('close',()=>{
+  if(dialog.isConnected)$('[data-action="pack-details"][data-id="'+kind+'"]')?.focus({preventScroll:true});
+ },{once:true});
+ dialog.showModal();
+}
+
 function scrollToPack(rail, choice, smooth = false) {
   // Use layout coordinates so the pack's visual scale does not shift its snap point.
   const left = choice.offsetLeft - (rail.clientWidth - choice.offsetWidth) / 2;
@@ -177,7 +210,6 @@ function selectPack(index, scroll = true) {
   $('#packSelect').value = selectedIndex;
   $('.pack-room').style.setProperty('--foil', pack.color);
   updatePackPanel();
-  refreshLineup();
   updateCarouselControls();
   if (scroll) scrollToPack(rail, choices[selectedIndex], true);
 }
@@ -245,13 +277,14 @@ function sellItems(ids){const sold=E.sell(state,ids);if(sold.count){log(`Sold ${
 function validDeposit(raw){return E.depositAmount(raw);}
 function deposit(){if(!E.canDeposit(state)){feedback='Deposits unlock when your balance falls below $1.00.';render();return;}const amount=E.deposit(state,$('#depositAmount').value);if(!amount){feedback='Enter an amount from $0.01 to $10.00, with no more than two decimal places.';render();return;}log('Virtual deposit',amount,'deposit');save();feedback=money(amount)+' added. Deposits stay locked while your balance is $1.00 or more.';sound('hit');haptic();render();}
 function showItem(id,uid){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;detailUid=uid;go('item');}
-window.tcgNativeMessage=notice;window.tcgGoBack=()=>{if(view==='packs')return false;go('packs');return true;};
+window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('#packDetails[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
 function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus();if(pos!=null)el?.setSelectionRange(pos,pos);}
 document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','confirm-deposit','redeem-code','sell','favorite','confirm-sell-all','sell-detail','sell-result','save-name','delete-confirm','category','choose-pack','leaderboard-toggle','previous-pack','next-pack'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':case 'wallet':filter='all';go(a);break;
 case 'category':selectedCategory=id;selectedIndex=0;mode='Normal';quantity=1;save();render();break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
-case 'mode':if(E.modes[id]){mode=id;updatePackPanel();refreshLineup();}break;
+case 'pack-details':openPackDetails(id);break;
+case 'mode':if(E.modes[id]){mode=id;updatePackPanel();}break;
 case 'open':startOpening();break;case 'start-seal':beginSeal();break;case 'skip-reveal':if(phase!=='sealed')reveal();break;case 'confirm-deposit':deposit();break;case 'redeem-code':redeemCode();break;
 case 'tier-prev':case 'tier-next':{const row=$('#tierRow'+id);row?.scrollBy({left:(a==='tier-next'?1:-1)*row.clientWidth*.85,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});sound('tick');}break;case 'view-category':filter=selectedCategory;go('collection');break;case 'filter':filter=id;limit=30;render();break;case 'more':{limit+=30;const y=scrollY;render();window.scrollTo(0,y);}break;
 case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);break;
@@ -276,12 +309,20 @@ async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE
 init();
 function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===8;}
 function updatePackPanel(){
- const panel=$('#packPanel'),active=document.activeElement;
- const openStates=$$('details',panel).map(details=>details.open);
- const focus=active?.id==='packQuantity'?'#packQuantity':active?.dataset.action==='mode'?'[data-action="mode"][aria-pressed="true"]':null;
- panel.innerHTML=packPanel();
- $$('details',panel).forEach((details,index)=>{details.open=!!openStates[index];});
- if(focus)$(focus,panel)?.focus({preventScroll:true});
+ $('#packPanel').innerHTML=packPanel();
+ const dialog=$('#packDetails[open]');
+ if(!dialog)return;
+ $$('[data-action="mode"]',dialog).forEach(button=>{
+  const active=button.dataset.id===mode;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
+ const odds=$('#packOddsBody',dialog);
+ if(odds){
+  const expanded=$('.odds-extra',odds)?.open;
+  odds.innerHTML=packOdds(selectedPack());
+  if(expanded)$('.odds-extra',odds).open=true;
+ }
 }
 let receiptTimer,effectTimer,receiptExitTimer;
 function showReceipt(title,detail,kind='wallet',amount=null){let el=$('#receipt');if(!el){el=document.createElement('aside');el.id='receipt';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.append(el);}clearTimeout(receiptTimer);clearTimeout(receiptExitTimer);el.className='receipt '+kind;el.innerHTML=`<div class="receipt-icon">${icon(kind==='vault'?'vault':'coin')}</div><div class="receipt-copy"><small>${escape(title)}</small>${amount!==null?`<strong class="receipt-amount">+${money(amount)}</strong>`:''}<span>${escape(detail)}</span></div><button data-action="dismiss-receipt" aria-label="Dismiss notification">${icon('close')}</button><div class="receipt-progress"></div>`;receiptTimer=setTimeout(()=>{el.classList.add('leaving');receiptExitTimer=setTimeout(()=>el.remove(),220);},3600);}
@@ -294,7 +335,6 @@ function redeemCode(){try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.refe
 function winEffect(profit){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;$('#winCelebration')?.remove();const fx=document.createElement('div');fx.id='winCelebration';fx.className='win-celebration';fx.setAttribute('aria-hidden','true');fx.innerHTML=`<div class="win-halo"></div>${Array.from({length:18},(_,i)=>`<i style="--left:${8+(i*29)%84}%;--delay:${i*.035}s;--drift:${(i%2?1:-1)*(20+i%5*13)}px;--color:${E.rarityColors[i%6]};--spin:${i*23}deg">${icon('coin')}</i>`).join('')}`;document.body.append(fx);setTimeout(()=>fx.remove(),2200);}
 document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){lastInteraction={x:e.clientX,y:e.clientY};const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','tier-prev','tier-next','start-seal','skip-reveal','open','sell','sell-detail','sell-result','confirm-sell-all','confirm-deposit','redeem-code'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
 
-function refreshLineup(){const root=$('#insideLineup');if(root)root.innerHTML=$('.contents-details')?.open?insideLineup():'';}
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;
  const row = Math.floor(item.artIndex / 4);
@@ -322,4 +362,23 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function collectionSpotlight(){const list=catalog.filter(i=>i.category===selectedCategory&&i.id.includes('-expansion-')&&i.finish==='Base');const cards=[0,3,6,9].map(n=>list[n]).filter(Boolean);return `<section class="collection-teaser" aria-label="Collection spotlight"><div class="section-heading"><h2>COLLECTION SPOTLIGHT</h2><button class="text-link" data-action="view-category">View collection</button></div><div class="teaser-grid">${cards.map(item=>`<button class="teaser-card" style="--rarity:${E.rarityColors[item.tier]}" data-action="item" data-id="${item.id}"><span class="teaser-image">${cardImage(item)}</span><span class="teaser-copy"><strong>${escape(item.name)}</strong><small>${escape(item.series)}</small></span></button>`).join('')}</div></section>`;}
 
 function displayOdds(pack,oddsMode=mode){const wild=oddsMode==='Gamble'?0:E.wildChance;return E.odds(catalog,pack,oddsMode).map((n,t)=>n*(1-wild)+(t===5?wild*100:0));}
-function simpleOdds(pack,groups,base){const actual=displayOdds(pack),wild=mode!=='Gamble';return `<details class="odds-details simple-odds"><summary><span class="odds-heading">View odds</span><span class="odds-mode">${mode}</span></summary><p class="odds-intro">Chance per card${wild?' · includes Wild':''}</p><ul class="odds-list">${actual.map((n,t)=>n>0?`<li><span class="odds-label"><i style="--rarity:${E.rarityColors[t]}" aria-hidden="true"></i>${E.rarityNames[t]}</span><strong>${chance(n,2)}</strong></li>`:'').join('')}</ul><p class="odds-note">${wild?'Wild: 1 in 10 openings makes every card a Grail. This is included above.':'Wild is off in Gamble mode. Each card is a separate draw.'}</p><details class="odds-extra"><summary>Values & detailed odds</summary><p class="odds-note">${wild?'Base chances below apply when Wild does not trigger.':'Chances below are per card.'}</p><table class="odds-table"><thead><tr><th>Rarity</th><th>Card value</th><th>${wild?'Base chance':'Chance'}</th></tr></thead><tbody>${groups.map((pool,t)=>{if(!base[t])return '';const vals=pool.map(E.value);return `<tr><td><span class="rarity" style="--rarity:${E.rarityColors[t]}">${E.rarityNames[t]}</span></td><td>${money(Math.min(...vals))}–${money(Math.max(...vals))}</td><td>${chance(base[t],2)}</td></tr>`;}).join('')}</tbody></table><p class="odds-note">Average card value${wild?' before Wild':''}: ${money(Math.round(E.expectedReturn(catalog,pack,mode)*pack.price))}. Individual card chances are under What’s inside. All values are free simulator currency.</p></details></details>`;}
+function packOdds(pack){
+ const groups=packPool(pack),base=E.odds(catalog,pack,mode);
+ const actual=displayOdds(pack),wild=mode!=='Gamble';
+ const rows=actual.map((percent,tier)=>({percent,tier,values:groups[tier].map(E.value)}))
+   .filter(row=>row.percent>0).reverse();
+ const wildValues=wildCards(pack).map(E.value);
+ const range=values=>values.length?`${money(Math.min(...values))}–${money(Math.max(...values))}`:'';
+ return `<p class="odds-intro">Chance per card${wild?' · includes Wild':''}</p>
+   <ul class="pack-odds-list">${rows.map(({percent,tier,values})=>`<li style="--rarity:${E.rarityColors[tier]}">
+     <div><span>${E.rarityNames[tier]} <small>${range(tier===5?[...values,...wildValues]:values)}</small></span><strong>${chance(percent,2)}</strong></div>
+     <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]} chance"></progress>
+   </li>`).join('')}</ul>
+   <p class="odds-note">${wild?'Wild: 1 in 10 openings makes every card a Grail. This is included above.':'Wild is off in Gamble mode. Each card is a separate draw.'}</p>
+   <details class="odds-extra"><summary>Values & detailed odds</summary>
+     <p class="odds-note">${wild?'Base chances below apply when Wild does not trigger.':'Chances below are per card.'}</p>
+     <table class="odds-table"><thead><tr><th>Rarity</th><th>Card value</th><th>${wild?'Base chance':'Chance'}</th></tr></thead>
+     <tbody>${rows.filter(row=>base[row.tier]>0).map(({tier,values})=>`<tr><td class="rarity" style="--rarity:${E.rarityColors[tier]}">${E.rarityNames[tier]}</td><td>${range(values)}</td><td>${chance(base[tier],2)}</td></tr>`).join('')}</tbody></table>
+     <p class="odds-note">Average card value${wild?' before Wild':''}: ${money(Math.round(E.expectedReturn(catalog,pack,mode)*pack.price))}. Values are in virtual currency.</p>
+   </details>`;
+}
