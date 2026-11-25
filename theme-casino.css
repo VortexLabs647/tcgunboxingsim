@@ -1417,12 +1417,6 @@ body::before { background: none; }
   color: #f5eaff;
 }
 
-body[data-view="packs"] .header-wallet .deposit {
-  background: linear-gradient(145deg, #9753dd, #5f2a9b 57%, #64266e);
-  border-color: #d4a2ff;
-  box-shadow: inset 0 1px #fff6, 0 0 12px #ae52d04d;
-}
-
 .pack-room > .category-tabs button.active {
   border-color: color-mix(in srgb, var(--cat) 80%, #fff);
   background: linear-gradient(145deg, color-mix(in srgb, var(--cat) 32%, #1b1232), #231633);
@@ -1432,17 +1426,6 @@ body[data-view="packs"] .header-wallet .deposit {
 .pack-room .pack-showcase .carousel-shell {
   background: radial-gradient(ellipse at 50% 46%, color-mix(in srgb, var(--foil) 33%, #352255), #231535 54%, #130f20 86%);
 }
-
-.pack-quick-links button {
-  --button-accent: #a381ee;
-  border-color: color-mix(in srgb, var(--button-accent) 60%, #46315c);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--button-accent) 23%, #231735), #20152e);
-  box-shadow: inset 0 1px #fff1;
-}
-
-.pack-quick-links button[data-id="options"] { --button-accent: #68cfdc; }
-.pack-quick-links button[data-id="cards"] { --button-accent: #e780c5; }
-.pack-quick-links button:hover { border-color: var(--button-accent); }
 
 .pack-room .pack-open-action {
   border-color: #ff96d8;
@@ -1468,12 +1451,6 @@ body[data-view="packs"] .header-wallet .deposit {
   color: #fff7ff;
 }
 
-body[data-view="packs"] .bottom-nav .nav-link.active {
-  background: linear-gradient(150deg, #4d25566b, #37224750);
-  box-shadow: inset 0 -2px #e888db;
-  color: #f9dffa;
-}
-
 @media (max-width: 820px), (max-width: 900px) and (hover: none) and (pointer: coarse) {
   .pack-room .pack-showcase .carousel-controls {
     grid-template-columns: 34px minmax(0, 1fr) 34px;
@@ -1492,4 +1469,162 @@ body[data-view="packs"] .bottom-nav .nav-link.active {
   .pack-room .pack-showcase .carousel-shell {
     background: radial-gradient(ellipse at 50% 44%, color-mix(in srgb, var(--foil) 32%, #3a205a) 0%, #241537 53%, transparent 86%);
   }
+}
+
+/* Action colors used across the simulator. */
+:root {
+  --action-violet: #c19aff;
+  --action-cyan: #59e2ef;
+  --action-magenta: #f88bcf;
+  --action-gold: #ffc66e;
+  --action-coral: #ff96a8;
+}
+
+:where(.primary, .secondary, .deposit, .user-button, .nav-link,
+    .category-tabs button, .mode-tabs button, .account-tabs button,
+    .profile-fold > summary, .item-actions button, .tier-nav button,
+    .pack-quick-links button, .pack-dialog header button, .receipt button,
+    .pack-room .carousel-controls > button, .skip-button) {
+  --action-accent: var(--action-violet);
+  --action-ink: color-mix(in srgb, var(--action-accent) 23%, #fff);
+  --action-edge: color-mix(in srgb, var(--action-accent) 63%, #282039);
+  --action-fill: linear-gradient(145deg,
+    color-mix(in srgb, var(--action-accent) 36%, #171125),
+    color-mix(in srgb, var(--action-accent) 16%, #171125));
+  --action-fill-selected: linear-gradient(145deg,
+    color-mix(in srgb, var(--action-accent) 48%, #21122f),
+    color-mix(in srgb, var(--action-accent) 24%, #21122f));
+}
+
+:is(.primary, .account-buttons .primary, .header-wallet .deposit):not(:where(.pack-open-action)) {
+  color: var(--primary-ink, #fff7ff);
+  border-color: var(--primary-edge, var(--action-violet));
+  background: var(--primary-fill, linear-gradient(135deg, #7133ad, #512c99 60%, #6c2d88));
+  box-shadow: inset 0 1px #ffffff40, 0 3px 10px #190c304d;
+  text-shadow: none;
+}
+
+:is([href="#vault"], [data-action="keep-result"], [data-action="confirm-deposit"],
+    [data-cloud-action="sync"], [data-action="save-name"], [data-action="more"],
+    [data-profile-section="stats"] > summary, .apk-download, .user-button) {
+  --action-accent: var(--action-cyan);
+}
+
+:is([href="#collection"], [data-action="favorite"], [data-action="redeem-code"],
+    [data-profile-section="referral"] > summary, [data-cloud-action="signup-tab"]) {
+  --action-accent: var(--action-magenta);
+}
+
+:is([href="#leaderboard"], [data-action="sell"], [data-action="sell-detail"],
+    [data-action="sell-all"], [data-action="confirm-sell-all"], [data-action="sell-result"],
+    [data-action="leaderboard-refresh"], [data-profile-section="rankings"] > summary) {
+  --action-accent: var(--action-gold);
+}
+
+:is(.danger, [data-profile-section="delete"] > summary) {
+  --action-accent: var(--action-coral);
+}
+
+:is([data-action="confirm-deposit"], .account-buttons [data-cloud-action="sync"],
+    [data-action="save-name"], .apk-download) {
+  --primary-fill: linear-gradient(135deg, #156e83, #194b70 63%, #244179);
+  --primary-edge: var(--action-cyan);
+}
+
+:is([data-action="sell-result"], [data-action="sell-detail"], [data-action="confirm-sell-all"]) {
+  --primary-fill: linear-gradient(135deg, #ffde96, #f5ad5d);
+  --primary-edge: #ffe8b6;
+  --primary-ink: #33182c;
+}
+
+[data-action="redeem-code"] {
+  --primary-fill: linear-gradient(135deg, #9d306c, #762c86 65%, #572788);
+  --primary-edge: var(--action-magenta);
+}
+
+:is(.secondary, .account-buttons .secondary, .user-button, .account-tabs button,
+    .item-actions button:first-child, .item-actions button + button,
+    .tier-nav button, .pack-dialog header button, .receipt button, .skip-button,
+    .pack-room .carousel-controls > button, .pack-quick-links button) {
+  background: var(--action-fill);
+  border-color: var(--action-edge);
+  color: var(--action-ink);
+  box-shadow: inset 0 1px #ffffff24;
+}
+
+.pack-quick-links button[data-id="options"] { --action-accent: var(--action-cyan); }
+.pack-quick-links button[data-id="cards"] { --action-accent: var(--action-magenta); }
+.pack-quick-links button small { color: var(--action-ink); }
+
+:is(.profile-fold > summary, .profile-fold[open] > summary, .profile-fold > summary:hover) {
+  background: var(--action-fill);
+  color: var(--action-ink);
+}
+
+.profile-fold > summary > span { color: var(--action-accent); }
+.profile-fold[open] > summary { background: var(--action-fill-selected); }
+
+.category-tabs button { --action-accent: var(--cat, var(--action-violet)); }
+:is(.category-tabs button, .pack-room > .category-tabs button) {
+  background: var(--action-fill);
+  border-color: var(--action-edge);
+  color: var(--action-ink);
+}
+
+.mode-tabs button[data-id="High"] { --action-accent: var(--action-cyan); }
+.mode-tabs button[data-id="Max"] { --action-accent: var(--action-gold); }
+.mode-tabs button:is([data-id="Ultra"], [data-id="Gamble"]) { --action-accent: var(--action-magenta); }
+
+:is(.pack-dialog-body .mode-tabs button, .pack-dialog-body .mode-tabs button[data-id="Gamble"]) {
+  background: var(--action-fill);
+  color: var(--action-ink);
+  border-color: var(--action-edge);
+}
+
+:is(.category-tabs button.active, .pack-room > .category-tabs button.active,
+    .pack-dialog-body .mode-tabs button.active,
+    .pack-dialog-body .mode-tabs button[data-id="Gamble"].active,
+    .account-tabs button.active, .topbar .nav-link.active, .bottom-nav .nav-link.active) {
+  background: var(--action-fill-selected);
+  border-color: var(--action-accent);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px var(--action-edge), inset 0 -2px var(--action-accent);
+}
+
+:is(.category-tabs button, .topbar .nav-link, .bottom-nav .nav-link) .icon {
+  color: var(--action-accent);
+}
+
+/* Override the base theme's fixed danger text color. */
+.secondary.danger:enabled { color: var(--action-ink) !important; }
+
+.text-link { color: #8ee5f4; }
+.text-link:hover { color: #c5f7ff; }
+
+@media (hover: hover) {
+  :is(.primary, .secondary, .deposit, .user-button, .account-tabs button,
+      .category-tabs button, .mode-tabs button, .item-actions button,
+      .tier-nav button, .pack-dialog header button, .receipt button, .skip-button,
+      .pack-room .carousel-controls > button, .pack-quick-links button):enabled:hover,
+  :is(a.primary, a.secondary, .profile-fold > summary):hover {
+    border-color: var(--action-accent);
+    filter: brightness(1.1);
+  }
+
+  :is(.topbar, .bottom-nav) .nav-link:not(.active):hover { background: var(--action-fill); }
+}
+
+:is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):focus-visible, .profile-fold > summary:focus-visible {
+  outline-color: #a9f1ff;
+}
+
+:is(button.primary, button.secondary, .item-actions button:first-child,
+    .item-actions button + button, .pack-room .carousel-controls > button):disabled {
+  opacity: 1;
+  background: #262130;
+  border-color: #665974;
+  color: #c2b7ce;
+  box-shadow: none;
+  text-shadow: none;
+  filter: none;
 }
