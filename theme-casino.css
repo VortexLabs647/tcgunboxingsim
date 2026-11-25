@@ -2147,22 +2147,17 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   font-size: clamp(1.12rem, 5.2vw, 1.65rem);
 }
 
-/* Peel the top seal, lower the wrapper, and bring the wheel in behind it. */
-.charging .rip-pack {
-  animation: foil-slip var(--tear-time) cubic-bezier(.32,.1,.42,1) both;
-}
-.charging .foil-shell .pack-seal.top {
-  animation: foil-strip var(--tear-time) ease-out both;
-}
+/* A short peel crossfades the wrapper into the wheel. */
+.opening-screen { grid-template-rows: auto auto minmax(0,1fr) auto; }
+.charging .rip-pack { animation: foil-slip var(--tear-time) ease-out both; }
+.charging .foil-shell .pack-seal.top { animation: foil-strip var(--tear-time) ease-out both; }
 @keyframes foil-slip {
-  0% { transform: translateY(0); opacity: 1; }
-  23% { transform: translateY(2%) rotate(-2deg); opacity: 1; }
-  100% { transform: translateY(30%) rotate(6deg) scale(.9); opacity: 0; }
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(14%); }
 }
 @keyframes foil-strip {
-  0% { transform: translate(0,0); opacity: 1; }
-  24% { transform: translate(12%,-37%) rotate(-7deg); opacity: 1; }
-  100% { transform: translate(62%,-235%) rotate(-25deg); opacity: 0; }
+  from { transform: none; }
+  to { transform: translate(27%,-85%) rotate(-12deg); }
 }
 
 /* One wrapper template is used for every category, edition and opening stage. */
@@ -2259,11 +2254,11 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 .opening-stage .card-wheel { width: min(90cqw, 90cqh, 430px); }
 .charging .card-wheel {
   visibility: visible;
-  animation: wheel-entrance var(--tear-time) cubic-bezier(.25,.6,.35,1) both;
+  animation: wheel-entrance var(--tear-time) ease-in both;
 }
 @keyframes wheel-entrance {
-  0%, 25% { opacity: 0; transform: translateY(9%) scale(.82); }
-  100% { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .wheel-disc {
   position: absolute;
@@ -2403,6 +2398,16 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   box-shadow: none;
   clip-path: none;
 }
+/* Tint the metal and leave the printed art and lettering at their original colors. */
+.foil[data-edition="Sapphire"] { --wrapper-tint: hue-rotate(-67deg); }
+.foil[data-edition="Amethyst"] { --wrapper-tint: hue-rotate(-28deg) saturate(1.28); }
+.foil[data-edition="Emerald"] { --wrapper-tint: hue-rotate(215deg); }
+.foil[data-edition="Ruby"] { --wrapper-tint: hue-rotate(47deg) saturate(1.35); }
+.foil[data-edition="Gold"] { --wrapper-tint: hue-rotate(103deg) saturate(1.4); }
+.foil[data-edition="Obsidian"] { --wrapper-tint: hue-rotate(-55deg) saturate(.24) brightness(.69); }
+.foil[data-edition="Diamond"] { --wrapper-tint: hue-rotate(-100deg) saturate(.66) brightness(1.25); }
+.foil[data-edition="Sovereign"] { --wrapper-tint: hue-rotate(72deg) saturate(1.43); }
+.foil::before, .foil .pack-seal.top { filter: var(--wrapper-tint, none); }
 .foil .foil-logo { top: 8%; }
 .foil .foil-title { bottom: 9%; }
 .foil .foil-category { bottom: 4%; }

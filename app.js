@@ -11,7 +11,7 @@ let effectsBus=null,effectSources=new Set(),effectsUntil=0,winSources=new Set(),
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,balanceFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
-const SEAL_SWEEP_MS=680,TEAR_MS=560,SPIN_MS=3600,FACE_UP_AT=1;
+const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
 const REFERRAL_KEY='tcg-cccollectables-claimed';
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedCategory='creatures',selectedIndex=0,mode='Normal',quantity=1,search='',filter='all',sort='recent',limit=30,detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -34,8 +34,8 @@ function wildCards(pack,oddsMode=mode){
  if(oddsMode==='Gamble')return [];
  return E.pools(catalog,pack,'Normal')[5].filter(item=>oddsMode!=='Ultra'||E.value(item)<=pack.price*20);
 }
-function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" data-edition="${p.name}" style="--foil:#ed83cd;--foil-alt:#ad6fea"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div></div>`;}
-function packRipArt(p){return `<div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(p)}</div><div class="seal-track" aria-hidden="true"><i class="seal-trail"></i><span class="seal-spark">${icon('star')}${Array.from({length:6},(_,i)=>`<i style="--sx:${[-12,8,-7,11,-15,5][i]}px;--sy:${[-9,-12,12,8,3,-4][i]}px;--delay:${-i*.09}s"></i>`).join('')}</span></div></div>`;}
+function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" data-edition="${p.name}" style="--foil:${p.color}"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div></div>`;}
+
 
 function packsView(){
  const category=E.categories[selectedCategory],selected=selectedPack();
@@ -242,18 +242,40 @@ function itemView(){const item=byId[detailId];if(!item)return empty('CARD NOT FO
 function haptic(pattern=20){if(navigator.vibrate)navigator.vibrate(pattern);}
 function sound(kind){try{if(kind==='tick'){const now=performance.now();if(now-lastTickAt<65)return;lastTickAt=now;}audioCtx??=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});const now=audioCtx.currentTime;if((kind==='tick'||kind==='click')&&now<effectsUntil)return;stopEffects();effectsBus=audioCtx.createGain();effectsBus.gain.value=1;effectsBus.connect(audioCtx.destination);effectsUntil=now+({tick:.055,click:.08,seal:1.65,charge:.42,rip:.35,burst:.5,cash:.6,grail:.85,hit:.5}[kind]||.5);const tone=(freq,t,d=.12,gain=.035,type='sine')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,now+t);g.gain.setValueAtTime(.001,now+t);g.gain.exponentialRampToValueAtTime(gain,now+t+.008);g.gain.exponentialRampToValueAtTime(.001,now+t+d);o.connect(g);g.connect(effectsBus);trackEffect(o);o.start(now+t);o.stop(now+t+d+.02);};if(kind==='tick'){tone(720,0,.045,.017,'triangle');return;}if(kind==='click'){tone(460,0,.055,.02,'triangle');tone(620,.025,.04,.012);return;}if(kind==='seal'){[1319,1568,1760,2093,2349].forEach((f,i)=>tone(f,.12+i*.3,.24,.012,'sine'));return;}if(kind==='charge'){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(75,now);o.frequency.exponentialRampToValueAtTime(520,now+.36);g.gain.setValueAtTime(.001,now);g.gain.linearRampToValueAtTime(.06,now+.24);g.gain.exponentialRampToValueAtTime(.001,now+.4);o.connect(g);g.connect(effectsBus);trackEffect(o);o.start();o.stop(now+.42);return;}if(kind==='rip'||kind==='burst'){const length=Math.floor(audioCtx.sampleRate*(kind==='rip'?.35:.2)),buffer=audioCtx.createBuffer(1,length,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/length,1.7);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),filter=audioCtx.createBiquadFilter();src.buffer=buffer;filter.type=kind==='rip'?'highpass':'lowpass';filter.frequency.value=kind==='rip'?1100:900;g.gain.value=.12;src.connect(filter);filter.connect(g);g.connect(effectsBus);trackEffect(src);src.start();if(kind==='rip')return;}const notes=kind==='cash'?[784,988,1175,1568]:kind==='grail'?[392,523,659,784,1047,1568]:kind==='burst'?[131,262,523]:[523,659,784];notes.forEach((f,i)=>tone(f,i*.095,.28,.045));}catch{}}
 function startOpening(){if(pending&&view==='opening')return;stopWinMusic();const pack=selectedPack(),purchase=E.purchase(state,catalog,pack,mode,quantity);if(!purchase){go('wallet');notice('Add virtual funds to open this pack.');return;}pending=purchase;log(`${quantity}× ${E.categories[pack.category].name} ${pack.name} · ${mode}`,-purchase.cost,'pack');save();phase='sealed';view='opening';history.replaceState(null,'','#opening');render();window.scrollTo({top:0,behavior:'instant'});}
-function sparkles(){return `<div class="stage-sparkles">${Array.from({length:14},(_,i)=>`<i style="left:${(i*37)%100}%;top:${(i*23)%100}%;--speed:${2+i%4}s;--delay:${-(i%6)}s"></i>`).join('')}</div>`;}
-function openingView(){if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');if(phase==='revealed')return resultsView();const p=pending.pack;return `<section class="opening-screen ${phase}" id="openingScreen" style="--foil:${p.color};--spin-color:${E.rarityColors[0]};--seal-time:${SEAL_SWEEP_MS}ms;--tear-time:${TEAR_MS}ms;--spin-time:${SPIN_MS}ms"><div class="eyebrow">${E.categories[p.category].name} · ${p.name} · ${pending.mode}</div><h1>${phase==='sealed'?'READY TO <em>RIP.</em>':phase==='unsealing'?'UNSEALING YOUR <em>PACK.</em>':'YOUR NEXT <em>DISCOVERY.</em>'}</h1><div class="opening-stage"><div class="opening-aura" aria-hidden="true"></div>${sparkles()}${raritySpinner()}<button class="rip-pack" id="ripPack" type="button" data-action="start-seal" aria-label="Open purchased pack" ${phase!=='sealed'?'disabled':''}>${packRipArt(p)}</button></div><p class="rip-instruction"><span class="opening-message">${phase==='sealed'?'Click or tap the pack to open.':phase==='unsealing'?'Unsealing your pack…':'Opening your pack…'}</span><strong class="spin-readout" aria-hidden="true"><span class="rarity-label"></span></strong></p><button class="skip-button" data-action="skip-reveal" ${phase==='sealed'?'disabled':''}>Reveal now</button></section>`;}
-
-function beginSeal(){
- if(!pending||view!=='opening'||phase!=='sealed')return;
- phase='unsealing';const screen=$('#openingScreen');screen.classList.replace('sealed','unsealing');$('#ripPack').disabled=true;$('.skip-button',screen).disabled=false;$('h1',screen).innerHTML='UNSEALING YOUR <em>PACK.</em>';$('.opening-message',screen).textContent='Unsealing your pack…';
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
- if(!reduced)sound('seal');
- timers.push(setTimeout(()=>{if(pending&&view==='opening'&&phase==='unsealing')rip();},reduced?60:SEAL_SWEEP_MS));
+function openingView(){
+ if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');
+ if(phase==='revealed')return resultsView();
+ const pack=pending.pack;
+ return `<section class="opening-screen ${phase}" id="openingScreen" style="--foil:${pack.color};--spin-color:${E.rarityColors[0]};--tear-time:${TEAR_MS}ms;--spin-time:${SPIN_MS}ms">
+   <div class="eyebrow">${E.categories[pack.category].name} · ${pack.name} · ${pending.mode}</div>
+   <h1>${phase==='sealed'?'READY TO <em>RIP.</em>':'CARD <em>WHEEL.</em>'}</h1>
+   <div class="opening-stage">
+     <div class="opening-aura" aria-hidden="true"></div>
+     ${raritySpinner()}
+     <button class="rip-pack" id="ripPack" type="button" data-action="start-seal" aria-label="Open purchased pack" ${phase!=='sealed'?'disabled':''}>
+       <div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(pack)}</div></div>
+     </button>
+   </div>
+   <p class="rip-instruction" role="status">
+     <span class="opening-message">${phase==='sealed'?'Tap the pack to open.':'Opening your pack…'}</span>
+     <strong class="spin-readout"><span class="rarity-label"></span></strong>
+   </p>
+ </section>`;
 }
 
-function rip(){if(!pending||phase!=='unsealing')return;phase='charging';const screen=$('#openingScreen'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;screen.classList.replace('unsealing','charging');$('h1',screen).innerHTML='YOUR NEXT <em>DISCOVERY.</em>';$('.opening-message',screen).textContent='Opening your pack…';sound('rip');haptic(15);timers.push(setTimeout(reduced?reveal:spinReveal,reduced?60:TEAR_MS));}
+function rip(){
+ if(!pending||view!=='opening'||phase!=='sealed')return;
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches){reveal();return;}
+ phase='charging';
+ const screen=$('#openingScreen');
+ screen.classList.replace('sealed','charging');
+ $('#ripPack').disabled=true;
+ $('h1',screen).innerHTML='CARD <em>WHEEL.</em>';
+ $('.opening-message',screen).textContent='Opening your pack…';
+ sound('rip');
+ haptic(15);
+ timers.push(setTimeout(spinReveal,TEAR_MS));
+}
 
 // One awarded pull supplies both the face-up artwork and the final rarity. For a batch, feature its best pull.
 function openingPull(){return pending.pulls.reduce((best,pull)=>pull.tier>best.tier||(pull.tier===best.tier&&pull.value>best.value)?pull:best);}
@@ -288,7 +310,6 @@ function spinReveal(){
  const tier=openingPull().tier;
  screen.style.setProperty('--spin-color','#c7a4fb');
  screen.classList.add('spinning');
- $('h1',screen).innerHTML='CARD <em>WHEEL.</em>';
  timers.push(setTimeout(()=>{
   if(!pending||view!=='opening'||phase!=='spinning')return;
   screen.classList.add('face-up','landed');
@@ -339,7 +360,7 @@ case 'apply-odds':{
  updatePackPanel();
  break;
 }
-case 'open':startOpening();break;case 'start-seal':beginSeal();break;case 'skip-reveal':if(phase!=='sealed')reveal();break;case 'confirm-deposit':deposit();break;case 'redeem-code':redeemCode();break;
+case 'open':startOpening();break;case 'start-seal':rip();break;case 'confirm-deposit':deposit();break;case 'redeem-code':redeemCode();break;
 case 'tier-prev':case 'tier-next':{const row=$('#tierRow'+id);row?.scrollBy({left:(a==='tier-next'?1:-1)*row.clientWidth*.85,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});sound('tick');}break;case 'view-category':filter=selectedCategory;go('collection');break;case 'filter':filter=id;limit=30;render();break;case 'more':{limit+=30;const y=scrollY;render();window.scrollTo(0,y);}break;
 case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);break;
 case 'sell':{const v=state.vault.find(v=>v.uid===id),name=byId[v?.itemId]?.name,sold=sellItems([id]);render();if(sold.count)saleEffect(sold.amount,name+' sold');}break;
@@ -392,7 +413,7 @@ function insideLineup(){const p=selectedPack(),groups=packPool(p),odds=E.odds(ca
 function referralForm(){return `<h2>REFERRAL CODE</h2><p>Redeem a code for a one-time virtual balance reward.</p><label class="field-label" for="referralCode">Your code</label><input id="referralCode" class="full-width" maxlength="40" autocomplete="off" placeholder="Enter referral code" ${state.referralClaimed?'disabled':''}><button class="primary full" data-action="redeem-code" ${state.referralClaimed?'disabled':''}>${state.referralClaimed?'Reward already claimed':'Redeem code'}</button><small>${state.referralClaimed?'Your one-time reward is saved on this device.':'One redemption per device profile.'}</small>`;}
 function redeemCode(){try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;}catch{}const result=E.redeemReferral(state,$('#referralCode').value);if(!result.ok){feedback=result.reason==='claimed'?'You have already used this referral reward.':'That referral code was not found.';render();notice(feedback);return;}try{localStorage.setItem(REFERRAL_KEY,'1');}catch{}save();feedback='$100.00 referral reward added.';render();saleEffect(result.amount,'Referral reward · one-time use','Code redeemed');}
 function winEffect(profit){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;$('#winCelebration')?.remove();const fx=document.createElement('div');fx.id='winCelebration';fx.className='win-celebration';fx.setAttribute('aria-hidden','true');fx.innerHTML=`<div class="win-halo"></div>${Array.from({length:18},(_,i)=>`<i style="--left:${8+(i*29)%84}%;--delay:${i*.035}s;--drift:${(i%2?1:-1)*(20+i%5*13)}px;--color:${E.rarityColors[i%6]};--spin:${i*23}deg">${icon('coin')}</i>`).join('')}`;document.body.append(fx);setTimeout(()=>fx.remove(),2200);}
-document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){lastInteraction={x:e.clientX,y:e.clientY};const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','tier-prev','tier-next','start-seal','skip-reveal','open','sell','sell-detail','sell-result','confirm-sell-all','confirm-deposit','redeem-code'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){lastInteraction={x:e.clientX,y:e.clientY};const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','tier-prev','tier-next','start-seal','open','sell','sell-detail','sell-result','confirm-sell-all','confirm-deposit','redeem-code'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
 
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;
