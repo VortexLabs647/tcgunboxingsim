@@ -52,9 +52,7 @@ function packsView(){
      </div>
      <div class="carousel-controls">
        <button data-action="previous-pack" aria-label="Previous pack">${icon('chevron')}<span>Previous</span></button>
-       <div class="pack-pagination" role="group" aria-label="Pack editions">
-         ${editions.map(pack=>`<button type="button" data-action="choose-pack" data-id="${pack.index}" style="--edition-color:${pack.color}" aria-pressed="${pack.index===selectedIndex}" aria-label="${pack.name}, ${money(pack.price,true)}" title="${pack.name} · ${money(pack.price,true)}"></button>`).join('')}
-       </div>
+       <p class="pack-edition-count" role="status" data-total="${editions.length}">${editionPosition(selected,editions.length)}</p>
        <button data-action="next-pack" aria-label="Next pack"><span>Next</span>${icon('chevron')}</button>
      </div>
    </section>
@@ -72,6 +70,9 @@ function packsView(){
    </dialog>
  </div>`;
 }
+function editionPosition(pack,total){
+ return `${pack.name} · ${pack.index+1} of ${total}`;
+}
 function packValueRange(pack,oddsMode=mode){
  const chances=E.odds(catalog,pack,oddsMode);
  const possible=packPool(pack,oddsMode).filter((_,tier)=>chances[tier]>0).flat();
@@ -82,9 +83,12 @@ function packPanel(){
  const pack=selectedPack(),{min,max}=packValueRange(pack);
  const cost=pack.price*quantity,canOpen=state.balance>=cost;
  return `<div class="selected-title"><h2>${E.categories[pack.category].name} ${pack.name} Pack</h2><span class="selected-price">${money(pack.price,true)}<small> per pack</small></span></div>
-   <div class="pack-facts">
-     <div><small>Minimum pull</small><strong>${money(min,true)}</strong></div>
-     <div><small>Top chase</small><strong class="chase-value">${money(max,true)}</strong></div>
+   <div class="pack-value-summary" role="group" aria-labelledby="packValuesLabel">
+     <p id="packValuesLabel">Virtual card values</p>
+     <div class="pack-facts">
+       <div><small>Minimum pull</small><strong>${money(min,true)}</strong></div>
+       <div><small>Highest possible pull</small><strong class="chase-value">${money(max,true)}</strong></div>
+     </div>
    </div>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
      <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">${icon('chart')}<span>Odds</span></button>
@@ -225,9 +229,8 @@ function selectPack(index, scroll = true) {
     choice.classList.toggle('selected', i === selectedIndex);
     choice.setAttribute('aria-pressed', String(i === selectedIndex));
   });
-  $$('.pack-pagination button').forEach((dot, i) => {
-    dot.setAttribute('aria-pressed', String(i === selectedIndex));
-  });
+  const counter = $('.pack-edition-count');
+  if (before !== selectedIndex) counter.textContent = editionPosition(pack,counter.dataset.total);
   $('.pack-room').style.setProperty('--foil', pack.color);
   updatePackPanel();
   updateCarouselControls();
