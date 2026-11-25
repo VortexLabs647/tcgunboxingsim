@@ -2201,3 +2201,35 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   }
   100% { transform: perspective(880px) rotateY(900deg); }
 }
+
+/* Share the illustrated foil print across carousel, odds thumbnail and rip stage. */
+.printed-wrapper, .printed-seam {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: url("pack-opal-print.webp") center / 100% 100% no-repeat;
+}
+.printed-wrapper {
+  mask-image: linear-gradient(to bottom, transparent 7.8%, black 7.9% 29%, transparent 34% 92%, black 96%);
+}
+.printed-seam { clip-path: inset(0 0 92%); }
+.foil:has(.printed-wrapper) .foil-logo { visibility: hidden; }
+.foil.creatures[data-edition="Opal"] .printed-wrapper { mask-image: linear-gradient(transparent 7.8%, black 7.9%); }
+.foil.creatures[data-edition="Opal"] > :is(.pack-seal,.foil-body) { visibility: hidden; }
+.foil[data-edition="Sapphire"] { --print-hue: 275deg; }
+.foil[data-edition="Amethyst"] { --print-hue: 330deg; }
+.foil[data-edition="Emerald"] { --print-hue: 195deg; }
+.foil[data-edition="Ruby"] { --print-hue: 43deg; }
+.foil[data-edition="Gold"] { --print-hue: 89deg; }
+.foil[data-edition="Obsidian"] { --print-hue: 280deg; --print-saturation: .38; }
+.foil[data-edition="Diamond"] { --print-hue: 230deg; }
+.foil[data-edition="Sovereign"] { --print-hue: 75deg; }
+.printed-seam, .printed-wrapper { filter: hue-rotate(var(--print-hue,0deg)) saturate(var(--print-saturation,1)); }
+.charging .printed-seam { animation: foil-strip var(--tear-time) ease-out both; transform-origin: top right; }
+.charging .rarity-spin { opacity: 1; }
+.charging .card-lift { animation: draw-from-wrapper var(--tear-time) ease-out both; }
+@keyframes draw-from-wrapper {
+  from { opacity: 0; transform: translateY(10%) scale(.72); }
+  to { opacity: 1; transform: translateY(calc(20% - 24px)) scale(.84) rotate(-7deg); }
+}
