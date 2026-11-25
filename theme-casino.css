@@ -9,8 +9,20 @@
     U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+@font-face {
+  font-family: 'Fredoka';
+  src: url('fredoka-bold-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   --interface-font: 'Nunito', 'DM Sans', system-ui, sans-serif;
+  --display-font: 'Fredoka', var(--interface-font);
   font-family: var(--interface-font);
 }
 
@@ -986,7 +998,7 @@ body::before { background: none; }
 
 .pack-room .pack-showcase .selected-title h2 {
   color: #fcf5ff;
-  font-family: var(--interface-font);
+  font-family: var(--display-font);
   font-size: clamp(1.25rem, 2.3vw, 1.65rem);
   font-weight: 800;
   line-height: 1.13;
@@ -1823,7 +1835,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 }
 
 .pack-dialog[data-kind="odds"] h2 {
-  font: 800 clamp(1rem, 4.6vw, 1.35rem)/1.2 var(--interface-font);
+  font: 700 clamp(1rem, 4.6vw, 1.35rem)/1.2 var(--display-font);
 }
 
 .pack-dialog-pack {
@@ -2062,15 +2074,10 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 .pack-odds-list progress::-moz-progress-bar { border-radius: 5px; }
 
 
-/* Keep the rounded interface lettering separate from the pack and card logos. */
-:is(h1, h2, .result-value, .spin-face-design > strong) {
-  font-family: var(--interface-font);
-}
-
-h1 { font-weight: 900; }
-h2 { font-weight: 800; }
-
+/* Chunky display lettering matches the glossy buttons. */
+:is(h1, h2, .pack-edition-count, .result-value, .spin-face-design > strong),
 :is(button, .primary, .secondary, .nav-link, .profile-fold > summary, .odds-extra > summary):not(:where(
     .pack-choice, .rip-pack, .item-button, .teaser-card)) {
-  font-weight: 750;
+  font-family: var(--display-font);
+  font-weight: 700;
 }
