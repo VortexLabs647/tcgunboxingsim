@@ -11,7 +11,7 @@ let effectsBus=null,effectSources=new Set(),effectsUntil=0,winSources=new Set(),
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,balanceFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
-const SEAL_SWEEP_MS=780,TEAR_MS=320,SPIN_MS=3600,FACE_UP_AT=1;
+const SEAL_SWEEP_MS=680,TEAR_MS=560,SPIN_MS=3600,FACE_UP_AT=1;
 const REFERRAL_KEY='tcg-cccollectables-claimed';
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedCategory='creatures',selectedIndex=0,mode='Normal',quantity=1,search='',filter='all',sort='recent',limit=30,detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -34,7 +34,7 @@ function wildCards(pack,oddsMode=mode){
  if(oddsMode==='Gamble')return [];
  return E.pools(catalog,pack,'Normal')[5].filter(item=>oddsMode!=='Ultra'||E.value(item)<=pack.price*20);
 }
-function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" data-edition="${p.name}" style="--foil:#ed83cd;--foil-alt:#ad6fea"><div class="pack-seal top"><i></i></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div><div class="pack-seal bottom"><i></i></div></div>`;}
+function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" data-edition="${p.name}" style="--foil:#ed83cd;--foil-alt:#ad6fea"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div></div>`;}
 function packRipArt(p){return `<div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(p)}</div><div class="seal-track" aria-hidden="true"><i class="seal-trail"></i><span class="seal-spark">${icon('star')}${Array.from({length:6},(_,i)=>`<i style="--sx:${[-12,8,-7,11,-15,5][i]}px;--sy:${[-9,-12,12,8,3,-4][i]}px;--delay:${-i*.09}s"></i>`).join('')}</span></div></div>`;}
 
 function packsView(){
