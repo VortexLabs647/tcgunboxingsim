@@ -29,10 +29,10 @@ function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='open
 function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='wallet'?walletView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${icon('star')}${kicker}</div><h1>${title}</h1></div></div>`;}
 function categories(current,action,all=false){return `<div class="category-tabs ${all?'collection-tabs':''}" role="group" aria-label="Collectible category">${all?`<button style="--cat:#d8b9ef" data-action="${action}" data-id="all" class="${current==='all'?'active':''}" aria-pressed="${current==='all'}">All items</button>`:''}${Object.entries(E.categories).map(([id,c])=>`<button style="--cat:${c.color}" data-action="${action}" data-id="${id}" class="${current===id?'active':''}" aria-pressed="${current===id}">${icon(c.icon)}${c.name}</button>`).join('')}</div>`;}
-function packPool(p){return E.pools(catalog,p,mode);}
-function wildCards(pack){
- if(mode==='Gamble')return [];
- return E.pools(catalog,pack,'Normal')[5].filter(item=>mode!=='Ultra'||E.value(item)<=pack.price*20);
+function packPool(pack,oddsMode=mode){return E.pools(catalog,pack,oddsMode);}
+function wildCards(pack,oddsMode=mode){
+ if(oddsMode==='Gamble')return [];
+ return E.pools(catalog,pack,'Normal')[5].filter(item=>oddsMode!=='Ultra'||E.value(item)<=pack.price*20);
 }
 function packArt(p){const c=E.categories[p.category],top=E.pools(catalog,p,'Normal').flat().slice(-3);return `<div class="foil ${p.category}" style="--foil:${p.color};--foil-alt:${c.color}"><div class="pack-seal top"><i></i></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${top.map((i,n)=>cardImage(i,'art-'+n)).join('')}</div><div class="foil-title">${p.name.toUpperCase()}</div><div class="foil-category">${c.name}</div></div><div class="pack-seal bottom"><i></i></div></div>`;}
 function packRipArt(p){return `<div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(p)}</div><div class="seal-track" aria-hidden="true"><i class="seal-trail"></i><span class="seal-spark">${icon('star')}${Array.from({length:6},(_,i)=>`<i style="--sx:${[-12,8,-7,11,-15,5][i]}px;--sy:${[-9,-12,12,8,3,-4][i]}px;--delay:${-i*.09}s"></i>`).join('')}</span></div></div>`;}
@@ -62,16 +62,20 @@ function packsView(){
    </div>
    ${collectionSpotlight()}
    <dialog id="packDetails" class="pack-dialog" aria-labelledby="packDetailsTitle">
-     <header><h2 id="packDetailsTitle"></h2><form method="dialog"><button aria-label="Close pack details" autofocus>${icon('close')}</button></form></header>
+     <header>
+       <div class="pack-odds-art" aria-hidden="true" hidden></div>
+       <div><p class="pack-dialog-pack" hidden></p><h2 id="packDetailsTitle"></h2></div>
+       <form method="dialog"><button aria-label="Close pack details" autofocus>${icon('close')}</button></form>
+     </header>
      <div id="packDetailsBody" class="pack-dialog-body"></div>
-     <div class="pack-dialog-actions" hidden><form method="dialog"><button class="secondary">Back to packs</button></form></div>
+     <div class="pack-dialog-actions" hidden><button class="primary" type="button" data-action="apply-odds"></button></div>
    </dialog>
  </div>`;
 }
-function packValueRange(pack){
- const chances=E.odds(catalog,pack,mode);
- const possible=packPool(pack).filter((_,tier)=>chances[tier]>0).flat();
- const values=[...possible,...wildCards(pack)].map(E.value);
+function packValueRange(pack,oddsMode=mode){
+ const chances=E.odds(catalog,pack,oddsMode);
+ const possible=packPool(pack,oddsMode).filter((_,tier)=>chances[tier]>0).flat();
+ const values=[...possible,...wildCards(pack,oddsMode)].map(E.value);
  return {min:Math.min(...values),max:Math.max(...values)};
 }
 function packPanel(){
@@ -93,10 +97,6 @@ function packPanel(){
    </div>`;
 }
 
-function packOddsRange(pack){
- const {min,max}=packValueRange(pack);
- return `${money(min,true)}–${money(max,true)} in virtual value`;
-}
 function packModeControls(){
  return `<div class="mode-tabs" role="group" aria-label="Odds mode">${Object.keys(E.modes).map(key=>`<button data-action="mode" data-id="${key}" class="${mode===key?'active':''}" aria-pressed="${mode===key}">${key}</button>`).join('')}</div>`;
 }
@@ -105,21 +105,20 @@ function openPackDetails(kind){
  const dialog=$('#packDetails'), pack=selectedPack();
  const title=$('#packDetailsTitle',dialog), content=$('#packDetailsBody',dialog);
  dialog.dataset.kind=kind;
- $('.pack-dialog-actions',dialog).hidden=kind!=='odds';
+ const oddsSheet=kind==='odds', art=$('.pack-odds-art',dialog), name=$('.pack-dialog-pack',dialog);
+ art.hidden=name.hidden=$('.pack-dialog-actions',dialog).hidden=!oddsSheet;
+ art.innerHTML=oddsSheet?packArt(pack):'';
+ name.textContent=oddsSheet?`${E.categories[pack.category].name} ${pack.name} Pack`:'';
  if(kind==='options'){
   title.textContent='Pack options';
   content.innerHTML=`<div class="pack-options-controls"><label for="packQuantity">Quantity</label>
     <select id="packQuantity" aria-label="Number of packs">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n===1?'':'s'}</option>`).join('')}</select>
     <div class="pack-modes"><span>Odds mode</span>${packModeControls()}</div></div>`;
  }else if(kind==='odds'){
-  title.textContent='Pack odds';
-  content.innerHTML=`<div class="pack-odds-hero" style="--foil:${pack.color}">
-    <div class="pack-odds-art" aria-hidden="true">${packArt(pack)}</div>
-    <div><h3>${E.categories[pack.category].name} ${pack.name} Pack</h3>
-      <p id="packOddsRange">${packOddsRange(pack)}</p></div>
-  </div>
-  <div class="pack-odds-modes">${packModeControls()}</div>
-  <div id="packOddsBody">${packOdds(pack)}</div>`;
+  title.textContent='Pull rates & values';
+  content.innerHTML=`<div class="pack-odds-modes">${packModeControls()}</div>
+    <div id="packOddsBody"></div>`;
+  previewPackOdds(dialog,mode);
  }else if(kind==='cards'){
   title.textContent='Cards in this pack';
   content.innerHTML=`<div class="section-heading"><h3>${E.categories[pack.category].name} collection</h3><button class="text-link" data-action="view-category">View collection</button></div>
@@ -129,6 +128,7 @@ function openPackDetails(kind){
   if(dialog.isConnected)$('[data-action="pack-details"][data-id="'+kind+'"]')?.focus({preventScroll:true});
  },{once:true});
  dialog.showModal();
+ content.scrollTop=0;
 }
 
 function scrollToPack(rail, choice, smooth = false) {
@@ -304,7 +304,22 @@ case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':ca
 case 'category':selectedCategory=id;selectedIndex=0;mode='Normal';quantity=1;save();render();break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
 case 'pack-details':openPackDetails(id);break;
-case 'mode':if(E.modes[id]){mode=id;updatePackPanel();}break;
+case 'mode':{
+ if(!Object.hasOwn(E.modes,id))break;
+ const dialog=b.closest('#packDetails[data-kind="odds"]');
+ if(dialog){previewPackOdds(dialog,id);break;}
+ mode=id;
+ updatePackPanel();
+ break;
+}
+case 'apply-odds':{
+ const dialog=b.closest('#packDetails[open][data-kind="odds"]');
+ if(!dialog)break;
+ mode=dialog.dataset.previewMode;
+ dialog.close();
+ updatePackPanel();
+ break;
+}
 case 'open':startOpening();break;case 'start-seal':beginSeal();break;case 'skip-reveal':if(phase!=='sealed')reveal();break;case 'confirm-deposit':deposit();break;case 'redeem-code':redeemCode();break;
 case 'tier-prev':case 'tier-next':{const row=$('#tierRow'+id);row?.scrollBy({left:(a==='tier-next'?1:-1)*row.clientWidth*.85,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});sound('tick');}break;case 'view-category':filter=selectedCategory;go('collection');break;case 'filter':filter=id;limit=30;render();break;case 'more':{limit+=30;const y=scrollY;render();window.scrollTo(0,y);}break;
 case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);break;
@@ -328,23 +343,26 @@ window.addEventListener('beforeinstallprompt',e=>e.preventDefault());
 async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=47');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs(catalog);try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;if(state.referralClaimed)localStorage.setItem(REFERRAL_KEY,'1');}catch{}state.settings={sound:true,haptics:true};selectedCategory=E.categories[state.preferences.category]?state.preferences.category:'creatures';selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','wallet','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&location.protocol==='https:'&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 init();
 function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===8;}
-function updatePackPanel(){
- $('#packPanel').innerHTML=packPanel();
- const dialog=$('#packDetails[open]');
- if(!dialog)return;
+function updateModeButtons(dialog,oddsMode){
  $$('[data-action="mode"]',dialog).forEach(button=>{
-  const active=button.dataset.id===mode;
+  const active=button.dataset.id===oddsMode;
   button.classList.toggle('active',active);
   button.setAttribute('aria-pressed',String(active));
  });
+}
+function previewPackOdds(dialog,oddsMode){
+ dialog.dataset.previewMode=oddsMode;
+ updateModeButtons(dialog,oddsMode);
  const odds=$('#packOddsBody',dialog);
- if(odds){
-  const expanded=$('.odds-extra',odds)?.open;
-  const pack=selectedPack();
-  $('#packOddsRange',dialog).textContent=packOddsRange(pack);
-  odds.innerHTML=packOdds(pack);
-  if(expanded)$('.odds-extra',odds).open=true;
- }
+ const expanded=$('.odds-extra',odds)?.open;
+ odds.innerHTML=packOdds(selectedPack(),oddsMode);
+ if(expanded)$('.odds-extra',odds).open=true;
+ $('[data-action="apply-odds"]',dialog).textContent='Apply '+oddsMode;
+}
+function updatePackPanel(){
+ $('#packPanel').innerHTML=packPanel();
+ const dialog=$('#packDetails[open][data-kind="options"]');
+ if(dialog)updateModeButtons(dialog,mode);
 }
 let receiptTimer,effectTimer,receiptExitTimer;
 function showReceipt(title,detail,kind='wallet',amount=null){let el=$('#receipt');if(!el){el=document.createElement('aside');el.id='receipt';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.append(el);}clearTimeout(receiptTimer);clearTimeout(receiptExitTimer);el.className='receipt '+kind;el.innerHTML=`<div class="receipt-icon">${icon(kind==='vault'?'vault':'coin')}</div><div class="receipt-copy"><small>${escape(title)}</small>${amount!==null?`<strong class="receipt-amount">+${money(amount)}</strong>`:''}<span>${escape(detail)}</span></div><button data-action="dismiss-receipt" aria-label="Dismiss notification">${icon('close')}</button><div class="receipt-progress"></div>`;receiptTimer=setTimeout(()=>{el.classList.add('leaving');receiptExitTimer=setTimeout(()=>el.remove(),220);},3600);}
@@ -384,23 +402,28 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function collectionSpotlight(){const list=catalog.filter(i=>i.category===selectedCategory&&i.id.includes('-expansion-')&&i.finish==='Base');const cards=[0,3,6,9].map(n=>list[n]).filter(Boolean);return `<section class="collection-teaser" aria-label="Collection spotlight"><div class="section-heading"><h2>COLLECTION SPOTLIGHT</h2><button class="text-link" data-action="view-category">View collection</button></div><div class="teaser-grid">${cards.map(item=>`<button class="teaser-card" style="--rarity:${E.rarityColors[item.tier]}" data-action="item" data-id="${item.id}"><span class="teaser-image">${cardImage(item)}</span><span class="teaser-copy"><strong>${escape(item.name)}</strong><small>${escape(item.series)}</small></span></button>`).join('')}</div></section>`;}
 
 function displayOdds(pack,oddsMode=mode){const wild=oddsMode==='Gamble'?0:E.wildChance;return E.odds(catalog,pack,oddsMode).map((n,t)=>n*(1-wild)+(t===5?wild*100:0));}
-function packOdds(pack){
- const groups=packPool(pack),base=E.odds(catalog,pack,mode);
- const actual=displayOdds(pack),wild=mode!=='Gamble';
+function packOdds(pack,oddsMode){
+ const groups=packPool(pack,oddsMode),base=E.odds(catalog,pack,oddsMode);
+ const actual=displayOdds(pack,oddsMode),wild=oddsMode!=='Gamble';
+ const {min,max}=packValueRange(pack,oddsMode);
  const rows=actual.map((percent,tier)=>({percent,tier,values:groups[tier].map(E.value)}))
    .filter(row=>row.percent>0).reverse();
- const wildValues=wildCards(pack).map(E.value);
+ const wildValues=wildCards(pack,oddsMode).map(E.value);
  const range=values=>values.length?`${money(Math.min(...values))}–${money(Math.max(...values))}`:'';
- return `<div class="pack-odds-heading"><h3>Card probabilities</h3><p class="odds-intro">Per card${wild?' · includes Wild':''}</p></div>
+ return `<div class="pack-odds-heading"><h3>Card probabilities</h3><p class="odds-intro">Per card · rarest first</p></div>
    <ul class="pack-odds-list">${rows.map(({percent,tier,values})=>`<li style="--rarity:${E.rarityColors[tier]}">
      <div><span>${E.rarityNames[tier]} <small>${range(tier===5?[...values,...wildValues]:values)}</small></span><strong>${chance(percent,2)}</strong></div>
      <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]} chance"></progress>
    </li>`).join('')}</ul>
+   <dl class="pack-odds-range" aria-label="Virtual value per card">
+     <div><dt>Min. virtual value</dt><dd>${money(min,true)}</dd></div>
+     <div><dt>Max. virtual value</dt><dd>${money(max,true)}</dd></div>
+   </dl>
    <p class="odds-note">${wild?'Wild: 1 in 10 openings makes every card a Grail. This is included above.':'Wild is off in Gamble mode. Each card is a separate draw.'}</p>
    <details class="odds-extra"><summary>Values & detailed odds</summary>
      <p class="odds-note">${wild?'Base chances below apply when Wild does not trigger.':'Chances below are per card.'}</p>
      <table class="odds-table"><thead><tr><th>Rarity</th><th>Card value</th><th>${wild?'Base chance':'Chance'}</th></tr></thead>
      <tbody>${rows.filter(row=>base[row.tier]>0).map(({tier,values})=>`<tr><td class="rarity" style="--rarity:${E.rarityColors[tier]}">${E.rarityNames[tier]}</td><td>${range(values)}</td><td>${chance(base[tier],2)}</td></tr>`).join('')}</tbody></table>
-     <p class="odds-note">Average card value${wild?' before Wild':''}: ${money(Math.round(E.expectedReturn(catalog,pack,mode)*pack.price))}. Values are in virtual currency.</p>
+     <p class="odds-note">Average card value${wild?' before Wild':''}: ${money(Math.round(E.expectedReturn(catalog,pack,oddsMode)*pack.price))}. Values are in virtual currency.</p>
    </details>`;
 }
