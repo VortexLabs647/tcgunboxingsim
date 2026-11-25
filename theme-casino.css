@@ -11,7 +11,7 @@
 
 @font-face {
   font-family: 'Fredoka';
-  src: url('fredoka-bold-latin.woff2') format('woff2');
+  src: url('fredoka-bold-latin.woff2?v=68') format('woff2');
   font-style: normal;
   font-weight: 700;
   font-display: swap;
@@ -2080,4 +2080,13 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
     .pack-choice, .rip-pack, .item-button, .teaser-card)) {
   font-family: var(--display-font);
   font-weight: 700;
+}
+
+
+.pack-room .pack-showcase .pack-quick-links button {
+  font-size: clamp(.875rem, 3.7vw, 1rem);
+}
+
+.pack-room .pack-showcase .selected-title h2 {
+  font-size: clamp(1.12rem, 5.2vw, 1.65rem);
 }
