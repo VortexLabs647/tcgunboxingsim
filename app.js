@@ -10,7 +10,7 @@ let leaderboardLoaded=0,leaderboardLoading=false,leaderboardRows=null,leaderboar
 let effectsBus=null,effectSources=new Set(),effectsUntil=0,winSources=new Set(),winStopTimer=null;
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
-let lastTickAt=0,cardSequence=0,balanceFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
+let lastTickAt=0,cardSequence=0,balanceFrame=0,wheelAudioFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
 const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
 const REFERRAL_KEY='tcg-cccollectables-claimed';
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
@@ -24,7 +24,7 @@ function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||
 function updateHeader(){$('#balance').textContent=money(state.balance);$('#userInitials').textContent=(state.name||'Player').slice(0,2).toUpperCase();}
 function log(label,amount,kind){state.history.unshift({label,amount,kind,date:new Date().toISOString()});state.history=state.history.slice(0,150);}
 function nav(){const links=[['packs','grid','Packs'],['vault','vault','Vault'],['collection','card','Collection'],['leaderboard','star','Ranks'],['profile','user','Profile']];const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===view?'active':''}" ${key===view?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');$('#desktopNav').innerHTML=html;$('#bottomNav').innerHTML=html;}
-function clearAnimation(){stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
+function clearAnimation(){cancelAnimationFrame(wheelAudioFrame);stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
 function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','wallet','leaderboard','opening','item'].includes(next)?next:'packs';search='';limit=30;confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
 function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='wallet'?walletView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${kicker}</div><h1>${title}</h1></div></div>`;}
@@ -240,7 +240,91 @@ function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>
 
 function itemView(){const item=byId[detailId];if(!item)return empty('CARD NOT FOUND.','Choose another collectible.');const own=state.vault.find(v=>v.uid===detailUid),value=own?.value??E.value(item);return `<button class="secondary back-button" data-action="back-item">Back to ${previousView==='packs'?'packs':previousView==='vault'?'vault':'collection'}</button><div class="detail-page"><div class="detail-image ${item.category}">${cardImage(item)}</div><div class="detail-content"><div class="eyebrow">${E.categories[item.category].name} · ${escape(item.number)}</div><h1>${escape(item.name)}</h1><p>${escape(item.lore)}</p><div class="detail-price">${money(value)}</div><p class="price-definition">${own?'Vault value':'Virtual collectible value'}</p>${own?`<button class="primary full" data-action="sell-detail" data-id="${own.uid}" ${own.locked?'disabled':''}>${own.locked?'Favorited':'Sell · '+money(value)}</button>`:''}<p class="price-reference">Original collectible. Values are fictional simulator currency and are not market prices.</p><span class="sim-label">ORIGINAL ART · VIRTUAL CURRENCY</span></div></div>`;}
 function haptic(pattern=20){if(navigator.vibrate)navigator.vibrate(pattern);}
-function sound(kind){try{if(kind==='tick'){const now=performance.now();if(now-lastTickAt<65)return;lastTickAt=now;}audioCtx??=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});const now=audioCtx.currentTime;if((kind==='tick'||kind==='click')&&now<effectsUntil)return;stopEffects();effectsBus=audioCtx.createGain();effectsBus.gain.value=1;effectsBus.connect(audioCtx.destination);effectsUntil=now+({tick:.055,click:.08,seal:1.65,charge:.42,rip:.35,burst:.5,cash:.6,grail:.85,hit:.5}[kind]||.5);const tone=(freq,t,d=.12,gain=.035,type='sine')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,now+t);g.gain.setValueAtTime(.001,now+t);g.gain.exponentialRampToValueAtTime(gain,now+t+.008);g.gain.exponentialRampToValueAtTime(.001,now+t+d);o.connect(g);g.connect(effectsBus);trackEffect(o);o.start(now+t);o.stop(now+t+d+.02);};if(kind==='tick'){tone(720,0,.045,.017,'triangle');return;}if(kind==='click'){tone(460,0,.055,.02,'triangle');tone(620,.025,.04,.012);return;}if(kind==='seal'){[1319,1568,1760,2093,2349].forEach((f,i)=>tone(f,.12+i*.3,.24,.012,'sine'));return;}if(kind==='charge'){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(75,now);o.frequency.exponentialRampToValueAtTime(520,now+.36);g.gain.setValueAtTime(.001,now);g.gain.linearRampToValueAtTime(.06,now+.24);g.gain.exponentialRampToValueAtTime(.001,now+.4);o.connect(g);g.connect(effectsBus);trackEffect(o);o.start();o.stop(now+.42);return;}if(kind==='rip'||kind==='burst'){const length=Math.floor(audioCtx.sampleRate*(kind==='rip'?.35:.2)),buffer=audioCtx.createBuffer(1,length,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/length,1.7);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),filter=audioCtx.createBiquadFilter();src.buffer=buffer;filter.type=kind==='rip'?'highpass':'lowpass';filter.frequency.value=kind==='rip'?1100:900;g.gain.value=.12;src.connect(filter);filter.connect(g);g.connect(effectsBus);trackEffect(src);src.start();if(kind==='rip')return;}const notes=kind==='cash'?[784,988,1175,1568]:kind==='grail'?[392,523,659,784,1047,1568]:kind==='burst'?[131,262,523]:[523,659,784];notes.forEach((f,i)=>tone(f,i*.095,.28,.045));}catch{}}
+function sound(kind){
+ if(document.hidden)return;
+ try{
+  if(kind==='tick'){
+   const now=performance.now();
+   if(now-lastTickAt<65)return;
+   lastTickAt=now;
+  }
+  audioCtx??=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state!=='running')audioCtx.resume().catch(()=>{});
+  const now=audioCtx.currentTime;
+  if((kind==='tick'||kind==='click')&&now<effectsUntil)return;
+  stopEffects();
+  effectsBus=audioCtx.createGain();
+  effectsBus.connect(audioCtx.destination);
+  effectsUntil=now+({tick:.055,click:.08,rip:.35,wheel:.037,land:.46,cash:.48,credit:.37,vault:.25,hit:.5}[kind]||.5);
+
+  const tone=(frequency,delay,duration,volume,type='sine',endFrequency=frequency)=>{
+   const source=audioCtx.createOscillator(),gain=audioCtx.createGain();
+   const start=now+delay,end=start+duration;
+   source.type=type;
+   source.frequency.setValueAtTime(frequency,start);
+   source.frequency.exponentialRampToValueAtTime(endFrequency,end);
+   gain.gain.setValueAtTime(.001,start);
+   gain.gain.exponentialRampToValueAtTime(volume,start+.005);
+   gain.gain.exponentialRampToValueAtTime(.001,end);
+   source.connect(gain);
+   gain.connect(effectsBus);
+   trackEffect(source);
+   source.start(start);
+   source.stop(end);
+  };
+
+  switch(kind){
+   case 'tick': tone(720,0,.045,.017,'triangle'); break;
+   case 'click':
+    tone(460,0,.055,.02,'triangle');
+    tone(620,.025,.04,.012);
+    break;
+   case 'wheel':
+    tone(310,0,.025,.038,'triangle',155);
+    tone(2280,0,.018,.013,'triangle',1300);
+    break;
+   case 'land':
+    tone(200,0,.075,.04,'triangle',102);
+    tone(784,.044,.18,.04,'triangle');
+    tone(1175,.105,.26,.033);
+    break;
+   case 'cash':
+   case 'credit': {
+    const coins=kind==='cash'?[1320,1568,1397,1760]:[1568,1976,2349];
+    coins.forEach((frequency,index)=>{
+     const time=index*.068;
+     tone(frequency,time,.17,.029,'triangle');
+     tone(frequency*2.31,time,.073,.013);
+    });
+    break;
+   }
+   case 'vault':
+    tone(530,0,.135,.032,'triangle');
+    tone(795,.06,.19,.027);
+    break;
+   case 'rip': {
+    const buffer=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*.35),audioCtx.sampleRate);
+    const data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,1.7);
+    const source=audioCtx.createBufferSource(),filter=audioCtx.createBiquadFilter(),gain=audioCtx.createGain();
+    source.buffer=buffer;
+    filter.type='highpass';
+    filter.frequency.value=1100;
+    gain.gain.value=.12;
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(effectsBus);
+    trackEffect(source);
+    source.start();
+    break;
+   }
+   case 'hit':
+    [523,659,784].forEach((frequency,index)=>tone(frequency,index*.095,.28,.045,'sine'));
+    break;
+  }
+ }catch{}
+}
+
 function startOpening(){if(pending&&view==='opening')return;stopWinMusic();const pack=selectedPack(),purchase=E.purchase(state,catalog,pack,mode,quantity);if(!purchase){go('wallet');notice('Add virtual funds to open this pack.');return;}pending=purchase;log(`${quantity}× ${E.categories[pack.category].name} ${pack.name} · ${mode}`,-purchase.cost,'pack');save();phase='sealed';view='opening';history.replaceState(null,'','#opening');render();window.scrollTo({top:0,behavior:'instant'});}
 function openingView(){
  if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');
@@ -302,6 +386,28 @@ function raritySpinner(){
  </div>`;
 }
 
+function playWheelTicks(disc){
+ const segmentAngle=360/disc.children.length;
+ let previousSegment=0,lastSound=-Infinity;
+ const tick=(now)=>{
+  if(phase!=='spinning'||!disc.isConnected)return;
+  const transform=getComputedStyle(disc).transform;
+  if(transform!=='none'){
+   const matrix=new DOMMatrixReadOnly(transform);
+   const angle=Math.atan2(matrix.b,matrix.a)*180/Math.PI;
+   // Each boundary crosses the pointer halfway between two card centers.
+   const segment=(Math.round(angle/segmentAngle)+disc.children.length)%disc.children.length;
+   if(segment!==previousSegment&&now-lastSound>=40){
+    sound('wheel');
+    lastSound=now;
+   }
+   previousSegment=segment;
+  }
+  wheelAudioFrame=requestAnimationFrame(tick);
+ };
+ wheelAudioFrame=requestAnimationFrame(tick);
+}
+
 function spinReveal(){
  if(!pending||view!=='opening'||phase!=='charging')return;
  clearAnimation();
@@ -310,8 +416,11 @@ function spinReveal(){
  const tier=openingPull().tier;
  screen.style.setProperty('--spin-color','#c7a4fb');
  screen.classList.add('spinning');
+ playWheelTicks($('.wheel-disc',screen));
  timers.push(setTimeout(()=>{
   if(!pending||view!=='opening'||phase!=='spinning')return;
+  cancelAnimationFrame(wheelAudioFrame);
+  sound('land');
   screen.classList.add('face-up','landed');
   screen.style.setProperty('--spin-color',E.rarityColors[tier]);
   screen.dataset.landingRarity=E.rarityNames[tier];
@@ -324,7 +433,19 @@ function spinReveal(){
 }
 
 function isHighValuePull(){return !!pending&&pending.pulls.some(p=>p.tier>=4||p.value>=pending.pack.price*5);}
-function reveal(){if(!pending||view!=='opening'||phase==='revealed')return;clearAnimation();phase='revealed';render();const best=Math.max(...pending.pulls.map(p=>p.tier)),profit=pending.pulls.reduce((s,p)=>s+p.value,0)-pending.cost;if(isHighValuePull())playWinMusic();else sound(profit>0?'grail':'hit');haptic(best>=4?[40,30,70]:30);if(profit>0)winEffect(profit);}
+function reveal(){
+ if(!pending||view!=='opening'||phase==='revealed')return;
+ const skippedWheel=phase==='sealed';
+ clearAnimation();
+ phase='revealed';
+ render();
+ const best=Math.max(...pending.pulls.map(p=>p.tier));
+ const profit=pending.pulls.reduce((s,p)=>s+p.value,0)-pending.cost;
+ if(isHighValuePull()&&!document.hidden)playWinMusic();
+ else if(skippedWheel)sound('hit');
+ haptic(best>=4?[40,30,70]:30);
+ if(profit>0)winEffect(profit);
+}
 function trackEffect(source){effectSources.add(source);source.onended=()=>effectSources.delete(source);}
 function stopEffects(){for(const source of effectSources){try{source.stop();source.disconnect();}catch{}}effectSources.clear();if(effectsBus){try{effectsBus.disconnect();}catch{}effectsBus=null;}effectsUntil=0;}
 function stopWinMusic(){clearTimeout(winStopTimer);for(const source of winSources){try{source.stop();source.disconnect();}catch{}}winSources.clear();if(winMusicGain){try{winMusicGain.disconnect();}catch{}winMusicGain=null;}}
@@ -335,7 +456,7 @@ function resultTitle(){if(pending.wild)return 'WILD <em>GRAILS.</em>';const best
 function resultsView(){const best=Math.max(...pending.pulls.map(p=>p.tier)),total=pending.pulls.reduce((s,p)=>s+p.value,0),profit=total-pending.cost;return `<section class="results-screen ${profit>0?'winning':''}${best===5?' grail-result':''}" style="--rarity:${E.rarityColors[best]}"><div class="reveal-shade" aria-hidden="true"></div><div class="eyebrow">${pending.wild?'WILD · ALL GRAIL · ':''}${pending.quantity} ${pending.quantity>1?'COLLECTIBLES':'COLLECTIBLE'} REVEALED${pending.quantity>1?' · SWIPE TO SEE EACH PULL':''}</div><h1>${resultTitle()}</h1><div class="result-grid" aria-label="Revealed collectibles" tabindex="0">${pending.pulls.map((pull,i)=>{const item=byId[pull.itemId];return `<article class="result ${item.category}" data-tier="${pull.tier}" style="--rarity:${E.rarityColors[pull.tier]};--delay:${i*.02}s"><span class="rarity">${E.rarityNames[pull.tier]}</span><div class="result-image">${cardImage(item)}</div><h3>${escape(item.name)}</h3><p>${escape(item.detail)}</p><div class="result-value">${money(pull.value)}</div><span class="result-edition">${escape(item.finish).toUpperCase()} · ${escape(item.number)}</span></article>`;}).join('')}</div><div class="result-summary"><span>Cost ${money(pending.cost)}</span><span>Value ${money(total)}</span><strong class="${profit>=0?'positive':'negative'}">${profit>=0?'Profit +':'Net '}${money(profit)}</strong></div><div class="result-actions"><button class="primary" data-action="sell-result">Sell ${pending.quantity>1?'all ':''}· ${money(total)}</button><button class="secondary" data-action="keep-result">Vault ${pending.quantity>1?'all':'item'}</button><button class="text-link" data-action="packs">Choose another pack</button></div>${profit>0||best>=4?`<div class="particles" aria-hidden="true">${Array.from({length:40},(_,i)=>`<i style="--x:${(E.random()-.5)*900}px;--y:${(E.random()-.4)*700}px;--rot:${E.random()*800}deg;--color:${E.rarityColors[i%6]};--delay:${i*.015}s"></i>`).join('')}</div>`:''}</section>`;}
 function sellItems(ids){const sold=E.sell(state,ids);if(sold.count){log(`Sold ${sold.count} collectible${sold.count>1?'s':''}`,sold.amount,'sale');save();}return sold;}
 function validDeposit(raw){return E.depositAmount(raw);}
-function deposit(){if(!E.canDeposit(state)){feedback='Deposits unlock when your balance falls below $1.00.';render();return;}const amount=E.deposit(state,$('#depositAmount').value);if(!amount){feedback='Enter an amount from $0.01 to $10.00, with no more than two decimal places.';render();return;}log('Virtual deposit',amount,'deposit');save();feedback=money(amount)+' added. Deposits stay locked while your balance is $1.00 or more.';sound('hit');haptic();render();}
+function deposit(){if(!E.canDeposit(state)){feedback='Deposits unlock when your balance falls below $1.00.';render();return;}const amount=E.deposit(state,$('#depositAmount').value);if(!amount){feedback='Enter an amount from $0.01 to $10.00, with no more than two decimal places.';render();return;}log('Virtual deposit',amount,'deposit');save();feedback=money(amount)+' added. Deposits stay locked while your balance is $1.00 or more.';sound('credit');haptic();render();}
 function showItem(id,uid){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;detailUid=uid;go('item');}
 window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('#packDetails[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
 function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus();if(pos!=null)el?.setSelectionRange(pos,pos);}
@@ -368,7 +489,7 @@ case 'favorite':{const v=state.vault.find(v=>v.uid===id);if(v){v.locked=!v.locke
 case 'confirm-sell-all':{const sold=sellItems(state.vault.filter(v=>!v.locked).map(v=>v.uid));confirmAction='';render();if(sold.count)saleEffect(sold.amount,`${sold.count} collectibles sold`);}break;
 case 'cancel-confirm':confirmAction='';render();break;case 'sell-detail':{const sold=sellItems([id]);go('vault');if(sold.count)saleEffect(sold.amount,'Collectible sold');}break;
 case 'sell-result':if(pending&&!pending.sold){const sold=sellItems(pending.pulls.map(v=>v.uid));go('packs');if(sold.count)saleEffect(sold.amount,`${sold.count} collectible${sold.count>1?'s':''} sold`);}break;
-case 'keep-result':{const count=pending?.quantity||0;go('packs');showReceipt('Added to your vault',`${count} collectible${count>1?'s':''} saved`,'vault');}break;
+case 'keep-result':{const count=pending?.quantity||0;go('packs');sound('vault');showReceipt('Added to your vault',`${count} collectible${count>1?'s':''} saved`,'vault');}break;
 case 'leaderboard-refresh':loadLeaderboard(true);break;
 case 'leaderboard-toggle':if(window.TCGCloud?.user&&window.TCGCloud.ready&&window.TCGCloud.canPlay){if(!state.leaderboard&&!state.name.trim()){go('profile');notice('Save a collector name first, then join the leaderboard.');break;}state.leaderboard=!state.leaderboard;save();leaderboardLoaded=0;render();}else{go('profile');notice('Sign in and finish syncing to join the leaderboard.');}break;
 case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Enter a username first.';render();break;}state.name=name.slice(0,24);save();feedback='Username saved.';render();}break;
@@ -413,7 +534,7 @@ function insideLineup(){const p=selectedPack(),groups=packPool(p),odds=E.odds(ca
 function referralForm(){return `<h2>REFERRAL CODE</h2><p>Redeem a code for a one-time virtual balance reward.</p><label class="field-label" for="referralCode">Your code</label><input id="referralCode" class="full-width" maxlength="40" autocomplete="off" placeholder="Enter referral code" ${state.referralClaimed?'disabled':''}><button class="primary full" data-action="redeem-code" ${state.referralClaimed?'disabled':''}>${state.referralClaimed?'Reward already claimed':'Redeem code'}</button><small>${state.referralClaimed?'Your one-time reward is saved on this device.':'One redemption per device profile.'}</small>`;}
 function redeemCode(){try{if(localStorage.getItem(REFERRAL_KEY)==='1')state.referralClaimed=true;}catch{}const result=E.redeemReferral(state,$('#referralCode').value);if(!result.ok){feedback=result.reason==='claimed'?'You have already used this referral reward.':'That referral code was not found.';render();notice(feedback);return;}try{localStorage.setItem(REFERRAL_KEY,'1');}catch{}save();feedback='$100.00 referral reward added.';render();saleEffect(result.amount,'Referral reward · one-time use','Code redeemed');}
 function winEffect(profit){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;$('#winCelebration')?.remove();const fx=document.createElement('div');fx.id='winCelebration';fx.className='win-celebration';fx.setAttribute('aria-hidden','true');fx.innerHTML=`<div class="win-halo"></div>${Array.from({length:18},(_,i)=>`<i style="--left:${8+(i*29)%84}%;--delay:${i*.035}s;--drift:${(i%2?1:-1)*(20+i%5*13)}px;--color:${E.rarityColors[i%6]};--spin:${i*23}deg">${icon('coin')}</i>`).join('')}`;document.body.append(fx);setTimeout(()=>fx.remove(),2200);}
-document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){lastInteraction={x:e.clientX,y:e.clientY};const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','tier-prev','tier-next','start-seal','open','sell','sell-detail','sell-result','confirm-sell-all','confirm-deposit','redeem-code'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){lastInteraction={x:e.clientX,y:e.clientY};const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','tier-prev','tier-next','start-seal','open','sell','sell-detail','sell-result','keep-result','confirm-sell-all','confirm-deposit','redeem-code'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
 
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;
