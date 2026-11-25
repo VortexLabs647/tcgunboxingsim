@@ -1575,27 +1575,30 @@ body::before { background: none; }
 
 /* The pack stage has a soft spotlight tinted by the selected edition. */
 :root {
-  --showcase-night: #101321;
-  --showcase-panel: #181e31;
-  --showcase-edge: #a0acd44d;
+  --showcase-night: #150e29;
+  --showcase-panel: #231638;
+  --showcase-edge: #bd92ed85;
   --showcase-text: #f3f5ff;
-  --showcase-muted: #bec8e4;
-  --showcase-accent: #c2d4ff;
+  --showcase-muted: #e2ccea;
+  --showcase-accent: #d7c1ff;
   --showcase-spotlight:
-    radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--foil, #9aafff) 28%, #29395e), transparent 72%),
-    radial-gradient(ellipse at 78% 12%, #2c40744f, transparent 55%),
+    radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--foil, #9aafff) 28%, #4c246f), transparent 72%),
+    radial-gradient(ellipse at 78% 12%, #5f21a35c, transparent 55%),
     var(--showcase-night);
 }
 
 body,
 body[data-view="packs"]:has(.pack-room) {
-  background: radial-gradient(ellipse 40rem 24rem at 25% 0%, #252d49, transparent 95%), var(--showcase-night);
+  background:
+    radial-gradient(ellipse 33rem 24rem at 0% 10%, #512664a8, transparent 90%),
+    radial-gradient(ellipse 38rem 26rem at 100% 85%, #342c7e91, transparent 92%),
+    var(--showcase-night);
 }
 
 .ambient { background: none; }
 
 :is(.topbar, .bottom-nav) {
-  background: #131827;
+  background: linear-gradient(115deg, #36184a, #221539 65%, #24204e);
   border-color: var(--showcase-edge);
   box-shadow: none;
 }
@@ -1637,7 +1640,7 @@ body[data-view="packs"]:has(.pack-room) {
 
 .pack-dialog > header {
   border-color: var(--showcase-edge);
-  background: #141a2b;
+  background: #321c4a;
 }
 
 :is(.pack-dialog-body .mode-tabs button, .pack-dialog-body .mode-tabs button[data-id="Gamble"]) {
@@ -1655,99 +1658,110 @@ body[data-view="packs"]:has(.pack-room) {
 }
 
 .results-screen {
-  background: radial-gradient(ellipse at 50% 25%, #2b3c62, transparent 70%), var(--showcase-night);
+  background: radial-gradient(ellipse at 50% 25%, #572a77, transparent 70%), var(--showcase-night);
   border-color: var(--showcase-edge);
   box-shadow: none;
 }
 
 /* Compact controls leave the available height to the foil carousel. */
 .pack-room {
-  --pack-ui-edge: #788c9e66;
-  --pack-ui-panel: #19232d;
+  --pack-ui-edge: #ba91efaa;
   --pack-ui-text: #f2f8fb;
-  --pack-ui-muted: #bdcbd5;
-  --pack-ui-accent: #bdebd8;
-  --pack-ui-ink: #14302b;
+  --pack-ui-muted: #eee0ff;
+  --pack-ui-ink: #322041;
 }
 
 body[data-view="packs"] .header-wallet {
-  background: #1b2833;
-  border-color: #7e9b9b70;
-  box-shadow: none;
+  background: #2d1d44;
+  border-color: #bd87e9ab;
+  box-shadow: inset 0 1px #fff2;
 }
 
 body[data-view="packs"] .topbar .header-wallet .deposit {
-  border-color: #8ab5ab;
-  background: #2b4a49;
-  color: #e1fff4;
-  box-shadow: none;
+  --button-light: #fce5a2;
+  --button-color: #efa051;
+  --button-edge: #ffdc8f;
+  color: #33203c;
 }
 
 body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active {
-  background: #203b3a;
-  color: #e0fcee;
-  box-shadow: inset 0 0 0 1px #82ada5;
+  --button-light: #eee2ff;
+  --button-color: #bd90ff;
+  --button-edge: #f2e5ff;
+  color: #312251;
 }
 
-body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color: #bdebd8; }
+body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color: currentColor; }
 
 .pack-room > .category-tabs {
   gap: 3px;
   padding: 3px;
   border: 1px solid var(--pack-ui-edge);
   border-radius: 14px;
-  background: #141c27;
+  background: #27173d;
 }
 
 .pack-room > .category-tabs button {
   min-width: 0;
   padding-inline: 4px;
-  border: 1px solid transparent;
   border-radius: 10px;
-  background: transparent;
-  color: var(--pack-ui-muted);
-  box-shadow: none;
+  color: #fff3ff;
 }
 
 .pack-room > .category-tabs button.active {
-  border-color: #90c8b7;
-  background: #2b4a49;
-  color: #e1fff4;
-  box-shadow: none;
+  --button-light: #ffe0f4;
+  --button-color: #f59bcc;
+  --button-edge: #ffdcf3;
+  color: #472043;
+}
+
+.pack-room > .category-tabs button[data-id="football"]:not(.active) {
+  --button-light: #28698b;
+  --button-color: #264168;
+  --button-edge: #77c6e8;
+}
+
+.pack-room > .category-tabs button[data-id="basketball"]:not(.active) {
+  --button-light: #974c47;
+  --button-color: #60314f;
+  --button-edge: #f0a884;
 }
 
 .pack-room > .category-tabs button .icon { color: currentColor; }
 
 .pack-room .pack-showcase .carousel-shell {
   background:
-    radial-gradient(ellipse at 50% 48%, color-mix(in srgb, var(--foil) 31%, #24394a) 0%, transparent 78%),
-    #121b26;
+    radial-gradient(circle at 8% 20%, #ffb5e14f 0 3px, transparent 5px),
+    radial-gradient(circle at 93% 64%, #a4b5ff66 0 4px, transparent 6px),
+    radial-gradient(circle at 13% 77%, #ffd19c52 0 2px, transparent 4px),
+    radial-gradient(circle at 88% 12%, #bca3ff63 0 3px, transparent 5px),
+    radial-gradient(ellipse at 50% 48%, color-mix(in srgb, var(--foil) 34%, #4e2679) 0%, transparent 78%),
+    #25163e;
 }
 
 .pack-room .pack-showcase .pack-carousel { background: none; }
 
 .pack-room .carousel-controls > button {
-  border: 1px solid var(--pack-ui-edge);
   border-radius: 50%;
-  background: var(--pack-ui-panel);
   color: var(--pack-ui-text);
-  box-shadow: none;
 }
 
 .pack-room .carousel-controls > button:disabled {
-  background: #141c27;
-  color: #92a3ba;
+  border-color: #74668b;
+  background: #2c2243;
+  color: #c1b6cf;
+  box-shadow: none;
 }
 
 .pack-room .pack-pagination {
   border-color: var(--pack-ui-edge);
-  background: #18222e;
+  background: #26173d;
 }
 
 .pack-room .pack-showcase .pack-panel {
   display: flex;
   flex-direction: column;
-  background: #151f2a;
+  background: #27183d;
   border-color: var(--pack-ui-edge);
 }
 
@@ -1763,10 +1777,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 
 .pack-room .pack-showcase .pack-quick-links {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.52fr) minmax(0, 1fr);
-  gap: 0;
-  border: 1px solid var(--pack-ui-edge);
-  border-radius: 11px;
-  background: var(--pack-ui-panel);
+  gap: 5px;
 }
 
 .pack-room .pack-showcase .pack-quick-links button {
@@ -1774,18 +1785,25 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--pack-ui-text);
-  box-shadow: none;
-  font-weight: 700;
+  min-width: 0;
+  border-radius: 10px;
+  color: #fff6ff;
+  font-weight: 800;
 }
 
-.pack-room .pack-showcase .pack-quick-links button + button { border-left: 1px solid var(--pack-ui-edge); }
-.pack-room .pack-showcase .pack-quick-links button:first-child { border-radius: 10px 0 0 10px; }
-.pack-room .pack-showcase .pack-quick-links button:last-child { border-radius: 0 10px 10px 0; }
-.pack-room .pack-showcase .pack-quick-links button .icon { width: 15px; height: 15px; color: var(--pack-ui-accent); }
+.pack-room .pack-quick-links [data-id="options"] {
+  --button-light: #315f93;
+  --button-color: #383768;
+  --button-edge: #8dc2ff;
+}
+
+.pack-room .pack-quick-links [data-id="cards"] {
+  --button-light: #9d406b;
+  --button-color: #5a2c63;
+  --button-edge: #f499c5;
+}
+
+.pack-room .pack-showcase .pack-quick-links button .icon { width: 15px; height: 15px; color: #ffe3fa; }
 .pack-room .pack-showcase .pack-quick-links button small { color: var(--pack-ui-muted); }
 
 .pack-room .pack-action-dock {
@@ -1794,25 +1812,21 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 }
 
 .pack-room .pack-open-action[data-action] {
-  border: 1px solid #e2fff0;
+  --button-light: #ffe8a3;
+  --button-color: #efae50;
+  --button-edge: #ffe4aa;
   border-radius: 12px;
-  background: linear-gradient(105deg, #cbf4df, #a9dccc);
   color: var(--pack-ui-ink);
-  box-shadow: none;
 }
 
 .pack-room .pack-open-action[data-action="wallet"] {
-  border-color: #8ab5ab;
-  background: #213c3b;
-  color: #e1fff4;
+  --button-light: #a74889;
+  --button-color: #662d73;
+  --button-edge: #f09bd1;
+  color: #fff5fc;
 }
 
 .pack-room .pack-open-action[data-action] .icon { color: currentColor; }
-
-@media (hover: hover) {
-  .pack-room .pack-showcase .pack-quick-links button:hover { background: #263642; }
-  .pack-room .pack-open-action[data-action]:hover { box-shadow: none; }
-}
 
 @media (max-width: 820px), (max-width: 900px) and (hover: none) and (pointer: coarse) {
   .pack-room > .category-tabs { margin: 3px 12px 1px; }
@@ -1858,9 +1872,9 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 
 /* Keep the pack browser visible behind the odds sheet. */
 .pack-dialog[data-kind="odds"] {
-  --odds-edge: #738d9e75;
-  --odds-muted: #b7c9d5;
-  --odds-rail: #101824;
+  --odds-edge: #ad85d387;
+  --odds-muted: #dbc9ed;
+  --odds-rail: #1c132d;
   position: fixed;
   inset: auto 0 0;
   width: min(560px, 100%);
@@ -1870,7 +1884,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   border: 1px solid var(--odds-edge);
   border-bottom: 0;
   border-radius: 22px 22px 0 0;
-  background: #17232e;
+  background: #281a3c;
   box-shadow: 0 -8px 42px #070d17a8;
 }
 
@@ -1883,7 +1897,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   gap: 10px;
   padding: 11px 15px;
   border-color: var(--odds-edge);
-  background: radial-gradient(ellipse at 10% 0%, #2d465a, transparent 80%), #1c2a37;
+  background: radial-gradient(ellipse at 10% 0%, #6a347d, transparent 85%), #33204c;
 }
 
 .pack-dialog[data-kind="odds"] h2 {
@@ -1910,7 +1924,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   height: 34px;
   border-color: var(--odds-edge);
   border-radius: 10px;
-  background: #17232e;
+  background: #281a3c;
   color: #eaf7f7;
   box-shadow: none;
 }
@@ -1936,9 +1950,10 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 
 .pack-dialog-body .pack-odds-modes .mode-tabs button.active,
 .pack-dialog-body .pack-odds-modes .mode-tabs button[data-id="Gamble"].active {
-  background: #bdebd8;
-  border-color: #d4f7e4;
-  color: #14302b;
+  --button-light: #eadcff;
+  --button-color: #caa4fa;
+  --button-edge: #f4e2ff;
+  color: #2b1845;
 }
 
 .pack-odds-heading {
@@ -1986,7 +2001,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   margin: 11px 0 0;
   border: 1px solid var(--odds-edge);
   border-radius: 9px;
-  background: #1b2a35;
+  background: #321f47;
 }
 
 .pack-odds-range > div { padding: 5px 9px; }
@@ -2000,17 +2015,17 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   flex: 0 0 auto;
   padding: 8px 15px max(10px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--odds-edge);
-  background: #1c2a37;
+  background: #33204c;
 }
 
 .pack-dialog .pack-dialog-actions .primary {
   width: 100%;
   min-height: 44px;
-  border: 1px solid #d4f7e4;
+  --button-light: #eadcff;
+  --button-color: #caa4fa;
+  --button-edge: #f4e2ff;
   border-radius: 10px;
-  background: linear-gradient(105deg, #cbf4df, #a9dccc);
-  color: #14302b;
-  box-shadow: none;
+  color: #2b1845;
 }
 
 @media (max-height: 480px) {
@@ -2018,3 +2033,35 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   .pack-dialog[data-kind="odds"] > header { padding-block: 7px; }
   .pack-odds-art .foil { --pack-height: 46px; }
 }
+
+/* Saturated fills and offset edges echo printed trading cards. */
+:where(.primary, .account-buttons .primary) {
+  --button-light: #f9d9ff;
+  --button-color: #c892ee;
+  --button-edge: #f8d9ff;
+}
+
+:is(.primary, .account-buttons .primary):enabled:not(:where(.pack-open-action, .pack-dialog-actions button)),
+a.primary { color: #2d1940; }
+
+:is(.primary, .account-buttons .primary, .secondary, .account-buttons .secondary,
+    .pack-room > .category-tabs button, .pack-room .carousel-controls > button:enabled,
+    .pack-room .pack-showcase .pack-quick-links button, .topbar .header-wallet .deposit,
+    body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active,
+    .pack-room .pack-open-action[data-action], .pack-dialog header button,
+    .pack-dialog-body .pack-odds-modes .mode-tabs button.active,
+    .pack-dialog-body .pack-odds-modes .mode-tabs button[data-id="Gamble"].active,
+    .pack-dialog .pack-dialog-actions .primary):not(:disabled) {
+  border: 1px solid var(--button-edge, #bd92ed);
+  background: linear-gradient(180deg, var(--button-light, #7042a1), var(--button-color, #492d78));
+  box-shadow: inset 0 1px #fff5, inset 0 -2px #190d2c38, 0 2px #11091e;
+}
+
+.pack-choice.selected .foil {
+  filter: drop-shadow(0 9px 14px #110b21b3) drop-shadow(0 0 12px color-mix(in srgb, var(--foil) 46%, transparent));
+}
+
+.pack-room .pack-showcase .chase-value { color: #ffe4a5; }
+.pack-odds-list progress { height: 13px; border-radius: 5px; }
+.pack-odds-list progress::-webkit-progress-value { border-radius: 5px; }
+.pack-odds-list progress::-moz-progress-bar { border-radius: 5px; }
