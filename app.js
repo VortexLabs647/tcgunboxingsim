@@ -64,17 +64,23 @@ function packsView(){
    <dialog id="packDetails" class="pack-dialog" aria-labelledby="packDetailsTitle">
      <header><h2 id="packDetailsTitle"></h2><form method="dialog"><button aria-label="Close pack details" autofocus>${icon('close')}</button></form></header>
      <div id="packDetailsBody" class="pack-dialog-body"></div>
+     <div class="pack-dialog-actions" hidden><form method="dialog"><button class="secondary">Back to packs</button></form></div>
    </dialog>
  </div>`;
 }
+function packValueRange(pack){
+ const chances=E.odds(catalog,pack,mode);
+ const possible=packPool(pack).filter((_,tier)=>chances[tier]>0).flat();
+ const values=[...possible,...wildCards(pack)].map(E.value);
+ return {min:Math.min(...values),max:Math.max(...values)};
+}
 function packPanel(){
- const pack=selectedPack(),groups=packPool(pack),chances=E.odds(catalog,pack,mode);
- const possible=groups.filter((_,tier)=>chances[tier]>0).flat();
- const values=[...possible,...wildCards(pack)].map(E.value),cost=pack.price*quantity,canOpen=state.balance>=cost;
+ const pack=selectedPack(),{min,max}=packValueRange(pack);
+ const cost=pack.price*quantity,canOpen=state.balance>=cost;
  return `<div class="selected-title"><h2>${E.categories[pack.category].name} ${pack.name} Pack</h2><span class="selected-price">${money(pack.price,true)}<small> per pack</small></span></div>
    <div class="pack-facts">
-     <div><small>Minimum pull</small><strong>${money(Math.min(...values),true)}</strong></div>
-     <div><small>Top chase</small><strong class="chase-value">${money(Math.max(...values),true)}</strong></div>
+     <div><small>Minimum pull</small><strong>${money(min,true)}</strong></div>
+     <div><small>Top chase</small><strong class="chase-value">${money(max,true)}</strong></div>
    </div>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
      <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
@@ -85,6 +91,10 @@ function packPanel(){
    <p class="pack-sim-note">Free virtual currency · No cashouts</p>`;
 }
 
+function packOddsRange(pack){
+ const {min,max}=packValueRange(pack);
+ return `${money(min,true)}–${money(max,true)} in virtual value`;
+}
 function packModeControls(){
  return `<div class="mode-tabs" role="group" aria-label="Odds mode">${Object.keys(E.modes).map(key=>`<button data-action="mode" data-id="${key}" class="${mode===key?'active':''}" aria-pressed="${mode===key}">${key}</button>`).join('')}</div>`;
 }
@@ -92,6 +102,8 @@ function packModeControls(){
 function openPackDetails(kind){
  const dialog=$('#packDetails'), pack=selectedPack();
  const title=$('#packDetailsTitle',dialog), content=$('#packDetailsBody',dialog);
+ dialog.dataset.kind=kind;
+ $('.pack-dialog-actions',dialog).hidden=kind!=='odds';
  if(kind==='options'){
   title.textContent='Pack options';
   content.innerHTML=`<div class="pack-options-controls"><label for="packQuantity">Quantity</label>
@@ -99,9 +111,13 @@ function openPackDetails(kind){
     <div class="pack-modes"><span>Odds mode</span>${packModeControls()}</div></div>`;
  }else if(kind==='odds'){
   title.textContent='Pack odds';
-  content.innerHTML=`<p class="pack-dialog-pack">${E.categories[pack.category].name} ${pack.name} Pack</p>
-    ${packModeControls()}
-    <div id="packOddsBody">${packOdds(pack)}</div>`;
+  content.innerHTML=`<div class="pack-odds-hero" style="--foil:${pack.color}">
+    <div class="pack-odds-art" aria-hidden="true">${packArt(pack)}</div>
+    <div><h3>${E.categories[pack.category].name} ${pack.name} Pack</h3>
+      <p id="packOddsRange">${packOddsRange(pack)}</p></div>
+  </div>
+  <div class="pack-odds-modes">${packModeControls()}</div>
+  <div id="packOddsBody">${packOdds(pack)}</div>`;
  }else if(kind==='cards'){
   title.textContent='Cards in this pack';
   content.innerHTML=`<div class="section-heading"><h3>${E.categories[pack.category].name} collection</h3><button class="text-link" data-action="view-category">View collection</button></div>
@@ -322,7 +338,9 @@ function updatePackPanel(){
  const odds=$('#packOddsBody',dialog);
  if(odds){
   const expanded=$('.odds-extra',odds)?.open;
-  odds.innerHTML=packOdds(selectedPack());
+  const pack=selectedPack();
+  $('#packOddsRange',dialog).textContent=packOddsRange(pack);
+  odds.innerHTML=packOdds(pack);
   if(expanded)$('.odds-extra',odds).open=true;
  }
 }
@@ -371,7 +389,7 @@ function packOdds(pack){
    .filter(row=>row.percent>0).reverse();
  const wildValues=wildCards(pack).map(E.value);
  const range=values=>values.length?`${money(Math.min(...values))}–${money(Math.max(...values))}`:'';
- return `<p class="odds-intro">Chance per card${wild?' · includes Wild':''}</p>
+ return `<div class="pack-odds-heading"><h3>Card probabilities</h3><p class="odds-intro">Per card${wild?' · includes Wild':''}</p></div>
    <ul class="pack-odds-list">${rows.map(({percent,tier,values})=>`<li style="--rarity:${E.rarityColors[tier]}">
      <div><span>${E.rarityNames[tier]} <small>${range(tier===5?[...values,...wildValues]:values)}</small></span><strong>${chance(percent,2)}</strong></div>
      <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]} chance"></progress>
