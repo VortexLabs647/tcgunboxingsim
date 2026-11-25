@@ -2282,3 +2282,157 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   from { opacity: 0; transform: translateY(10%) scale(.72); }
   to { opacity: 1; transform: translateY(calc(20% - 24px)) scale(.84) rotate(-7deg); }
 }
+
+/* Rarity colors follow each preview card and the awarded card. */
+.card-wheel {
+  position: absolute;
+  width: min(100%, 430px);
+  max-width: 100%;
+  aspect-ratio: 1;
+  max-height: 100%;
+  height: auto;
+  container-type: size;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .18s;
+  filter: drop-shadow(0 0 24px #c965e741);
+}
+.opening-stage { container-type: size; }
+.opening-stage .card-wheel { width: min(90cqw, 90cqh, 430px); }
+.spinning .card-wheel { visibility: visible; opacity: 1; }
+.wheel-disc {
+  position: absolute;
+  inset: 3%;
+  border: 1.6cqw solid #ffe6b7;
+  border-radius: 50%;
+  background: var(--wheel-colors);
+  box-shadow: 0 0 0 .8cqw #581d68, inset 0 0 0 1.1cqw #fffa, 0 0 7cqw #da83ed59;
+  will-change: transform;
+}
+.wheel-disc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-conic-gradient(from -22.5deg, #180c23a6 0 44.5deg, #fff7d2 44.5deg 45deg);
+}
+.spinning .wheel-disc { animation: card-wheel-turn var(--spin-time) cubic-bezier(.12,.62,.13,1) both; }
+@keyframes card-wheel-turn {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(var(--wheel-stop)); }
+}
+.wheel-slot {
+  position: absolute;
+  left: 40%;
+  top: 36%;
+  width: 20%;
+  height: 28%;
+  transform: rotate(var(--slot-angle)) translateY(-108%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .8cqw;
+}
+.wheel-slot .cartoon-card {
+  flex: 1;
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  max-width: none;
+  padding: .5cqw;
+  border-radius: 1.4cqw;
+  border: .45cqw solid var(--rarity);
+  box-shadow: 0 0 2cqw var(--rarity);
+}
+.wheel-slot .cartoon-card-head,
+.wheel-slot .cartoon-card-name,
+.wheel-slot .cartoon-card-edition { display: none; }
+.wheel-slot .cartoon-card-art { height: 100%; border-radius: .8cqw; }
+.wheel-slot > span {
+  font-family: var(--display-font);
+  font-size: 2.4cqw;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+}
+.wheel-pointer {
+  position: absolute;
+  z-index: 4;
+  left: 44%;
+  top: 0;
+  width: 12%;
+  height: 9%;
+  background: linear-gradient(#fff9d3, #f7b950);
+  clip-path: polygon(0 0,100% 0,50% 100%);
+  filter: drop-shadow(0 1px 3px #211127);
+}
+.wheel-hub {
+  position: absolute;
+  z-index: 2;
+  inset: 38%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 700 8cqw var(--display-font);
+  color: #fff0c9;
+  background: radial-gradient(circle at 30% 15%,#a661b5,#3c175c 80%);
+  border: .9cqw solid #ffe0a8;
+  box-shadow: 0 0 0 1cqw #51205e, 0 1cqw 3cqw #21092ba6;
+}
+.wheel-winner {
+  position: absolute;
+  z-index: 5;
+  inset: 18% 30% 15%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(.7);
+  transition: opacity .22s, transform .28s;
+}
+.wheel-winner .cartoon-card {
+  width: 100%;
+  height: auto;
+  max-height: 89%;
+  flex: 1;
+  min-height: 0;
+  filter: drop-shadow(0 0 3cqw var(--spin-color));
+}
+.wheel-winner strong {
+  margin-top: 2cqw;
+  font: 700 4cqw/1.15 var(--display-font);
+  padding: 1.5cqw 2cqw;
+  background: #21112eef;
+  border: .3cqw solid var(--spin-color);
+  border-radius: 2cqw;
+  color: #fff;
+  white-space: nowrap;
+}
+.landed .wheel-winner { opacity: 1; visibility: visible; transform: scale(1); }
+.landed .wheel-hub { visibility: hidden; }
+.landed .wheel-disc { filter: brightness(.55); }
+@media (prefers-reduced-motion: reduce) {
+  .card-wheel { display: none; }
+}
+
+/* The illustrated blank master keeps every edition on the same packaging. */
+.foil { background: url("pack-pearl-wrapper.webp") center / 100% 100% no-repeat; }
+.foil .foil-body {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  clip-path: none;
+}
+.foil .foil-body::before, .foil .foil-body::after { display: none; }
+.foil .pack-seal.top {
+  height: 9%;
+  background: url("pack-pearl-wrapper.webp") top center / 100% auto no-repeat;
+  box-shadow: none;
+  clip-path: none;
+}
+.foil .pack-seal.bottom, .foil .pack-seal i { display: none; }
+.foil .foil-logo { top: 8%; }
+.foil .foil-title { bottom: 9%; }
+.foil .foil-category { bottom: 4%; }

@@ -11,7 +11,7 @@ let effectsBus=null,effectSources=new Set(),effectsUntil=0,winSources=new Set(),
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,balanceFrame=0,lastInteraction={x:0,y:0},winMusicGain=null;
-const SEAL_SWEEP_MS=780,TEAR_MS=320,SPIN_MS=2400,FACE_UP_AT=.79;
+const SEAL_SWEEP_MS=780,TEAR_MS=320,SPIN_MS=3600,FACE_UP_AT=1;
 const REFERRAL_KEY='tcg-cccollectables-claimed';
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedCategory='creatures',selectedIndex=0,mode='Normal',quantity=1,search='',filter='all',sort='recent',limit=30,detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -259,16 +259,24 @@ function rip(){if(!pending||phase!=='unsealing')return;phase='charging';const sc
 function openingPull(){return pending.pulls.reduce((best,pull)=>pull.tier>best.tier||(pull.tier===best.tier&&pull.value>best.value)?pull:best);}
 
 function raritySpinner(){
- const hero=openingPull();
- const back=`<span class="spin-face-design"><strong>TCG</strong><small>UNBOXING SIM</small></span>`;
- return `<div class="rarity-spin" aria-hidden="true">
-   <div class="spin-glow"></div>
-   <div class="card-lift">
-     <div class="spin-card">
-       <div class="spin-face">${back}</div>
-       <div class="spin-face spin-face-reverse">${back}<div class="spin-result-art">${cardImage(byId[hero.itemId])}</div></div>
-     </div>
+ const hero=openingPull(),groups=packPool(pending.pack,pending.mode);
+ const odds=E.odds(catalog,pending.pack,pending.mode);
+ const previews=groups.flatMap((items,tier)=>odds[tier]>0?items.map(item=>({item,tier})):[])
+   .filter(entry=>entry.item.id!==hero.itemId);
+ const slots=Array.from({length:7},(_,i)=>previews[Math.floor(i*previews.length/7)]||{item:byId[hero.itemId],tier:hero.tier});
+ const landingIndex=hero.itemId.length%8;
+ slots.splice(landingIndex,0,{item:byId[hero.itemId],tier:hero.tier});
+ const stops=slots.map(({tier},i)=>`${E.rarityColors[tier]} ${i*45}deg ${(i+1)*45}deg`).join(',');
+ const rotation=1800+(360-landingIndex*45)%360;
+ return `<div class="card-wheel" aria-hidden="true" data-winner="${hero.itemId}" data-landing-index="${landingIndex}">
+   <div class="wheel-pointer"></div>
+   <div class="wheel-disc" style="--wheel-stop:${rotation}deg;--wheel-colors:conic-gradient(from -22.5deg,${stops})">
+     ${slots.map(({item,tier},i)=>`<div class="wheel-slot" data-item-id="${item.id}" data-tier="${tier}" style="--slot-angle:${i*45}deg;--rarity:${E.rarityColors[tier]}">
+       ${cardImage(item)}<span>${E.rarityNames[tier]}</span>
+     </div>`).join('')}
    </div>
+   <div class="wheel-hub">TCG</div>
+   <div class="wheel-winner">${cardImage(byId[hero.itemId])}<strong>${escape(byId[hero.itemId].name)}</strong></div>
  </div>`;
 }
 
@@ -280,16 +288,18 @@ function spinReveal(){
  const tier=openingPull().tier;
  screen.style.setProperty('--spin-color','#c7a4fb');
  screen.classList.add('spinning');
+ $('h1',screen).innerHTML='CARD <em>WHEEL.</em>';
  timers.push(setTimeout(()=>{
   if(!pending||view!=='opening'||phase!=='spinning')return;
   screen.classList.add('face-up','landed');
   screen.style.setProperty('--spin-color',E.rarityColors[tier]);
   screen.dataset.landingRarity=E.rarityNames[tier];
+  screen.dataset.landingCard=openingPull().itemId;
   const label=$('.rarity-label',screen);
   label.textContent=E.rarityNames[tier];
   label.classList.add('active');
  },SPIN_MS*FACE_UP_AT));
- timers.push(setTimeout(reveal,SPIN_MS+350));
+ timers.push(setTimeout(reveal,SPIN_MS+1100));
 }
 
 function isHighValuePull(){return !!pending&&pending.pulls.some(p=>p.tier>=4||p.value>=pending.pack.price*5);}
