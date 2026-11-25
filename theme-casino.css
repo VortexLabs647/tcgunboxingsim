@@ -1653,16 +1653,10 @@ body[data-view="packs"] .header-wallet {
 }
 
 body[data-view="packs"] .topbar .header-wallet .deposit {
-  --button-light: #fce5a2;
-  --button-color: #efa051;
-  --button-edge: #ffdc8f;
   color: #33203c;
 }
 
 body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active {
-  --button-light: #eee2ff;
-  --button-color: #bd90ff;
-  --button-edge: #f2e5ff;
   color: #312251;
 }
 
@@ -1684,22 +1678,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 }
 
 .pack-room > .category-tabs button.active {
-  --button-light: #ffe0f4;
-  --button-color: #f59bcc;
-  --button-edge: #ffdcf3;
   color: #472043;
-}
-
-.pack-room > .category-tabs button[data-id="football"]:not(.active) {
-  --button-light: #28698b;
-  --button-color: #264168;
-  --button-edge: #77c6e8;
-}
-
-.pack-room > .category-tabs button[data-id="basketball"]:not(.active) {
-  --button-light: #974c47;
-  --button-color: #60314f;
-  --button-edge: #f0a884;
 }
 
 .pack-room > .category-tabs button .icon { color: currentColor; }
@@ -1735,34 +1714,14 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 
 .pack-room .pack-showcase .pack-quick-links {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
+  gap: 5px;
   margin: 0;
   padding: 0;
-  border: 1px solid #9b7bb677;
-  border-radius: 10px;
-  background: #211630;
 }
 
 .pack-room .pack-showcase .pack-quick-links button {
   min-width: 0;
   min-height: 44px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #f3e8ff;
-  font-weight: 700;
-  outline-offset: -3px;
-}
-
-.pack-room .pack-showcase .pack-quick-links button:first-child { border-radius: 9px 0 0 9px; }
-.pack-room .pack-showcase .pack-quick-links button:last-child { border-radius: 0 9px 9px 0; }
-.pack-room .pack-showcase .pack-quick-links button + button { border-left: 1px solid #9b7bb655; }
-
-@media (hover: hover) {
-  .pack-room .pack-showcase .pack-quick-links button:hover {
-    background: #35244b;
-    box-shadow: none;
-  }
 }
 
 .pack-room .pack-action-dock {
@@ -1771,17 +1730,11 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 }
 
 .pack-room .pack-open-action[data-action] {
-  --button-light: #ffe8a3;
-  --button-color: #efae50;
-  --button-edge: #ffe4aa;
   border-radius: 12px;
   color: var(--pack-ui-ink);
 }
 
 .pack-room .pack-open-action[data-action="wallet"] {
-  --button-light: #a74889;
-  --button-color: #662d73;
-  --button-edge: #f09bd1;
   color: #fff5fc;
 }
 
@@ -1903,9 +1856,6 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 
 .pack-dialog-body .pack-odds-modes .mode-tabs button.active,
 .pack-dialog-body .pack-odds-modes .mode-tabs button[data-id="Gamble"].active {
-  --button-light: #eadcff;
-  --button-color: #caa4fa;
-  --button-edge: #f4e2ff;
   color: #2b1845;
 }
 
@@ -1974,9 +1924,6 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 .pack-dialog .pack-dialog-actions .primary {
   width: 100%;
   min-height: 44px;
-  --button-light: #eadcff;
-  --button-color: #caa4fa;
-  --button-edge: #f4e2ff;
   border-radius: 10px;
   color: #2b1845;
 }
@@ -1987,73 +1934,104 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   .pack-odds-art .foil { --pack-height: 46px; }
 }
 
-/* Saturated fills and offset edges echo printed trading cards. */
-:where(.primary, .account-buttons .primary) {
-  --button-light: #f9d9ff;
-  --button-color: #c892ee;
-  --button-edge: #f8d9ff;
+/* Pearlescent controls use live labels over a shared foil finish. */
+:root {
+  --pearl-pink: #f5b3ed;
+  --pearl-lilac: #c79af4;
+  --pearl-cream: #ffe0bc;
+  --pearl-ink: #31153e;
+  --pearl-outline: #551761;
 }
 
-:is(.primary, .account-buttons .primary):enabled:not(:where(.pack-open-action, .pack-dialog-actions button)),
-a.primary { color: #2d1940; }
+:where(.primary, .category-tabs .active, .mode-tabs .active,
+       .account-tabs .active, .nav-link.active, .header-wallet .deposit,
+       [data-action="pack-details"][data-id="cards"]) {
+  --pearl-top: #f9dcff;
+  --pearl-mid: var(--pearl-pink);
+  --pearl-bottom: var(--pearl-lilac);
+  --pearl-tint: var(--pearl-cream);
+  --pearl-text: var(--pearl-ink);
+}
 
-/* Use each control's accent for its rim, shadow, and focus ring. */
-:is(.primary, .account-buttons .primary, .secondary, .account-buttons .secondary,
-    .category-tabs button, .pack-room .carousel-controls > button,
-    .topbar .header-wallet .deposit,
-    .pack-room .pack-open-action[data-action], .pack-dialog header button,
-    .pack-dialog-body .mode-tabs button.active, .pack-dialog .pack-dialog-actions .primary,
-    .account-tabs button, .tier-nav button, .skip-button):not(:disabled) {
-  border: 1px solid var(--button-edge, #bd92ed);
+:where(.primary, [data-action="pack-details"][data-id="cards"]) {
+  --pearl-glow: #ed9bfa55;
+}
+
+:where(.pack-open-action[data-action="open"]) {
+  --pearl-top: #fff3cd;
+  --pearl-mid: #ffdaa6;
+  --pearl-bottom: #eab277;
+  --pearl-tint: #ffe4f4;
+  --pearl-glow: #ecba594a;
+}
+
+:where([data-action="pack-details"][data-id="options"]) {
+  --pearl-mid: #45417c;
+  --pearl-bottom: #30264f;
+  --pearl-tint: #92b4f582;
+}
+
+:where(button.danger) {
+  --pearl-mid: #73345e;
+  --pearl-bottom: #44213e;
+  --pearl-tint: #ffacc174;
+}
+
+:root body :is(button, a.primary, a.secondary, .nav-link,
+    .pack-room .pack-showcase .pack-quick-links button,
+    .pack-dialog-body .pack-odds-modes .mode-tabs button,
+    .pack-room .pack-open-action[data-action],
+    .profile-fold > summary, .odds-extra > summary):not(:disabled):not(:where(
+    .pack-choice, .rip-pack, .item-button, .teaser-card)) {
+  border: 1px solid var(--pearl-outline);
+  border-radius: var(--pearl-radius, 999px);
   background:
-    linear-gradient(150deg, #ffffff26, transparent 42%),
-    linear-gradient(180deg, var(--button-light, #7042a1), var(--button-color, #492d78));
+    radial-gradient(ellipse at 92% 1%, var(--pearl-tint, #f5aedb65), transparent 62%),
+    linear-gradient(180deg, var(--pearl-top, #705092) 0%, var(--pearl-mid, #513574) 52%, var(--pearl-bottom, #3e2458) 100%);
+  box-shadow: inset 0 1px #fff8, inset 0 -2px #561b6c38, 0 2px #1a0d29,
+    0 0 8px var(--pearl-glow, #ba8ced24);
+  color: var(--pearl-text, #fff3ff);
+  text-shadow: none;
 }
 
-:is(.primary, .secondary, .category-tabs button, .pack-room .carousel-controls > button,
-    .topbar .header-wallet .deposit,
-    .topbar .user-button, :is(.topbar, .bottom-nav) .nav-link.active,
-    .pack-dialog header button, .pack-dialog-body .mode-tabs button, .account-tabs button,
-    .tier-nav button, .item-actions button, .skip-button, .receipt button,
-    .profile-fold > summary):not(:disabled) {
-  box-shadow: inset 0 1px #fff7, inset 0 -2px #190d2c38, 0 2px #11091e,
-    0 0 11px color-mix(in srgb, var(--button-glow, var(--button-edge, #bd92ed)) var(--button-halo, 29%), transparent);
+:root body :is(.topbar, .bottom-nav, .category-tabs) :is(.nav-link, button) .icon,
+:root body .pack-room .pack-open-action[data-action] .icon { color: currentColor; }
+
+:root body .bottom-nav { gap: 4px; }
+
+:root body :is(.text-link, .skip-button):not(:disabled) {
+  padding-inline: 9px;
+  text-decoration: none;
 }
 
-:is(.collection-tabs button.active, .account-tabs button.active, .pack-options-controls .mode-tabs button.active) {
-  --button-light: #f5ddff;
-  --button-color: #d9b3f2;
-  --button-edge: #ffeaff;
-  color: #2f1a49;
-}
+.profile-fold > summary { --pearl-radius: 14px; }
+:root body .odds-extra > summary { padding: 5px 10px; }
 
-.pack-room [data-action="open"] { --button-glow: #ffc05d; }
-.pack-room [data-action="wallet"].pack-open-action { --button-glow: #f486c6; }
-[data-action="favorite"] { --button-glow: #ff9bd0; }
-:is([data-action="sell"], [data-action="sell-detail"], [data-action="sell-result"]) { --button-glow: #fbd082; }
-:is([data-action="keep-result"], [data-action="leaderboard-refresh"]) { --button-glow: #7dd9fa; }
-
-:is(.topbar, .bottom-nav) .nav-link.active {
-  box-shadow: inset 0 0 0 1px #e3c6ff8c, inset 0 1px #fff7,
-    0 0 10px color-mix(in srgb, var(--button-glow, var(--button-edge, #bd92ed)) var(--button-halo, 29%), transparent);
-}
-
-body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active {
-  background: linear-gradient(145deg, var(--button-light), var(--button-color));
+/* Artwork doubles as the control in the carousel and card lists. */
+:root body :is(.item-button, .teaser-card) {
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px #c389e34d, inset 0 1px #f7d8ff77;
 }
 
 @media (hover: hover) {
-  :is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):hover { --button-halo: 47%; }
+  :root body :is(button, a.primary, a.secondary, .nav-link, summary):not(:disabled):not(:where(
+      .pack-choice, .rip-pack, .item-button, .teaser-card)):hover {
+    filter: brightness(1.08);
+  }
 }
 
-:is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):focus-visible {
-  --button-halo: 55%;
-  outline: 2px solid var(--button-glow, #f0ddff);
+:root body :is(button, a.primary, a.secondary, .nav-link, summary):focus-visible {
+  outline: 2px solid #ffe1fc;
   outline-offset: 2px;
 }
 
+:root body button:disabled {
+  border-radius: 999px;
+  box-shadow: none;
+}
+
 @media (forced-colors: active) {
-  :is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary):focus-visible {
+  :root body :is(button, a.primary, a.secondary, .nav-link, summary):focus-visible {
     outline-color: Highlight;
   }
 }
