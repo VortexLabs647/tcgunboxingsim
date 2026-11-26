@@ -1,6 +1,6 @@
 # TCG Unboxing Sim
 
-A free rock and mineral card collection game. Open nine editions of illustrated rock packs, discover 16 rocks and minerals, and organize your finds in the vault. Each edition features a signature rock.
+A free rock and mineral card collection game. Open nine editions of illustrated rock packs, discover 240 cards based on 48 rocks and minerals, and organize your finds in the vault. Each pack edition features a signature rock. Open one free pack at a time with one of three odds presets. Owned rocks earn small amounts of virtual money when tapped and while away, and a sale credits the amount the rock set aside.
 
 ## Play or install
 

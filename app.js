@@ -15,22 +15,61 @@ const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
 const CUE_GAIN = {tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, vault:6.1, hit:3.3};
 const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
-let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,quantity=1,search='',sort='recent',detailId=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
+let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
 function selectedPack(){return packs[selectedIndex];}
 function notice(message){$('#status').textContent=message;}
 function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
-function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='sealed';state=E.migrate(next,catalog);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
+function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='sealed';state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
 
+function money(units){return '$'+(units/1000000).toFixed(6);}
+function updateMoney(){
+ const cents=state.balance+state.rockRemainder/E.unitsPerCent;
+ $('#rockBalance').textContent='$'+(cents/100).toFixed(6);
+ const active=E.activeRocks(state);
+ const rate=$('#incomeRate');
+ if(rate)rate.textContent=money(active.reduce((sum,rock)=>sum+E.passiveUnits[rock.tier],0))+'/sec';
+ const sellButtons=$$('[data-action="sell-rock"]');
+ if(!sellButtons.length)return;
+ const reserve=new Map(state.vault.map(rock=>[rock.uid,rock.resaleUnits||0]));
+ for(const button of sellButtons){
+  const amount=reserve.get(button.dataset.id)||0;
+  button.disabled=amount===0;
+  button.textContent='Sell '+money(amount);
+ }
+}
+let incomeNeedsSave=false,lastIncomeSave=0,rockNoticeTimer;
+function incomeTick(force=false){
+ const cloud=window.TCGCloud;
+ if(!catalog.length||(!force&&document.hidden)||(cloud?.user&&!cloud.canPlay))return;
+ const now=Date.now();
+ if(E.settleIncome(state,now)>0)incomeNeedsSave=true;
+ if(incomeNeedsSave&&(force||now-lastIncomeSave>=30000)){
+  save();
+  incomeNeedsSave=false;lastIncomeSave=now;
+ }
+ if(!document.hidden)updateMoney();
+}
+function rockAction(action,uid){
+ const proceeds=action==='tap-rock'?E.tapRock(state,uid):E.sellRock(state,uid);
+ if(!proceeds)return;
+ save();
+ sound(action==='tap-rock'?'click':'vault');
+ if(action==='sell-rock')render();
+ const message=(action==='tap-rock'?'Rock tapped · +':'Rock sold · +')+money(proceeds);
+ notice(message);
+ clearTimeout(rockNoticeTimer);
+ rockNoticeTimer=setTimeout(()=>{if($('#status').textContent===message)notice('');},1600);
+}
+
 function updateHeader(){
- const count=state.discovered.length;
- $('#collectionCount').textContent=count+' / '+catalog.length;
+ updateMoney();
  $('#userInitials').textContent=(state.name||'Player').slice(0,2).toUpperCase();
 }
-function nav(){const links=[['packs','grid','Packs'],['vault','vault','Vault'],['collection','card','Collection'],['leaderboard','star','Ranks'],['profile','user','Profile']];const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===view?'active':''}" ${key===view?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');$('#desktopNav').innerHTML=html;$('#bottomNav').innerHTML=html;}
+function nav(){const links=[['packs','grid','Packs'],['vault','vault','Inventory'],['collection','card','Collection'],['leaderboard','star','Ranks'],['profile','user','Profile']];const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===view?'active':''}" ${key===view?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');$('#desktopNav').innerHTML=html;$('#bottomNav').innerHTML=html;}
 function clearAnimation(){cancelAnimationFrame(wheelAudioFrame);stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
 function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','leaderboard','opening','item'].includes(next)?next:'packs';search='';confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
-function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();}
+function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();updateMoney();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${kicker}</div><h1>${title}</h1></div></div>`;}
 function packArt(pack){
  return `<div class="foil rocks" data-edition="${pack.name}" style="--foil:${pack.color}"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${[...pack.cover.slice(1),pack.cover[0]].map((id,index)=>cardImage(byId[id],'art-'+index)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title">${pack.name.toUpperCase()}</div><div class="foil-category">ROCKS</div></div></div>`;
@@ -73,12 +112,11 @@ function packPanel(){
  const pack=selectedPack();
  return `<div class="selected-title"><h2>${pack.name} Rock Pack</h2></div>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
-     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Rarities</button>
-     <button data-action="pack-details" data-id="options" aria-haspopup="dialog">Options</button>
+     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
      <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
    </div>
    <div class="pack-action-dock">
-     <button class="primary open-pack-button pack-open-action" data-action="open">Open ${quantity} free pack${quantity===1?'':'s'}</button>
+     <button class="primary open-pack-button pack-open-action" data-action="open">Open 1 free pack</button>
    </div>`;
 }
 
@@ -90,16 +128,9 @@ function openPackDetails(kind){
  art.hidden=name.hidden=kind!=='odds';
  art.innerHTML=kind==='odds'?packArt(pack):'';
  name.textContent=`${pack.name} Rock Pack`;
- if(kind==='options'){
-  title.textContent='Pack options';
-  content.innerHTML=`<div class="pack-options-controls"><label for="packQuantity">Quantity</label>
-    <select id="packQuantity">${[1,3,5].map(n=>`<option value="${n}" ${quantity===n?'selected':''}>${n} pack${n===1?'':'s'}</option>`).join('')}</select></div>`;
- }else if(kind==='odds'){
-  title.textContent='Card rarity';
-  content.innerHTML=`<ul class="pack-odds-list">${E.rarityWeights.map((percent,tier)=>`<li style="--rarity:${E.rarityColors[tier]}">
-    <div><span>${E.rarityNames[tier]}</span><strong>${percent}%</strong></div>
-    <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]}"></progress>
-   </li>`).reverse().join('')}</ul>`;
+ if(kind==='odds'){
+  title.textContent='Pack odds';
+  content.innerHTML=oddsView();
  }else if(kind==='cards'){
   title.textContent='Cards in this pack';
   content.innerHTML=insideLineup(pack);
@@ -109,6 +140,16 @@ function openPackDetails(kind){
  },{once:true});
  dialog.showModal();
  content.scrollTop=0;
+}
+
+function oddsView(){
+ return `<div class="mode-tabs rock-odds-tabs" role="group" aria-label="Odds preset">
+  ${Object.keys(E.oddsPresets).map(preset=>`<button data-action="rock-odds" data-id="${preset}" class="${odds===preset?'active':''}" aria-pressed="${odds===preset}">${preset}</button>`).join('')}
+ </div>
+ <ul class="pack-odds-list">${E.oddsPresets[odds].map((percent,tier)=>`<li style="--rarity:${E.rarityColors[tier]}">
+  <div><span>${E.rarityNames[tier]}</span><strong>${percent}%</strong></div>
+  <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]}"></progress>
+ </li>`).reverse().join('')}</ul>`;
 }
 
 function scrollToPack(rail, choice, smooth = false) {
@@ -213,26 +254,32 @@ function selectPack(index, scroll = true) {
   updateCarouselControls();
   if (scroll) scrollToPack(rail, choices[selectedIndex], true);
 }
-function itemCard(item,own=null,itemChance=null){
+function itemCard(item,own=null,itemChance=null,earning=false){
  return `<article class="item-card" style="--rarity:${E.rarityColors[item.tier]}">
-  <button class="item-button" data-action="item" data-id="${item.id}">
+  <button class="item-button" data-action="${own?'tap-rock':'item'}" data-id="${own?.uid||item.id}" ${own?`aria-label="Tap ${escape(item.name)} to earn"`:''}>
    <div class="item-visual rocks">${cardImage(item)}${state.discovered.includes(item.id)?'<span class="item-badge">COLLECTED</span>':''}</div>
    <div class="item-copy"><span class="rarity">${E.rarityNames[item.tier]}</span><h3>${escape(item.name)}</h3><p>${escape(item.detail)}</p>
     ${itemChance===null?'':`<div class="item-value">${chance(itemChance,2)}</div>`}
    </div>
   </button>
-  ${own?`<div class="item-actions"><button data-action="favorite" data-id="${own.uid}" aria-pressed="${!!own.locked}">${own.locked?'Favorited':'Favorite'}</button></div>`:''}
+  ${own?`<p class="rock-rate">${earning?money(E.passiveUnits[own.tier])+'/sec':'Idle'} · ${money(E.tapUnits[own.tier])}/tap</p>
+  <div class="item-actions rock-actions">
+   <button data-action="favorite" data-id="${own.uid}" aria-label="${own.locked?'Unfavorite':'Favorite'} ${escape(item.name)}" aria-pressed="${!!own.locked}">${own.locked?'★':'☆'}</button>
+   ${own.locked?'':`<button data-action="sell-rock" data-id="${own.uid}" ${own.resaleUnits?'':'disabled'}>Sell ${money(own.resaleUnits||0)}</button>`}
+  </div>`:''}
  </article>`;
 }
 function stats(values){return `<div class="stats">${values.map(([label,value])=>`<div class="stat"><small>${label}</small><strong>${value}</strong></div>`).join('')}</div>`;}
 function empty(title,description,button=true){return `<div class="empty"><h2>${title}</h2><p>${description}</p>${button?'<button class="primary" data-action="packs">Explore packs</button>':''}</div>`;}
 function vaultView(){
+ const earning=new Set(E.activeRocks(state).map(rock=>rock.uid));
  const owned=state.vault.filter(card=>byId[card.itemId]?.name.toLowerCase().includes(search.toLowerCase()));
  if(sort==='rarity')owned.sort((a,b)=>b.tier-a.tier);
- return `${heading('YOUR ROCK COLLECTION','THE <em>VAULT.</em>')}${stats([['Cards',state.vault.length],['Unique rocks',state.discovered.length]])}
+ return `${heading('YOUR ROCK COLLECTION','YOUR <em>INVENTORY.</em>')}${stats([['Owned rocks',state.vault.length],['Rock income','<span id="incomeRate"></span>']])}
+  <p class="rock-income-note">Tap an owned rock to earn. Your 12 rarest distinct cards earn automatically for up to 8 hours away. Selling collects the money that rock set aside.</p>
   <div class="toolbar"><div class="search">${icon('search')}<input id="vaultSearch" placeholder="Search your rocks" aria-label="Search your rocks" value="${escape(search)}"></div>
    <select id="sort" aria-label="Sort vault"><option value="recent">Newest first</option><option value="rarity" ${sort==='rarity'?'selected':''}>Rarest first</option></select></div>
-  ${owned.length?`<div class="item-grid">${owned.map(card=>itemCard(byId[card.itemId],card)).join('')}</div>`:empty(state.vault.length?'NO MATCHES.':'YOUR VAULT IS EMPTY.',state.vault.length?'Try another rock name.':'Open a pack to start collecting.')}`;
+  ${owned.length?`<div class="item-grid">${owned.map(card=>itemCard(byId[card.itemId],card,null,earning.has(card.uid))).join('')}</div>`:empty(state.vault.length?'NO MATCHES.':'YOUR VAULT IS EMPTY.',state.vault.length?'Try another rock name.':'Open a pack to start collecting.')}`;
 }
 function collectionView(){
  const cards=catalog.filter(item=>item.name.toLowerCase().includes(search.toLowerCase()));
@@ -352,7 +399,7 @@ function sound(kind){
 function startOpening(){
  if(pending&&view==='opening')return;
  stopWinMusic();
- pending=E.openPack(state,catalog,selectedPack(),quantity);
+ pending=E.openPack(state,catalog,selectedPack(),odds);
  save();
  phase='sealed';view='opening';
  history.replaceState(null,'','#opening');
@@ -395,7 +442,7 @@ function rip(){
 }
 
 // One awarded pull supplies both the face-up artwork and the final rarity. For a batch, feature its best pull.
-function openingPull(){return pending.pulls.reduce((best,pull)=>pull.tier>best.tier?pull:best);}
+function openingPull(){return pending.pull;}
 
 function raritySpinner(){
  const hero=openingPull();
@@ -469,7 +516,7 @@ function reveal(){
  clearAnimation();
  phase='revealed';
  render();
- const best=Math.max(...pending.pulls.map(p=>p.tier));
+ const best=pending.pull.tier;
  if(best>=4&&!document.hidden)playWinMusic();
  else if(skippedWheel)sound('hit');
  haptic(best>=4?[40,30,70]:30);
@@ -485,9 +532,9 @@ function resultsView(){
  const best=openingPull().tier;
  return `<section class="results-screen ${best===5?'grail-result':''}" style="--rarity:${E.rarityColors[best]}">
   <div class="reveal-shade" aria-hidden="true"></div>
-  <div class="eyebrow">${pending.quantity} ${pending.quantity===1?'CARD':'CARDS'} REVEALED</div>
-  <h1>ROCKS <em>DISCOVERED.</em></h1>
-  <div class="result-grid" aria-label="Revealed rock cards" tabindex="0">${pending.pulls.map(pull=>{
+  <div class="eyebrow">${pending.duplicate?'ALREADY IN YOUR INVENTORY':'ADDED TO YOUR INVENTORY'}</div>
+  <h1>ROCK <em>REVEALED.</em></h1>
+  <div class="result-grid" aria-label="Revealed rock cards" tabindex="0">${[pending.pull].map(pull=>{
    const item=byId[pull.itemId];
    return `<article class="result rocks" style="--rarity:${E.rarityColors[item.tier]}">
     <span class="rarity">${E.rarityNames[item.tier]}</span><div class="result-image">${cardImage(item)}</div>
@@ -496,17 +543,19 @@ function resultsView(){
   }).join('')}</div>
   <div class="result-actions">
    <button class="primary" data-action="keep-result">Back to packs</button>
-   <button class="secondary" data-action="vault">View vault</button>
+   <button class="secondary" data-action="vault">View inventory</button>
   </div>
  </section>`;
 }
 function showItem(id){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;go('item');}
 window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('#packDetails[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
 function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus();if(pos!=null)el?.setSelectionRange(pos,pos);}
-document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','favorite','save-name','delete-confirm','leaderboard-toggle'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
+document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','tap-rock','sell-rock','favorite','save-name','delete-confirm','leaderboard-toggle'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':go(a);break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
 case 'pack-details':openPackDetails(id);break;
+case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
+case 'tap-rock':case 'sell-rock':rockAction(a,id);break;
 case 'open':startOpening();break;case 'start-seal':rip();break;
 case 'view-category':go('collection');break;
 case 'item':showItem(id);break;case 'back-item':go(previousView);break;
@@ -520,27 +569,29 @@ case 'delete-start':profileSections.add('delete');confirmAction='delete';render(
 case 'delete-confirm':{state=E.defaults();selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
 }});
 document.addEventListener('input',e=>{if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
-document.addEventListener('change',e=>{if(e.target.id==='packQuantity'){quantity=Number(e.target.value);updatePackPanel();}if(e.target.id==='sort'){sort=e.target.value;render();}});
+document.addEventListener('change',e=>{if(e.target.id==='sort'){sort=e.target.value;render();}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','leaderboard'].includes(target)){go(target);}});
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=78');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=79');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};E.settleIncome(state);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true);if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 init();
+setInterval(incomeTick,1000);
+window.addEventListener('pageshow',()=>incomeTick(true));
 function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===8;}
 function updatePackPanel(){
  $('#packPanel').innerHTML=packPanel();
 }
 function insideLineup(pack){
  const pools=E.pools(catalog);
- return `<div class="item-grid rock-lineup">${catalog.slice().sort((a,b)=>b.tier-a.tier).map(item=>itemCard(item,null,E.itemOdds(item,pack,pools[item.tier]))).join('')}</div>`;
+ return `<div class="item-grid rock-lineup">${catalog.slice().sort((a,b)=>b.tier-a.tier).map(item=>itemCard(item,null,E.itemOdds(item,pack,pools[item.tier],odds))).join('')}</div>`;
 }
 
-document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','start-seal','open','keep-result'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','start-seal','open','keep-result','tap-rock','sell-rock'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
 
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;
  const row = Math.floor(item.artIndex / 4);
  const artwork = item.image;
- return `<span class="original-card cartoon-card card--${item.category} ${extra}" data-finish="${escape(item.finish)}" role="img" aria-label="${escape(item.name+' · '+item.detail)}" style="--card-color:${E.rarityColors[item.tier]};--art:url('${escape(artwork)}');--art-x:${column*100/3}%;--art-y:${row*100/3}%">
+ return `<span class="original-card cartoon-card card--${item.category} ${extra}" data-finish="${escape(item.finish)}" role="img" aria-label="${escape(item.name+' · '+item.detail)}" style="--specimen-filter:${item.artFilter||'none'};--card-color:${E.rarityColors[item.tier]};--art:url('${escape(artwork)}');--art-x:${column*100/3}%;--art-y:${row*100/3}%">
    <span class="cartoon-card-head"><b>${escape(item.detail)}</b></span>
    <span class="cartoon-card-art"></span>
    <span class="cartoon-card-name">${escape(item.name)}</span>
@@ -557,7 +608,7 @@ function leaderboardContent(){if(leaderboardError)return `<div class="content-ca
 async function loadLeaderboard(force=false){if(leaderboardLoading||(!force&&Date.now()-leaderboardLoaded<15000))return;leaderboardLoading=true;leaderboardError='';const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const cfg=window.TCG_CLOUD_CONFIG;if(!window.TCGCloud?.configured)throw Error('Rankings are not connected yet.');const query='select=entry_id,display_name,packs_opened&limit=50&order=';const fetchBoard=async order=>{const r=await fetch(cfg.url+'/rest/v1/leaderboard_entries?'+query+order,{headers:{apikey:cfg.publishableKey},signal:controller.signal});if(!r.ok)throw Error('Rankings could not load. Please try again.');const rows=await r.json();if(!Array.isArray(rows))throw Error('Rankings could not load.');return rows;};const opened=await fetchBoard('packs_opened.desc,entry_id.asc');leaderboardRows={opened};leaderboardLoaded=Date.now();}catch(e){leaderboardError=e.name==='AbortError'?'Rankings took too long to load. Please try again.':e.message;}finally{clearTimeout(timeout);leaderboardLoading=false;const target=$('#leaderboardTables');if(target)target.innerHTML=leaderboardContent();}}
 
 document.addEventListener('toggle',event=>{const id=event.target.dataset?.profileSection;if(id){if(event.target.open)profileSections.add(id);else profileSections.delete(id);}},true);
-window.addEventListener('pagehide',()=>{clearAnimation();stopWinMusic();});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){stopEffects();stopWinMusic();}});
+window.addEventListener('pagehide',()=>{incomeTick(true);clearAnimation();stopWinMusic();});
+document.addEventListener('visibilitychange',()=>{incomeTick(true);if(document.visibilityState==='hidden'){stopEffects();stopWinMusic();}});
 
 function collectionSpotlight(){const cards=[1,5,8,13].map(index=>catalog[index]).filter(Boolean);return `<section class="collection-teaser" aria-label="Collection spotlight"><div class="section-heading"><h2>COLLECTION SPOTLIGHT</h2><button class="text-link" data-action="view-category">View collection</button></div><div class="teaser-grid">${cards.map(item=>`<button class="teaser-card" style="--rarity:${E.rarityColors[item.tier]}" data-action="item" data-id="${item.id}"><span class="teaser-image">${cardImage(item)}</span><span class="teaser-copy"><strong>${escape(item.name)}</strong><small>${escape(item.series)}</small></span></button>`).join('')}</div></section>`;}

@@ -2548,3 +2548,38 @@ body .results-screen { grid-template-rows: auto auto minmax(0,1fr) auto; }
   .pack-room .pack-showcase .pack-panel { background: #24204b; }
   body .vault-layout .stats { grid-template-columns: repeat(2,1fr); }
 }
+
+/* Solid cartoon outlines stay visible in enabled, pressed and disabled states. */
+:root body :is(button,a.primary,a.secondary,.nav-link,.profile-fold > summary):not(.pack-choice,.rip-pack,.item-button,.teaser-card) {
+  border: 2px solid #15102a;
+  border-radius: 12px;
+  background-clip: padding-box;
+  box-shadow: inset 0 2px #ffffff33, 0 3px #120e28;
+}
+:root body :is(button,.nav-link):enabled:not(.pack-choice,.rip-pack,.item-button,.teaser-card):active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px #18112e55, 0 1px #120e28;
+}
+:root body button:disabled:not(.rip-pack) {
+  opacity: .55;
+  box-shadow: none;
+}
+.pack-room .pack-showcase .pack-quick-links {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+.rock-odds-tabs {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  margin: 0 0 14px;
+}
+.rock-odds-tabs button.active { --rock-button: var(--rock-gold); --rock-button-text: var(--rock-ink); }
+.card--rocks .cartoon-card-art { filter: var(--specimen-filter,none); }
+.rock-rate { margin: 0; padding: 0 9px 9px; color: #a6f4dc; font-size: .73rem; line-height: 1.4; }
+.rock-actions { padding: 0 6px 8px; gap: 5px; border-top: 0; }
+.rock-actions button { min-height: 35px; font-size: .75rem; padding: 4px; }
+.rock-actions button:first-child { flex: 0 0 30px; }
+.rock-actions [data-action="sell-rock"] { --rock-button: var(--rock-pink); --rock-button-text: var(--rock-ink); }
+.rock-actions button:disabled { background: #40365d; }
+.rock-income-note { color: #dfd6f3; font-size: .87rem; margin: 8px 0; }
+body .header-wallet .balance strong { font-variant-numeric: tabular-nums; }
+body[data-view="vault"] .stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#incomeRate { white-space: nowrap; font-size: clamp(.9rem,3.8vw,1.32rem); }
