@@ -938,7 +938,6 @@ body::before { background: none; }
   background:
     radial-gradient(ellipse at 5% 16%, color-mix(in srgb, var(--foil) 64%, transparent), transparent 48%),
     radial-gradient(ellipse at 92% 83%, color-mix(in srgb, var(--foil) 66%, transparent), transparent 48%),
-    url("pack-foil-texture.webp") center / 100% 100% no-repeat,
     var(--foil-dark);
   box-shadow: inset 0 1px 4px #fcddff9c, inset 0 -2px 5px #070316a8;
 }
@@ -2174,7 +2173,7 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
     linear-gradient(90deg, #f6b4ec88, transparent 3% 97%, #f6b4ec88),
     radial-gradient(ellipse at 12% 5%, #f48adb80, transparent 47%),
     radial-gradient(ellipse at 95% 93%, #f48adb88, transparent 48%),
-    url("pack-foil-texture.webp") center / 100% 100% no-repeat, #3d1258;
+    #3d1258;
 }
 .foil .foil-body::before {
   background:
@@ -2444,4 +2443,108 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   --pearl-bottom: #f7aa56;
   --pearl-tint: #fff6ef;
   --pearl-glow: #ffc25c57;
+}
+
+/* Crystal canyon palette and inked outlines carry the card artwork into the interface. */
+:root {
+  --rock-ink: #21183b;
+  --rock-paper: #fff2d5;
+  --rock-lilac: #c2a7ff;
+  --rock-mint: #83efcb;
+  --rock-pink: #ff9cc8;
+  --rock-gold: #ffce68;
+}
+
+body,
+body[data-view="packs"]:has(.pack-room) {
+  background: #171635;
+}
+
+body .ambient {
+  display: none;
+}
+
+body :is(.topbar, .bottom-nav) {
+  background: #25204c;
+  border-color: #7f69bb;
+}
+
+body .topbar .brand-gem {
+  background: var(--rock-mint);
+  color: var(--rock-ink);
+}
+
+body .header-wallet .balance {
+  border: 2px solid #110e2a;
+  border-radius: 14px;
+  background: #353063;
+  box-shadow: 0 3px #151129;
+  padding: 4px 10px;
+}
+body .header-wallet .balance strong { color: var(--rock-mint); }
+
+.pack-room .pack-showcase {
+  grid-row: 2;
+  border-color: #7566ac;
+  background: #201b3e;
+  box-shadow: 0 5px #110f26;
+}
+
+.pack-room .pack-showcase .carousel-shell,
+.opening-screen,
+.results-screen {
+  background: linear-gradient(#19153877,#17142f33), url("crystal-canyon.webp") center / cover no-repeat #25204c;
+}
+
+body :is(.opening-screen,.results-screen,.pack-dialog,.content-card,.stat,.item-card) {
+  border: 2px solid #7867b4;
+  box-shadow: 0 4px #121028;
+}
+body :is(.pack-dialog,.content-card,.stat,.item-card) { background: #2a2452; }
+
+:root body :is(button, a.primary, a.secondary, .nav-link,
+  .pack-room .pack-showcase .pack-quick-links button, .pack-room .pack-open-action[data-action],
+  .profile-fold > summary):not(:disabled):not(:where(.pack-choice,.rip-pack,.item-button,.teaser-card)) {
+  background: var(--rock-button,#6457a7);
+  color: var(--rock-button-text,#fff6e5);
+  border: 2px solid #18122e;
+  border-radius: 12px;
+  box-shadow: inset 0 2px #ffffff3a, 0 3px #140e28;
+}
+:where(.primary, .pack-open-action, .nav-link.active) {
+  --rock-button: var(--rock-gold);
+  --rock-button-text: var(--rock-ink);
+}
+:where([data-action="pack-details"][data-id="odds"], .nav-link[href="#vault"]:not(.active)) {
+  --rock-button: var(--rock-lilac);
+  --rock-button-text: var(--rock-ink);
+}
+:where([data-action="pack-details"][data-id="options"], .nav-link[href="#collection"]:not(.active)) {
+  --rock-button: var(--rock-mint);
+  --rock-button-text: var(--rock-ink);
+}
+:where([data-action="pack-details"][data-id="cards"], .nav-link[href="#leaderboard"]:not(.active)) {
+  --rock-button: var(--rock-pink);
+  --rock-button-text: var(--rock-ink);
+}
+:root body :is(button,.nav-link):enabled:not(.pack-choice,.rip-pack,.item-button,.teaser-card):active {
+  box-shadow: inset 0 2px #17122e4d;
+}
+.card--rocks {
+  border: 2px solid #24173d;
+  background: linear-gradient(150deg,#fff7d6,var(--card-color));
+}
+.cartoon-card.card--rocks .cartoon-card-art {
+  border: 2px solid #291b41;
+}
+.rock-lineup { grid-template-columns: repeat(auto-fit,minmax(125px,1fr)); }
+.rank-columns:has(> :only-child) { grid-template-columns: 1fr; }
+body .result:not(:only-child) { min-width: 145px; }
+body .results-screen { grid-template-rows: auto auto minmax(0,1fr) auto; }
+
+@media (max-width: 820px), (max-width: 900px) and (hover: none) and (pointer: coarse) {
+  .pack-room .pack-showcase { grid-row: 1 / -1; }
+  .pack-room .pack-showcase .carousel-shell { background-position: center 56%; }
+  .pack-room .pack-showcase .pack-panel { background: #24204b; }
+  body .vault-layout .stats { grid-template-columns: repeat(2,1fr); }
 }

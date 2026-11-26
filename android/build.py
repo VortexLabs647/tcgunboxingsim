@@ -9,7 +9,7 @@ def run(args):subprocess.run([str(x) for x in args],check=True,env=env,cwd=root)
 import shutil
 website=root.parent;assets=root/'assets/game';assets.mkdir(parents=True,exist_ok=True)
 for p in website.iterdir():
- if p.suffix in {'.js','.json','.html','.css','.webmanifest','.webp','.png','.svg','.ttf'} and p.name!='sw.js':shutil.copy2(p,assets/p.name)
+ if p.suffix in {'.js','.json','.html','.css','.webmanifest','.webp','.png','.svg','.ttf','.woff2'} and p.name!='sw.js':shutil.copy2(p,assets/p.name)
 p=assets/'index.html';p.write_text(p.read_text().replace('<head>','<head><script>window.TCGAndroid={openExternal:function(url){location.href=url;}};</script>',1))
 run([tools/'aapt','package','-f','-M',root/'AndroidManifest.xml','-S',root/'res','-A',root/'assets','-I',platform,'-F',build/'resources.apk'])
 run(['java','-jar',sdk/'ecj.jar','-1.8','-proc:none','-classpath',platform,'-d',build/'classes',root/'src/com/vortalyx/tcgunboxingsim/MainActivity.java'])

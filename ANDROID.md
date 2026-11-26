@@ -1,13 +1,7 @@
-# Android app 1.2.6
+# Android
 
-The Android app displays the game in an embedded WebView with no browser address bar. Android 8 or later is required.
+Play at [tcgunboxingsim.com](https://tcgunboxingsim.com/) and choose Install app or Add to Home screen from the browser menu. The web app is the current downloadable version.
 
-Version 1.2.6 first tries the live HTTPS website. If the page fails, returns a server error, or does not finish loading in ten seconds, it serves the included game files inside the app. The included copy uses the same game origin, so existing WebView local progress and account sessions remain available. Cloud saves and email sign-in require an internet connection. Website certificate checks and HTTPS-only traffic remain enabled.
+An existing TCG Unboxing Sim Android app loads the live site when online. Its older bundled offline copy predates the rock collection.
 
-Install the new `TCG_Unboxing_Sim.apk` over the old app. The package and signing certificate are unchanged, and the version code is now 9. Uninstalling or clearing app data can erase guest progress.
-
-The public `android/` folder contains the Activity, manifest, theme and build script. The script requires Android SDK build tools 35, platform 35 extension 15, ECJ and Java. Copy the website runtime files into `assets/game` before building. Release signing keys and passwords are kept outside the repository. Do not create a new signing key for future updates.
-
-Validation: Java compilation, APK alignment and APK signature verification. Device testing still needs to be completed on an Android phone.
-
-The app explicitly disables automatic WebView darkening so the illustrated cards and authored neon palette retain their intended colors.
+The Android wrapper source is in `android/`. A new native release requires the existing signing credentials and the SDK prerequisites in `android/build.py`.
