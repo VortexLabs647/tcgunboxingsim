@@ -2583,3 +2583,8 @@ body .results-screen { grid-template-rows: auto auto minmax(0,1fr) auto; }
 body .header-wallet .balance strong { font-variant-numeric: tabular-nums; }
 body[data-view="vault"] .stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
 #incomeRate { white-space: nowrap; font-size: clamp(.9rem,3.8vw,1.32rem); }
+.rock-sale-note { align-self: center; padding: 4px; color: #dfd6f3; font-size: .75rem; }
+.result-actions [data-action="sell-rock"] {
+  --rock-button: var(--rock-pink);
+  --rock-button-text: var(--rock-ink);
+}
