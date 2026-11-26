@@ -30,8 +30,12 @@ function updateMoney(){
  $('#rockBalance').textContent=money(state.balance*E.unitsPerCent+state.rockRemainder);
  const rate=$('#incomeRate');
  if(rate){
-  const income=E.activeRocks(state).reduce((sum,rock)=>sum+E.passiveUnits[rock.tier],0);
-  rate.textContent=money(income)+'/sec';
+  const income=E.activeRocks(state).reduce((sum,rock)=>sum+E.incomeRate(state,rock),0);
+  const starter=state.vault.find(rock=>rock.uid===E.starterId);
+  const boost=starter?E.incomeRate(state,starter):0;
+  const starterRate=$('#starterRate');
+  if(starterRate)starterRate.textContent=boost?money(boost)+'/sec until you can open Opal':'Ready when your balance runs low';
+  rate.textContent=money(income+boost)+'/sec';
  }
  const openButton=$('.pack-open-action');
  if(openButton)openButton.disabled=!E.canAfford(state,selectedPack());
@@ -114,6 +118,7 @@ function packPanel(){
    <div class="pack-quick-links" role="group" aria-label="Pack details">
      <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
      <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
+     <button data-action="pack-details" data-id="games" aria-haspopup="dialog">Mini games</button>
    </div>
    <div class="pack-action-dock">
      <button class="primary open-pack-button pack-open-action" data-action="open" ${E.canAfford(state,pack)?'':'disabled'}>Open pack · ${price}</button>
@@ -134,6 +139,9 @@ function openPackDetails(kind){
  }else if(kind==='cards'){
   title.textContent='Cards in this pack';
   content.innerHTML=insideLineup(pack);
+ }else if(kind==='games'){
+  title.textContent='Rock mini games';
+  content.innerHTML=miniGames();
  }else return;
  dialog.addEventListener('close',()=>{
   if(dialog.isConnected)$(`[data-action="pack-details"][data-id="${kind}"]`)?.focus({preventScroll:true});
@@ -150,6 +158,67 @@ function oddsView(){
   <div><span>${E.rarityNames[tier]}</span><strong>${percent}%</strong></div>
   <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]}"></progress>
  </li>`).reverse().join('')}</ul>`;
+}
+
+const challenges={rarity:{label:'Match rarity',key:'tier'},family:{label:'Match rock type',key:'detail'}};
+
+function miniGames(){
+ const owned=[...new Set(state.vault.map(rock=>rock.itemId))].map(id=>byId[id]).filter(Boolean);
+ return `<div class="rock-games">
+  <section class="content-card">
+   <h3>50/50 reveal</h3>
+   <p>Free practice draw. 50% Common and 50% Legendary.</p>
+   <button class="primary" data-action="practice-draw">Reveal a practice card</button>
+   <div id="practiceResult" class="practice-result" aria-live="polite"></div>
+  </section>
+  <section class="content-card">
+   <h3>Collection challenges</h3>
+   <p>Match a target using a rock from your Inventory. Your cards stay yours.</p>
+   ${owned.length?`<div class="challenge-controls">${Object.entries(challenges).map(([id,challenge])=>`<button class="secondary" data-action="start-challenge" data-id="${id}">${challenge.label}</button>`).join('')}</div>
+    <div id="challengeGame" class="challenge-game" hidden>
+     <p id="challengeTarget"></p>
+     <label for="challengeCard">Choose an owned rock</label>
+     <select id="challengeCard">${owned.map(card=>`<option value="${card.id}">${escape(card.name)}</option>`).join('')}</select>
+     <button class="primary" data-action="check-challenge">Check match</button>
+     <p id="challengeResult" aria-live="polite"></p>
+    </div>`:'<p>Open a pack to get your first rock.</p>'}
+  </section>
+ </div>`;
+}
+
+function practiceDraw(){
+ const result=$('#practiceResult');
+ if(!result)return;
+ const tier=E.random()<.5?0:4;
+ const cards=catalog.filter(card=>card.tier===tier);
+ const card=cards[Math.floor(E.random()*cards.length)];
+ result.innerHTML=`<span class="rarity" style="--rarity:${E.rarityColors[tier]}">${E.rarityNames[tier]}</span>${cardImage(card)}`;
+ sound('land');
+}
+
+function startChallenge(id){
+ if(!Object.hasOwn(challenges,id))return;
+ const game=$('#challengeGame');
+ if(!game)return;
+ const key=challenges[id].key;
+ const targets=[...new Set(state.vault.map(rock=>byId[rock.itemId]?.[key]).filter(value=>value!==undefined))];
+ if(!targets.length)return;
+ const target=targets[Math.floor(E.random()*targets.length)];
+ game.dataset.challenge=id;
+ game.dataset.target=target;
+ game.hidden=false;
+ $('#challengeTarget').textContent='Find a match for '+(key==='tier'?E.rarityNames[target]:target)+'.';
+ $('#challengeResult').textContent='';
+ $('#challengeCard').focus();
+}
+
+function checkChallenge(){
+ const game=$('#challengeGame'),selected=$('#challengeCard')?.value;
+ if(!game?.dataset.challenge||!state.vault.some(rock=>rock.itemId===selected))return;
+ const key=challenges[game.dataset.challenge].key;
+ const matched=String(byId[selected][key])===game.dataset.target;
+ $('#challengeResult').textContent=matched?'Match found!':'Try a different rock from your Inventory.';
+ if(matched)sound('vault');
 }
 
 function scrollToPack(rail, choice, smooth = false) {
@@ -262,7 +331,7 @@ function itemCard(item,own=null,itemChance=null,earning=false){
     ${itemChance===null?'':`<div class="item-value">${chance(itemChance,2)}</div>`}
    </div>
   </button>
-  ${own?`<p class="rock-rate">${earning?money(E.passiveUnits[own.tier])+'/sec':'Idle'}</p>
+  ${own?`<p class="rock-rate">${own.uid===E.starterId?'<span id="starterRate"></span>':earning?money(E.incomeRate(state,own))+'/sec':'Idle'}</p>
   <div class="item-actions rock-actions">
    <button data-action="favorite" data-id="${own.uid}" aria-label="${own.locked?'Unfavorite':'Favorite'} ${escape(item.name)}" aria-pressed="${!!own.locked}">${own.locked?'★':'☆'}</button>
    ${sellButton(own)}
@@ -282,7 +351,7 @@ function vaultView(){
  const owned=state.vault.filter(card=>byId[card.itemId]?.name.toLowerCase().includes(search.toLowerCase()));
  if(sort==='rarity')owned.sort((a,b)=>b.tier-a.tier);
  return `${heading('YOUR ROCK COLLECTION','YOUR <em>INVENTORY.</em>')}${stats([['Owned rocks',state.vault.length],['Rock income','<span id="incomeRate"></span>']])}
-  <p class="rock-income-note">Your 12 rarest distinct cards earn virtual money automatically, including up to 8 hours away. If you run out of rocks and pack money, a starter rock earns toward your next pack.</p>
+  <p class="rock-income-note">Your 12 rarest distinct cards earn virtual money automatically, including up to 8 hours away. If you can’t afford Opal, the starter rock earns up to the cost of that pack in about 80 seconds.</p>
   <div class="toolbar"><div class="search">${icon('search')}<input id="vaultSearch" placeholder="Search your rocks" aria-label="Search your rocks" value="${escape(search)}"></div>
    <select id="sort" aria-label="Sort vault"><option value="recent">Newest first</option><option value="rarity" ${sort==='rarity'?'selected':''}>Rarest first</option></select></div>
   ${owned.length?`<div class="item-grid">${owned.map(card=>itemCard(byId[card.itemId],card,null,earning.has(card.uid))).join('')}</div>`:empty(state.vault.length?'NO MATCHES.':'YOUR VAULT IS EMPTY.',state.vault.length?'Try another rock name.':'Open a pack to start collecting.')}`;
@@ -557,10 +626,13 @@ function resultsView(){
 function showItem(id){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;go('item');}
 window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('#packDetails[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
 function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus();if(pos!=null)el?.setSelectionRange(pos,pos);}
-document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','favorite','save-name','delete-confirm','leaderboard-toggle'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
+document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','favorite','save-name','delete-confirm','leaderboard-toggle','leaderboard-balance'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':go(a);break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
 case 'pack-details':openPackDetails(id);break;
+case 'practice-draw':practiceDraw();break;
+case 'start-challenge':startChallenge(id);break;
+case 'check-challenge':checkChallenge();break;
 case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
 case 'sell-rock':sellRock(id);break;
 case 'open':startOpening();break;case 'start-seal':rip();break;
@@ -570,6 +642,7 @@ case 'favorite':{const v=state.vault.find(v=>v.uid===id);if(v){v.locked=!v.locke
 case 'cancel-confirm':confirmAction='';render();break;
 case 'keep-result':go('packs');sound('vault');break;
 case 'leaderboard-refresh':loadLeaderboard(true);break;
+case 'leaderboard-balance':toggleLeaderboardBalance();break;
 case 'leaderboard-toggle':if(window.TCGCloud?.user&&window.TCGCloud.ready&&window.TCGCloud.canPlay){if(!state.leaderboard&&!state.name.trim()){go('profile');notice('Save a collector name first, then join the leaderboard.');break;}state.leaderboard=!state.leaderboard;save();leaderboardLoaded=0;render();}else{go('profile');notice('Sign in and finish syncing to join the leaderboard.');}break;
 case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Enter a username first.';render();break;}state.name=name.slice(0,24);save();feedback='Username saved.';render();}break;
 case 'delete-start':profileSections.add('delete');confirmAction='delete';render();$('.delete-details').scrollIntoView({block:'nearest'});break;
@@ -609,10 +682,64 @@ function cardImage(item,extra=''){
 
 
 
-function leaderboardMembership(){const u=window.TCGCloud?.user;return `<div class="rank-membership"><p>${u?'Show your collector name and stats in the rankings.':'Sign in to join the rankings.'}</p><button class="secondary" data-action="${u?'leaderboard-toggle':'profile'}" ${u&&!window.TCGCloud.canPlay?'disabled':''}>${u?(state.leaderboard?'Leave leaderboard':'Join leaderboard'):'Sign in to join'}</button>${u&&state.leaderboard?'<small>Joined · ranks update after cloud sync</small>':''}</div>`;}
-function leaderboardView(){return `${heading('THE COLLECTOR RANKINGS','THE <em>LEADERBOARD.</em>')}${leaderboardMembership()}<div class="rank-toolbar"><p>Top 50 · packs opened across synced collections</p><button class="secondary" data-action="leaderboard-refresh">Refresh</button></div><div id="leaderboardTables" aria-live="polite">${leaderboardContent()}</div>`;}
-function leaderboardContent(){if(leaderboardError)return `<div class="content-card"><p>${escape(leaderboardError)}</p><button class="secondary" data-action="leaderboard-refresh">Try again</button></div>`;if(!leaderboardRows)return '<p class="rank-loading">Loading rankings…</p>';return `<div class="rank-columns">${[['opened','PACKS OPENED','packs_opened']].map(([key,title,field])=>`<section class="content-card rank-board"><h2>${title}</h2>${leaderboardRows[key].length?`<table class="rank-table"><thead><tr><th>Rank</th><th>Collector</th><th>${key==='opened'?'Packs':'Virtual spent'}</th></tr></thead><tbody>${leaderboardRows[key].map((r,n)=>`<tr><td><span class="rank-place rank-${n+1}">${n+1}</span></td><td>${escape(r.display_name)}</td><td>${key==='spent'?money(Number(r[field])):Number(r[field]).toLocaleString('en-US')}</td></tr>`).join('')}</tbody></table>`:'<p class="rank-empty">No ranked collectors yet. Join to start the board.</p>'}</section>`).join('')}</div>`;}
-async function loadLeaderboard(force=false){if(leaderboardLoading||(!force&&Date.now()-leaderboardLoaded<15000))return;leaderboardLoading=true;leaderboardError='';const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const cfg=window.TCG_CLOUD_CONFIG;if(!window.TCGCloud?.configured)throw Error('Rankings are not connected yet.');const query='select=entry_id,display_name,packs_opened&limit=50&order=';const fetchBoard=async order=>{const r=await fetch(cfg.url+'/rest/v1/leaderboard_entries?'+query+order,{headers:{apikey:cfg.publishableKey},signal:controller.signal});if(!r.ok)throw Error('Rankings could not load. Please try again.');const rows=await r.json();if(!Array.isArray(rows))throw Error('Rankings could not load.');return rows;};const opened=await fetchBoard('packs_opened.desc,entry_id.asc');leaderboardRows={opened};leaderboardLoaded=Date.now();}catch(e){leaderboardError=e.name==='AbortError'?'Rankings took too long to load. Please try again.':e.message;}finally{clearTimeout(timeout);leaderboardLoading=false;const target=$('#leaderboardTables');if(target)target.innerHTML=leaderboardContent();}}
+function leaderboardMembership(){
+ const cloud=window.TCGCloud;
+ const joined=!!state.leaderboard;
+ return `<div class="rank-membership">
+  <p>${cloud?.user?'Show your collector name and pack count.':'Sign in to join the rankings.'}</p>
+  <button class="secondary" data-action="${cloud?.user?'leaderboard-toggle':'profile'}" ${cloud?.user&&!cloud.canPlay?'disabled':''}>
+   ${cloud?.user?(joined?'Leave leaderboard':'Join leaderboard'):'Sign in to join'}
+  </button>
+  ${cloud?.user&&joined?`<button class="secondary" data-action="leaderboard-balance" aria-pressed="${state.shareBalance===true}" ${cloud.canPlay?'':'disabled'}>${state.shareBalance?'Hide virtual balance':'Share virtual balance'}</button>`:''}
+ </div>`;
+}
+async function toggleLeaderboardBalance(){
+ const cloud=window.TCGCloud;
+ if(!cloud?.user||!cloud.canPlay||!state.leaderboard)return;
+ state.shareBalance=!state.shareBalance;
+ save();
+ render();
+ if(await cloud.flush())loadLeaderboard(true);
+}
+function leaderboardView(){
+ return `${heading('THE COLLECTOR RANKINGS','THE <em>LEADERBOARD.</em>')}${leaderboardMembership()}
+ <div class="rank-toolbar"><p>Top 50 by packs opened</p><button class="secondary" data-action="leaderboard-refresh">Refresh</button></div>
+ <div id="leaderboardTables" aria-live="polite">${leaderboardContent()}</div>`;
+}
+function leaderboardContent(){
+ if(leaderboardError)return `<div class="content-card"><p>${escape(leaderboardError)}</p><button class="secondary" data-action="leaderboard-refresh">Try again</button></div>`;
+ if(!leaderboardRows)return '<p class="rank-loading">Loading rankings…</p>';
+ const rows=leaderboardRows.opened;
+ return `<section class="content-card rank-board"><h2>Packs opened</h2>${rows.length?`<table class="rank-table">
+   <thead><tr><th>Rank</th><th>Collector</th><th>Packs</th><th>Virtual balance</th></tr></thead>
+   <tbody>${rows.map((row,index)=>`<tr>
+    <td><span class="rank-place rank-${index+1}">${index+1}</span></td><td>${escape(row.display_name)}</td>
+    <td>${Number(row.packs_opened).toLocaleString('en-US')}</td>
+    <td>${typeof row.balance_cents==='number'?money(row.balance_cents*E.unitsPerCent):'—'}</td>
+   </tr>`).join('')}</tbody>
+  </table>`:'<p class="rank-empty">No ranked collectors yet. Join to start the board.</p>'}</section>`;
+}
+async function loadLeaderboard(force=false){
+ if(leaderboardLoading||(!force&&Date.now()-leaderboardLoaded<15000))return;
+ leaderboardLoading=true;leaderboardError='';
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+ try{
+  const cfg=window.TCG_CLOUD_CONFIG;
+  if(!window.TCGCloud?.configured)throw Error('Rankings are not connected yet.');
+  const query='select=entry_id,display_name,packs_opened,balance_cents&limit=50&order=packs_opened.desc,entry_id.asc';
+  const response=await fetch(cfg.url+'/rest/v1/leaderboard_entries?'+query,{headers:{apikey:cfg.publishableKey},signal:controller.signal});
+  if(!response.ok)throw Error('Rankings could not load. Please try again.');
+  const opened=await response.json();
+  if(!Array.isArray(opened))throw Error('Rankings could not load.');
+  leaderboardRows={opened};leaderboardLoaded=Date.now();
+ }catch(error){
+  leaderboardError=error.name==='AbortError'?'Rankings took too long to load. Please try again.':error.message;
+ }finally{
+  clearTimeout(timeout);leaderboardLoading=false;
+  const target=$('#leaderboardTables');
+  if(target)target.innerHTML=leaderboardContent();
+ }
+}
 
 document.addEventListener('toggle',event=>{const id=event.target.dataset?.profileSection;if(id){if(event.target.open)profileSections.add(id);else profileSections.delete(id);}},true);
 window.addEventListener('pagehide',()=>{incomeTick(true);clearAnimation();stopWinMusic();});

@@ -32,3 +32,5 @@ begin
 end $$;
 revoke all on function tcg_private.sync_leaderboard() from public,anon,authenticated;
 create trigger sync_tcg_leaderboard after insert or update of state on public.game_saves for each row execute function tcg_private.sync_leaderboard();
+
+-- For the optional public virtual balance column, run leaderboard-balance.sql next.

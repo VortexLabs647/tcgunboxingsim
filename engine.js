@@ -16,14 +16,14 @@ const covers=[
 ];
 const signatureCards=['opal','sapphire','amethyst','emerald','jasper','pyrite','obsidian','diamond','tourmaline'];
 const oddsPresets={
- Balanced:[42,26,17,9,5,1],
- Explorer:[30,30,22,12,5,1],
- Collector:[52,22,12,7,5,2]
+ Balanced:[34,25,19,12,8,2],
+ Explorer:[24,29,22,15,8,2],
+ Collector:[42,19,13,10,11,5]
 };
 const productiveLimit=12,offlineSeconds=8*60*60;
 // One unit is $0.000001 in virtual currency.
 const unitsPerCent=10000;
-const passiveUnits=[1,2,3,4,5,6];
+const passiveUnits=[1,2,3,4,5,6],starterUnits=250;
 function saleValue(price,tier){
  return Math.max(1,Math.floor(price*salePercent[tier]/100));
 }
@@ -32,7 +32,7 @@ function saleProceeds(rock){
 }
 function canAfford(state,pack){return state.balance>=pack.price;}
 function ensureStarterRock(state,now){
- if(state.vault.length||state.balance>=packPrices[0])return;
+ if(canAfford(state,{price:packPrices[0]})||state.vault.some(rock=>rock.uid===starterId))return;
  state.vault.push({uid:starterId,itemId:'rock-granite',value:0,tier:0,date:new Date(now).toISOString(),locked:false});
  if(!state.discovered.includes('rock-granite'))state.discovered.push('rock-granite');
  state.rockClock=Math.max(state.rockClock,now);
@@ -40,10 +40,17 @@ function ensureStarterRock(state,now){
 function activeRocks(state){
  const seen=new Set();
  return state.vault.filter(rock=>{
-  if(seen.has(rock.itemId))return false;
+  if(rock.uid===starterId||seen.has(rock.itemId))return false;
   seen.add(rock.itemId);
   return true;
  }).sort((a,b)=>b.tier-a.tier).slice(0,productiveLimit);
+}
+function starterShortfall(state){
+ return Math.max(0,(packPrices[0]-state.balance)*unitsPerCent-state.rockRemainder);
+}
+function incomeRate(state,rock){
+ if(rock.uid===starterId)return starterShortfall(state)>0?starterUnits:0;
+ return passiveUnits[rock.tier];
 }
 function credit(state,units){
  const total=state.rockRemainder+units;
@@ -57,6 +64,7 @@ function settleIncome(state,now=Date.now()){
  state.rockClock=now-(now-state.rockClock)%1000;
  let earned=0;
  for(const rock of activeRocks(state))earned+=passiveUnits[rock.tier]*seconds;
+ if(state.vault.some(rock=>rock.uid===starterId))earned+=Math.min(starterShortfall(state),starterUnits*seconds);
  credit(state,earned);
  return earned;
 }
@@ -116,6 +124,7 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
  state.vault.unshift(pull);
  state.rockClock=Math.max(state.rockClock,now);
  state.best=Math.max(state.best,value);
+ ensureStarterRock(state,now);
  state.opened++;
  if(!state.discovered.includes(item.id))state.discovered.push(item.id);
  return {pull,pack,odds,duplicate};
@@ -168,7 +177,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={rarityNames,rarityColors,oddsPresets,passiveUnits,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);

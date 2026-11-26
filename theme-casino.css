@@ -2588,3 +2588,21 @@ body[data-view="vault"] .stats { grid-template-columns: repeat(2,minmax(0,1fr));
   --rock-button: var(--rock-pink);
   --rock-button-text: var(--rock-ink);
 }
+
+.pack-room .pack-showcase .pack-quick-links { grid-template-columns: repeat(3,minmax(0,1fr)); }
+:root body :is(.primary,.secondary,.pack-quick-links button,.rock-odds-tabs button,.profile-fold > summary) {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+.pack-quick-links [data-id="games"] { --rock-button: var(--rock-mint); --rock-button-text: var(--rock-ink); }
+.rock-games { display: grid; gap: 12px; text-align: center; }
+.rock-games section { display: grid; justify-items: center; gap: 10px; padding: 15px; }
+.rock-games p { margin: 0; }
+.practice-result:not(:empty), .challenge-game:not([hidden]) { display: grid; justify-items: center; gap: 8px; }
+.practice-result .cartoon-card { width: 108px; height: 151px; }
+.challenge-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.challenge-game select { width: min(100%,240px); }
+.rank-board .rank-table { width: 100%; }
+.rank-board .rank-table th:last-child { min-width: 64px; }
+.rank-board .rank-table td:last-child { font-variant-numeric: tabular-nums; }
