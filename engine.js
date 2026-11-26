@@ -18,7 +18,7 @@ const signatureCards=['opal','sapphire','amethyst','emerald','jasper','pyrite','
 const oddsPresets={
  Balanced:[34,25,19,12,8,2],
  Explorer:[24,29,22,15,8,2],
- Collector:[42,19,13,10,11,5]
+ '50/50':[50,0,0,0,50,0]
 };
 const productiveLimit=12,offlineSeconds=8*60*60;
 // One unit is $0.000001 in virtual currency.

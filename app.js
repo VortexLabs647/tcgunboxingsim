@@ -116,9 +116,8 @@ function packPanel(){
  const price=money(pack.price*E.unitsPerCent);
  return `<div class="selected-title"><h2>${pack.name} Rock Pack</h2></div>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
-     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog">Odds</button>
+     <button data-action="pack-details" data-id="odds" aria-haspopup="dialog"><span>Odds</span><small id="packOddsLabel">${odds}</small></button>
      <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
-     <button data-action="pack-details" data-id="games" aria-haspopup="dialog">Mini games</button>
    </div>
    <div class="pack-action-dock">
      <button class="primary open-pack-button pack-open-action" data-action="open" ${E.canAfford(state,pack)?'':'disabled'}>Open pack · ${price}</button>
@@ -139,9 +138,6 @@ function openPackDetails(kind){
  }else if(kind==='cards'){
   title.textContent='Cards in this pack';
   content.innerHTML=insideLineup(pack);
- }else if(kind==='games'){
-  title.textContent='Rock mini games';
-  content.innerHTML=miniGames();
  }else return;
  dialog.addEventListener('close',()=>{
   if(dialog.isConnected)$(`[data-action="pack-details"][data-id="${kind}"]`)?.focus({preventScroll:true});
@@ -154,71 +150,10 @@ function oddsView(){
  return `<div class="mode-tabs rock-odds-tabs" role="group" aria-label="Odds preset">
   ${Object.keys(E.oddsPresets).map(preset=>`<button data-action="rock-odds" data-id="${preset}" class="${odds===preset?'active':''}" aria-pressed="${odds===preset}">${preset}</button>`).join('')}
  </div>
- <ul class="pack-odds-list">${E.oddsPresets[odds].map((percent,tier)=>`<li style="--rarity:${E.rarityColors[tier]}">
+ <ul class="pack-odds-list">${E.oddsPresets[odds].map((percent,tier)=>percent>0?`<li style="--rarity:${E.rarityColors[tier]}">
   <div><span>${E.rarityNames[tier]}</span><strong>${percent}%</strong></div>
   <progress max="100" value="${percent}" aria-label="${E.rarityNames[tier]}"></progress>
- </li>`).reverse().join('')}</ul>`;
-}
-
-const challenges={rarity:{label:'Match rarity',key:'tier'},family:{label:'Match rock type',key:'detail'}};
-
-function miniGames(){
- const owned=[...new Set(state.vault.map(rock=>rock.itemId))].map(id=>byId[id]).filter(Boolean);
- return `<div class="rock-games">
-  <section class="content-card">
-   <h3>50/50 reveal</h3>
-   <p>Free practice draw. 50% Common and 50% Legendary.</p>
-   <button class="primary" data-action="practice-draw">Reveal a practice card</button>
-   <div id="practiceResult" class="practice-result" aria-live="polite"></div>
-  </section>
-  <section class="content-card">
-   <h3>Collection challenges</h3>
-   <p>Match a target using a rock from your Inventory. Your cards stay yours.</p>
-   ${owned.length?`<div class="challenge-controls">${Object.entries(challenges).map(([id,challenge])=>`<button class="secondary" data-action="start-challenge" data-id="${id}">${challenge.label}</button>`).join('')}</div>
-    <div id="challengeGame" class="challenge-game" hidden>
-     <p id="challengeTarget"></p>
-     <label for="challengeCard">Choose an owned rock</label>
-     <select id="challengeCard">${owned.map(card=>`<option value="${card.id}">${escape(card.name)}</option>`).join('')}</select>
-     <button class="primary" data-action="check-challenge">Check match</button>
-     <p id="challengeResult" aria-live="polite"></p>
-    </div>`:'<p>Open a pack to get your first rock.</p>'}
-  </section>
- </div>`;
-}
-
-function practiceDraw(){
- const result=$('#practiceResult');
- if(!result)return;
- const tier=E.random()<.5?0:4;
- const cards=catalog.filter(card=>card.tier===tier);
- const card=cards[Math.floor(E.random()*cards.length)];
- result.innerHTML=`<span class="rarity" style="--rarity:${E.rarityColors[tier]}">${E.rarityNames[tier]}</span>${cardImage(card)}`;
- sound('land');
-}
-
-function startChallenge(id){
- if(!Object.hasOwn(challenges,id))return;
- const game=$('#challengeGame');
- if(!game)return;
- const key=challenges[id].key;
- const targets=[...new Set(state.vault.map(rock=>byId[rock.itemId]?.[key]).filter(value=>value!==undefined))];
- if(!targets.length)return;
- const target=targets[Math.floor(E.random()*targets.length)];
- game.dataset.challenge=id;
- game.dataset.target=target;
- game.hidden=false;
- $('#challengeTarget').textContent='Find a match for '+(key==='tier'?E.rarityNames[target]:target)+'.';
- $('#challengeResult').textContent='';
- $('#challengeCard').focus();
-}
-
-function checkChallenge(){
- const game=$('#challengeGame'),selected=$('#challengeCard')?.value;
- if(!game?.dataset.challenge||!state.vault.some(rock=>rock.itemId===selected))return;
- const key=challenges[game.dataset.challenge].key;
- const matched=String(byId[selected][key])===game.dataset.target;
- $('#challengeResult').textContent=matched?'Match found!':'Try a different rock from your Inventory.';
- if(matched)sound('vault');
+ </li>`:'').reverse().join('')}</ul>`;
 }
 
 function scrollToPack(rail, choice, smooth = false) {
@@ -487,7 +422,7 @@ function openingView(){
  if(phase==='revealed')return resultsView();
  const pack=pending.pack;
  return `<section class="opening-screen ${phase}" id="openingScreen" style="--foil:${pack.color};--spin-color:${E.rarityColors[0]};--tear-time:${TEAR_MS}ms;--spin-time:${SPIN_MS}ms">
-   <div class="eyebrow">${pack.name} Rock Pack</div>
+   <div class="eyebrow">${pack.name} Rock Pack · ${pending.odds}</div>
    <h1>${phase==='sealed'?'READY TO <em>RIP.</em>':'CARD <em>WHEEL.</em>'}</h1>
    <div class="opening-stage">
      <div class="opening-aura" aria-hidden="true"></div>
@@ -522,7 +457,8 @@ function openingPull(){return pending.pull;}
 
 function raritySpinner(){
  const hero=openingPull();
- const previews=catalog.filter(item=>item.id!==hero.itemId).map(item=>({item,tier:item.tier}));
+ const oddsWeights=E.oddsPresets[pending.odds];
+ const previews=catalog.filter(item=>item.id!==hero.itemId&&oddsWeights[item.tier]>0).map(item=>({item,tier:item.tier}));
  const slots=Array.from({length:7},(_,i)=>previews[Math.floor(i*previews.length/7)]||{item:byId[hero.itemId],tier:hero.tier});
  const landingIndex=hero.itemId.length%8;
  slots.splice(landingIndex,0,{item:byId[hero.itemId],tier:hero.tier});
@@ -630,10 +566,7 @@ document.addEventListener('click',e=>{const external=e.target.closest('a[target=
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':go(a);break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
 case 'pack-details':openPackDetails(id);break;
-case 'practice-draw':practiceDraw();break;
-case 'start-challenge':startChallenge(id);break;
-case 'check-challenge':checkChallenge();break;
-case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
+case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;$('#packOddsLabel').textContent=odds;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
 case 'sell-rock':sellRock(id);break;
 case 'open':startOpening();break;case 'start-seal':rip();break;
 case 'view-category':go('collection');break;
@@ -662,7 +595,7 @@ function updatePackPanel(){
 }
 function insideLineup(pack){
  const pools=E.pools(catalog);
- return `<div class="item-grid rock-lineup">${catalog.slice().sort((a,b)=>b.tier-a.tier).map(item=>itemCard(item,null,E.itemOdds(item,pack,pools[item.tier],odds))).join('')}</div>`;
+ return `<div class="item-grid rock-lineup">${catalog.filter(item=>E.oddsPresets[odds][item.tier]>0).sort((a,b)=>b.tier-a.tier).map(item=>itemCard(item,null,E.itemOdds(item,pack,pools[item.tier],odds))).join('')}</div>`;
 }
 
 document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','start-seal','open','keep-result','sell-rock'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
