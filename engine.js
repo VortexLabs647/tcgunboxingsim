@@ -254,7 +254,10 @@ function migrate(old,catalog){
  state.pricedPacks=true;
  ensureStarterRock(state,Date.now());
  const index=old.preferences?.packIndex;
- state.preferences={category:'rocks',packIndex:Number.isInteger(index)?Math.max(0,Math.min(names.length-1,index)):0};
+ const savedTeam=old.preferences?.arenaTeam;
+ const ownedIds=new Set(state.vault.map(card=>card.uid));
+ const arenaTeam=Array.isArray(savedTeam)?[...new Set(savedTeam.filter(uid=>ownedIds.has(uid)))].slice(0,3):[];
+ state.preferences={category:'rocks',packIndex:Number.isInteger(index)?Math.max(0,Math.min(names.length-1,index)):0,arenaTeam};
  return state;
 }
 function validArenaProgress(state){

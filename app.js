@@ -28,8 +28,8 @@ function notice(message){
  }
  $('#status').textContent=message;
 }
-function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
-function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaLevelIndex=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
+function save(){state.preferences={category:'rocks',packIndex:selectedIndex,arenaTeam:[...arenaTeam]};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
+function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaLevelIndex=null;state=E.migrate(next,catalog);restoreArenaTeam();incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
 
 function money(units){
@@ -89,6 +89,7 @@ function incomeTick(force=false,announceAway=false){
 function sellRock(uid){
  const proceeds=E.sellRock(state,uid);
  if(proceeds===null)return;
+ arenaTeam.delete(uid);
  save();
  if(view==='opening')go('packs');
  else render();
@@ -404,7 +405,44 @@ function buyBadge(id){
  sound('vault');
 }
 function profileSection(id,label,content){return `<details class="profile-fold content-card" data-profile-section="${id}" ${profileSections.has(id)?'open':''}><summary>${label}<span aria-hidden="true">+</span></summary><div class="profile-fold-body">${content}</div></details>`;}
-function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>PROFILE.</em></h1></div><div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length],['Best Crystal Drop score',state.bestDropScore]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('install','Install the app','<p>On iPhone, open this site in Safari. Tap Share, select <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong> if shown, then tap Add.</p><p>On Android, open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>')}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
+function profileView(){
+ const rank=campaignRank();
+ const cleared=state.arenaCleared,total=E.arenaLevels.length;
+ const bosses=E.arenaLevels.slice(0,cleared).filter(level=>level.boss).length;
+ const bossTotal=E.arenaLevels.filter(level=>level.boss).length;
+ const team=state.vault.filter(card=>arenaTeam.has(card.uid));
+ const milestones=[
+  ['Campaign climb',cleared,total],
+  ['Boss hunter',bosses,bossTotal],
+  ['Rock collector',state.discovered.length,catalog.length]
+ ];
+ return `<div class="profile-dashboard">
+  <header class="simple-profile-heading"><h1>Profile</h1></header>
+  <section class="profile-hero" aria-label="Collector overview">
+   <div class="profile-portrait" aria-hidden="true"><img src="collector-golem.webp" alt="" width="160" height="160"></div>
+   <div class="profile-identity">
+    <div class="profile-identity-name"><h2>${escape(state.name||'Rock Collector')}</h2><button class="profile-edit" type="button" data-action="edit-collector" aria-label="Edit collector name">✎</button></div>
+    <p>${rank.title}</p>
+    <div class="profile-progress"><progress aria-label="Campaign progress" value="${cleared}" max="${total}"></progress><strong>${cleared} / ${total} stages cleared</strong></div>
+   </div>
+   <div class="profile-rank" title="Campaign rank ${rank.number}">${campaignShield(rank.number)}</div>
+  </section>
+  <div class="profile-overview">
+   <section class="profile-data-panel">
+    <h2>${icon('star')} Battle stats</h2>
+    <dl><div><dt>Stages played</dt><dd>${state.arenaPlayed}</dd></div><div><dt>Stages cleared</dt><dd>${cleared}</dd></div><div><dt>Bosses beaten</dt><dd>${bosses}</dd></div></dl>
+   </section>
+   <section class="profile-data-panel">
+    <h2>${icon('card')} Current team</h2>
+    ${team.length?`<div class="profile-team">${team.map(card=>`<div>${cardImage(byId[card.itemId])}<strong>Lv. ${E.cardLevel(card)}</strong></div>`).join('')}</div>`:'<a class="profile-team-link" href="#battle">Equip cards in Battle</a>'}
+   </section>
+   <section class="profile-data-panel">
+    <h2>${icon('arena')} Achievements</h2>
+    <ul class="profile-milestones">${milestones.map(([name,value,max])=>`<li><div><span>${name}</span><strong>${value} / ${max}</strong></div><progress aria-label="${name}" value="${value}" max="${max}"></progress></li>`).join('')}</ul>
+   </section>
+  </div>
+ </div>
+ <div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length],['Best Crystal Drop score',state.bestDropScore]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('install','Install the app','<p>On iPhone, open this site in Safari. Tap Share, select <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong> if shown, then tap Add.</p><p>On Android, open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>')}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
 
 function itemView(){
  const item=byId[detailId];
@@ -969,14 +1007,15 @@ case 'crystal-drop-lane':dropCrystal(Number(id));break;
 case 'leaderboard-refresh':loadLeaderboard(true);break;
 case 'leaderboard-balance':toggleLeaderboardBalance();break;
 case 'leaderboard-toggle':if(window.TCGCloud?.user&&window.TCGCloud.ready&&window.TCGCloud.canPlay){if(!state.leaderboard&&!state.name.trim()){go('profile');notice('Save a collector name first, then join the leaderboard.');break;}state.leaderboard=!state.leaderboard;save();leaderboardLoaded=0;render();}else{go('profile');notice('Sign in and finish syncing to join the leaderboard.');}break;
+case 'edit-collector':$('#username').focus();break;
 case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Enter a username first.';render();break;}state.name=name.slice(0,24);save();feedback='Username saved.';render();}break;
 case 'delete-start':profileSections.add('delete');confirmAction='delete';render();$('.delete-details').scrollIntoView({block:'nearest'});break;
-case 'delete-confirm':{state=E.defaults();selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
+case 'delete-confirm':{state=E.defaults();arenaTeam.clear();selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
 }});
 document.addEventListener('input',e=>{if(e.target.id==='arenaCode'){e.target.value=e.target.value.replace(/[^0-9]/g,'').slice(0,4);return;}if(e.target.id==='arenaFilter'){arenaFilter=e.target.value;$('#arenaTeam').innerHTML=teamOptions();return;}if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='arenaCode')$('[data-action="arena-join"]').click();if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','battle','leaderboard'].includes(target)){go(target);}});
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}restoreArenaTeam();state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
  if(snapshot)return E.creditReward(snapshot,cents);
  E.creditReward(state,cents);updateHeader();return state;
  },validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
@@ -994,6 +1033,19 @@ let arenaMode='levels',arenaLevelIndex=null;
 const arenaTeam=new Set();
 const battleCloud=()=>window.TCGCloud;
 
+function restoreArenaTeam(){
+ arenaTeam.clear();
+ const saved=state.preferences.arenaTeam;
+ if(Array.isArray(saved))saved.forEach(uid=>arenaTeam.add(uid));
+}
+function campaignRank(){
+ const names=['Trail Scout','Gem Prospector','Crystal Warden','Rock Champion'];
+ const step=Math.min(names.length-1,Math.floor(state.arenaCleared/4));
+ return {title:names[step],number:step+1};
+}
+function campaignShield(rank){
+ return `<span class="campaign-shield" aria-hidden="true"><span>RANK</span><b>${rank}</b></span>`;
+}
 function arenaView(){
  if(onlineRoom?.waiting)return `<section class="arena content-card">
   <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} ${onlineRoom.match.teams[0].length===1?'card':'cards'}.</p>
@@ -1006,19 +1058,18 @@ function arenaView(){
 
  for(const uid of arenaTeam)if(!state.vault.some(card=>card.uid===uid))arenaTeam.delete(uid);
  const cloud=battleCloud(),locked=arenaTeam.size===0||arenaBusy;
- return `<section class="arena arena-lobby">
-  <h1>Rock Arena</h1>
+ return `<section class="arena arena-lobby" data-mode="${arenaMode}">
+  <h1 class="arena-lobby-title">Rock Arena</h1>
   <div class="arena-mode-tabs" role="group" aria-label="Battle mode">
    <button class="secondary" data-action="arena-mode" data-id="levels" aria-pressed="${arenaMode==='levels'}">Levels</button>
    <button class="secondary" data-action="arena-mode" data-id="quick" aria-pressed="${arenaMode==='quick'}">Quick Battle</button>
   </div>
-  ${arenaMode==='levels'?arenaLevelsView():`<p>Play AI or challenge a friend. Wins earn ${winRewardRange()} in virtual coins.</p>`}
-  ${state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
-   <div class="search">${icon('search')}<input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}"></div>
-   <div class="team-list" id="arenaTeam">${teamOptions()}</div>
-   <p id="teamCount" role="status">${arenaTeam.size} / 3 equipped</p>`:
-   '<p>Open a pack to get your first battle card.</p>'}
-  ${arenaMode==='levels'?`<div class="arena-actions arena-level-actions"><button class="primary" data-action="arena-start-level" ${locked||cloud?.user&&!cloud.canPlay?'disabled':''}>Battle Level ${selectedArenaLevel()+1}</button></div>`:`
+  ${arenaMode==='levels'?arenaLevelsView(locked||cloud?.user&&!cloud.canPlay):`<p>Play AI or challenge a friend. Wins earn ${winRewardRange()} in virtual coins.</p>`}
+  ${arenaMode==='levels'?`<details class="campaign-team-setup" ${locked?'open':''}>
+   <summary>Battle team <span id="teamCount" role="status">${arenaTeam.size} / 3 equipped</span></summary>
+   ${arenaTeamOptions()}
+  </details>`:arenaTeamOptions()+'<p id="teamCount" role="status">'+arenaTeam.size+' / 3 equipped</p>'}
+  ${arenaMode==='levels'?'':`
    <div class="arena-actions"><button class="primary" data-action="arena-ai" ${locked?'disabled':''}>Battle AI</button>
    ${cloud?.user?`<button class="secondary" data-action="arena-create" ${locked||!cloud.canPlay?'disabled':''}>Create private room</button>`:
     '<a href="#profile" class="secondary">Sign in for online play</a>'}</div>
@@ -1045,9 +1096,16 @@ function selectArenaLevel(index){
  render();
  $(`[data-action="arena-level"][data-id="${index}"]`).focus({preventScroll:true});
 }
-function arenaLevelsView(){
+function arenaTeamOptions(){
+ return state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
+  <div class="search">${icon('search')}<input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}"></div>
+  <div class="team-list" id="arenaTeam">${teamOptions()}</div>`:
+  '<p>Open a pack to get your first battle card.</p>';
+}
+function arenaLevelsView(locked){
  const index=selectedArenaLevel(),level=E.arenaLevels[index];
  const {arenaCleared:cleared,arenaPlayed:played}=state;
+ const rank=campaignRank();
  const total=E.arenaLevels.length;
  const columns=3;
  const rows=Array.from({length:Math.ceil(total/columns)},(_,row)=>{
@@ -1059,17 +1117,23 @@ function arenaLevelsView(){
     const id=start+offset,complete=id<cleared,locked=id>cleared;
     const status=complete?'cleared':locked?'locked':'unlocked';
     return `<button type="button" class="arena-map-node" data-action="arena-level" data-id="${id}" data-cleared="${complete}" data-boss="${!!stage.boss}" aria-pressed="${id===index}" aria-label="Level ${id+1}, ${stage.name}, ${status}" ${locked?'disabled':''}>
-     <span class="arena-map-stone" aria-hidden="true"><b>${id+1}</b><span class="arena-map-mark">${complete?'✓':locked?'<i class="arena-map-lock"></i>':'◆'}</span></span>
+     <span class="arena-map-stone" aria-hidden="true"><b>${id+1}</b><span class="arena-map-mark">${complete?'★':locked?'<i class="arena-map-lock"></i>':'◆'}</span></span>
      ${stage.boss?'<span class="arena-map-boss" aria-hidden="true">Boss</span>':''}
+     <span class="arena-map-prize" aria-hidden="true">${complete?'✓':'<i></i>'+stage.reward+'¢'}</span>
     </button>`;
    }).join('')}
   </div>`;
  }).join('');
  return `<section class="arena-levels" aria-labelledby="arenaLevelsTitle">
-  <header class="arena-level-heading">
-   <h2 id="arenaLevelsTitle">Battle Levels</h2>
-   <div class="arena-level-progress"><span>${cleared} / ${total} cleared</span><progress aria-label="Levels cleared" value="${cleared}" max="${total}"></progress></div>
+  <header class="arena-campaign-title">
+   <img src="collector-golem.webp" alt="" width="132" height="132">
+   <h2 id="arenaLevelsTitle">Levels</h2>
+   <span aria-hidden="true" class="arena-title-gem"></span>
   </header>
+  <div class="arena-level-heading">
+   <div class="campaign-rank-label">${campaignShield(rank.number)}<strong>${rank.title}</strong></div>
+   <div class="arena-level-progress"><span>${cleared} / ${total} cleared</span><progress aria-label="Levels cleared" value="${cleared}" max="${total}"></progress></div>
+  </div>
   <div class="arena-level-grid">${rows}</div>
   <div class="arena-level-info">
    <div class="arena-level-summary">
@@ -1081,6 +1145,7 @@ function arenaLevelsView(){
     <span>${index<cleared?'Reward collected':'First-clear reward'}</span>
     ${index===played?`<small>+${money(E.arenaPlayReward*E.unitsPerCent)} first finished battle</small>`:''}
    </div>
+   <button class="primary arena-play" data-action="arena-start-level" ${locked?'disabled':''}>Battle Level ${index+1}</button>
   </div>
  </section>`;
 }
@@ -1114,6 +1179,7 @@ function pickArenaCard(uid){
   $('#teamCount').textContent='Team full. Unequip a card to make room.';
   return;
  }
+ save();
  const button=$$('.team-option').find(button=>button.dataset.id===uid);
  const equipped=arenaTeam.has(uid);
  if(button){
