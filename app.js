@@ -11,16 +11,16 @@ let lastClickTime=-Infinity,packCrinkleUntil=0,packCrinkleBuffer=null,audioMix=n
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
-const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
+const SPIN_MS=2400,RESULT_MS=900;
 // Match short, frequency-weighted listening levels across the game's sound cues.
-const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
+const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
-let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
+let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='idle',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
 function selectedPack(){return packs[selectedIndex];}
 function notice(message){$('#status').textContent=message;}
 function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
-function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='sealed';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
+function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
 
 function money(units){
@@ -114,7 +114,7 @@ function go(next){
  if(view==='opening'&&next!=='opening'){
   clearAnimation(audioOptions);
   pending=null;
-  phase='sealed';
+  phase='idle';
  }else stopEffects(audioOptions);
  if(view==='battle'&&next!=='battle'&&arenaMatch&&arenaMatch.winner!==null){
   clearArenaResult();
@@ -518,38 +518,30 @@ function sound(kind){
     tone(530,0,.135,.032,'triangle');
     tone(795,.06,.19,.027);
     break;
-   case 'pack-crinkle':
-   case 'rip': {
-    const crinkle=kind==='pack-crinkle';
-    const duration=crinkle?.15:.35;
-    const buffer=crinkle&&packCrinkleBuffer||audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*duration),audioCtx.sampleRate);
-    if(!crinkle||!packCrinkleBuffer){
-     const data=buffer.getChannelData(0);
+   case 'pack-crinkle': {
+    const duration=.15;
+    if(!packCrinkleBuffer){
+     packCrinkleBuffer=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*duration),audioCtx.sampleRate);
+     const data=packCrinkleBuffer.getChannelData(0);
      const folds=[.012,.029,.047,.081,.108,.131];
      const widths=[.010,.009,.015,.012,.017,.011];
      const strengths=[.62,.45,.95,.56,.76,.34];
      for(let i=0;i<data.length;i++){
       const time=i/audioCtx.sampleRate;
-      const envelope=crinkle
-       ? folds.reduce((level,center,index)=>level+strengths[index]*Math.max(0,1-Math.abs(time-center)/widths[index])**2,0)
-       : (1-i/data.length)**1.7;
+      const envelope=folds.reduce((level,center,index)=>level+strengths[index]*Math.max(0,1-Math.abs(time-center)/widths[index])**2,0);
       data[i]=(Math.random()*2-1)*envelope;
      }
-     if(crinkle)packCrinkleBuffer=buffer;
     }
     const source=audioCtx.createBufferSource(),filter=audioCtx.createBiquadFilter(),gain=audioCtx.createGain();
-    source.buffer=buffer;
-    filter.type=crinkle?'bandpass':'highpass';
-    filter.frequency.value=crinkle?2850:1100;
-    filter.Q.value=crinkle?.7:1;
-    gain.gain.value=crinkle?.2:.12;
-    if(crinkle){
-     gain.gain.setValueAtTime(0,now);
-     gain.gain.linearRampToValueAtTime(.2,now+.009);
-     gain.gain.setValueAtTime(.2,now+duration-.018);
-     gain.gain.linearRampToValueAtTime(0,now+duration);
-     packCrinkleUntil=now+duration+.018;
-    }
+    source.buffer=packCrinkleBuffer;
+    filter.type='bandpass';
+    filter.frequency.value=2850;
+    filter.Q.value=.7;
+    gain.gain.setValueAtTime(0,now);
+    gain.gain.linearRampToValueAtTime(.2,now+.009);
+    gain.gain.setValueAtTime(.2,now+duration-.018);
+    gain.gain.linearRampToValueAtTime(0,now+duration);
+    packCrinkleUntil=now+duration+.018;
     source.connect(filter);
     filter.connect(gain);
     gain.connect(effectsBus);
@@ -565,52 +557,35 @@ function sound(kind){
 }
 
 function startOpening(){
- if(pending&&view==='opening')return;
- stopWinMusic();
+ if(view!=='packs')return;
  pending=E.openPack(state,catalog,selectedPack(),odds);
  if(!pending){updateMoney();return;}
+ stopWinMusic();
  sound('click');
  save();
- phase='sealed';view='opening';
+ view='opening';
  history.replaceState(null,'','#opening');
- render();
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+  reveal();
+ }else{
+  phase='spinning';
+  render();
+  spinReveal();
+ }
  window.scrollTo({top:0,behavior:'instant'});
 }
 function openingView(){
  if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');
  if(phase==='revealed')return resultsView();
  const pack=pending.pack;
- return `<section class="opening-screen ${phase}" id="openingScreen" style="--foil:${pack.color};--spin-color:${E.rarityColors[0]};--tear-time:${TEAR_MS}ms;--spin-time:${SPIN_MS}ms">
+ return `<section class="opening-screen spinning" id="openingScreen" style="--foil:${pack.color};--spin-color:#c7a4fb;--spin-time:${SPIN_MS}ms">
    <div class="eyebrow">${pack.name} Rock Pack · ${pending.odds}</div>
-   <h1>${phase==='sealed'?'Open pack':'Rarity wheel'}</h1>
-   <div class="opening-stage">
-     <div class="opening-aura" aria-hidden="true"></div>
-     ${raritySpinner()}
-     <button class="rip-pack" id="ripPack" type="button" data-action="start-seal" aria-label="Rip open pack" ${phase!=='sealed'?'disabled':''}>
-       <div class="tear-pack"><div class="tear-layer foil-shell" aria-hidden="true">${packArt(pack)}</div></div>
-     </button>
-   </div>
-   <p class="rip-instruction" role="status">
-     <span class="opening-message">${phase==='sealed'?'Tap the pack to open.':'Opening pack…'}</span>
-     <strong class="spin-readout"><span class="rarity-label"></span></strong>
-   </p>
+   <h1>Rarity wheel</h1>
+   <div class="opening-stage">${raritySpinner()}</div>
+   <p class="opening-result" role="status"><strong class="opening-rarity"></strong></p>
  </section>`;
 }
 
-function rip(){
- if(!pending||view!=='opening'||phase!=='sealed')return;
- if(matchMedia('(prefers-reduced-motion: reduce)').matches){reveal();return;}
- phase='charging';
- const screen=$('#openingScreen');
- screen.classList.replace('sealed','charging');
- $('#ripPack').disabled=true;
- $('.opening-message',screen).textContent='Opening pack…';
- sound('rip');
- haptic(15);
- timers.push(setTimeout(spinReveal,TEAR_MS));
-}
-
-// One awarded pull supplies both the face-up artwork and the final rarity. For a batch, feature its best pull.
 function openingPull(){return pending.pull;}
 
 function raritySpinner(){
@@ -658,33 +633,27 @@ function playWheelTicks(disc){
 }
 
 function spinReveal(){
- if(!pending||view!=='opening'||phase!=='charging')return;
- phase='spinning';
- const screen=$('#openingScreen');
- const tier=openingPull().tier;
- screen.style.setProperty('--spin-color','#c7a4fb');
- screen.classList.add('spinning');
- $('#ripPack',screen).hidden=true;
- $('h1',screen).textContent='Rarity wheel';
- $('.opening-message',screen).textContent='';
- playWheelTicks($('.wheel-disc',screen));
- timers.push(setTimeout(()=>{
-  if(!pending||view!=='opening'||phase!=='spinning')return;
+ const screen=$('#openingScreen'),disc=$('.wheel-disc',screen);
+ const tier=openingPull().tier,rarity=E.rarityNames[tier];
+ const land=()=>{
+  if(!screen.isConnected||screen.classList.contains('landed'))return;
   cancelAnimationFrame(wheelAudioFrame);
   sound('land');
-  screen.classList.add('face-up','landed');
+  screen.classList.add('landed');
   screen.style.setProperty('--spin-color',E.rarityColors[tier]);
-  screen.dataset.landingRarity=E.rarityNames[tier];
-  const label=$('.rarity-label',screen);
-  label.textContent=E.rarityNames[tier];
-  label.classList.add('active');
- },SPIN_MS*FACE_UP_AT));
- timers.push(setTimeout(reveal,SPIN_MS+1100));
+  $('.opening-rarity',screen).textContent=rarity;
+  timers.push(setTimeout(reveal,RESULT_MS));
+ };
+ playWheelTicks(disc);
+ disc.addEventListener('animationend',event=>{
+  if(event.target===disc)land();
+ });
+ timers.push(setTimeout(land,SPIN_MS+150));
 }
 
 function reveal(){
  if(!pending||view!=='opening'||phase==='revealed')return;
- const skippedWheel=phase==='sealed';
+ const skippedWheel=phase==='idle';
  clearAnimation();
  phase='revealed';
  render();
@@ -759,7 +728,7 @@ case 'sort-by':setSort(id);break;
 case 'pack-details':openPackDetails(id);break;
 case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;$('#packOddsLabel').textContent=odds;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
 case 'sell-rock':sellRock(id);break;
-case 'open':startOpening();break;case 'start-seal':rip();break;
+case 'open':startOpening();break;
 case 'view-category':go('collection');break;
 case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);break;
 case 'favorite':{const v=state.vault.find(v=>v.uid===id);if(v){v.locked=!v.locked;save();render();}}break;
@@ -1146,7 +1115,7 @@ function insideLineup(pack){
  return `<div class="item-grid rock-lineup">${catalog.filter(item=>E.oddsPresets[odds][item.tier]>0).sort((a,b)=>b.tier-a.tier).map(item=>itemCard(item,null,E.itemOdds(item,pack,pools[item.tier],odds))).join('')}</div>`;
 }
 
-document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','start-seal','open','keep-result','sell-rock','buy-badge'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','open','keep-result','sell-rock','buy-badge'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
 
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;

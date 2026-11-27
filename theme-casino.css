@@ -2146,19 +2146,8 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   font-size: clamp(1.12rem, 5.2vw, 1.65rem);
 }
 
-/* A short peel crossfades the wrapper into the wheel. */
+/* Keep a row below the wheel for the landing result. */
 .opening-screen { grid-template-rows: auto auto minmax(0,1fr) auto; }
-.charging .rip-pack { animation: foil-slip var(--tear-time) ease-out both; }
-.charging .foil-shell .pack-seal.top { animation: foil-strip var(--tear-time) ease-out both; }
-@keyframes foil-slip {
-  from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translateY(14%); }
-}
-@keyframes foil-strip {
-  from { transform: none; }
-  to { transform: translate(27%,-85%) rotate(-12deg); }
-}
-
 /* One wrapper template is used for every category, edition and opening stage. */
 .foil {
   --foil-color: #d97acb;
@@ -2251,10 +2240,6 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
 }
 .opening-stage { container-type: size; }
 .opening-stage .card-wheel { width: min(90cqw, 90cqh, 430px); }
-.charging .card-wheel {
-  visibility: visible;
-  animation: wheel-entrance var(--tear-time) ease-in both;
-}
 @keyframes wheel-entrance {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -3180,7 +3165,6 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
 .landed .wheel-rim { box-shadow:inset 0 0 0 2px #f9dba5,0 0 18px var(--spin-color); }
 .opening-screen h1 { font-size:clamp(1.36rem,8vw,3.2rem); text-wrap:balance; }
 .opening-screen .eyebrow { max-width:100%; text-align:center; overflow-wrap:anywhere; font-size:clamp(.66rem,2.9vw,.83rem); }
-.opening-screen .spin-readout { max-width:100%; white-space:normal; }
 
 .arena-match .arena-actions[data-abilities="true"] { grid-template-columns:minmax(0,1fr) minmax(0,.7fr) minmax(0,1.35fr); gap:6px; }
 :root body .arena-match .arena-actions button {
@@ -3326,27 +3310,36 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
 @keyframes victory-countdown { to { transform:scaleX(0); } }
 @media (prefers-reduced-motion:reduce) { .victory-timer { visibility:hidden; } }
 
-.charging:not(.spinning) .card-wheel { visibility:hidden; animation:none; }
 .spinning .card-wheel { visibility:visible; animation:wheel-entrance .22s ease-out both; }
-.spinning .rip-pack[hidden] { display:none; }
 .opening-screen.spinning {
   background:
     radial-gradient(ellipse at 50% 44%,#6142a5a6,transparent 64%),
     linear-gradient(#161439 12%,#221b54e0 62%,#20183ea8),
     url('crystal-canyon.webp') center bottom / cover #21193e;
 }
-.opening-screen .rip-instruction { height:clamp(30px,7dvh,54px); }
-.opening-screen .spin-readout .rarity-label.active {
-  padding:5px 16px;
+.opening-result {
+  display:grid;
+  place-items:center;
+  min-block-size:44px;
+  margin:0;
+  padding:3px 5px 5px;
+}
+.opening-rarity {
+  display:grid;
+  place-items:center;
+  min-block-size:36px;
+  min-inline-size:min(100%,145px);
+  max-inline-size:100%;
+  padding:5px 13px;
   border:2px solid var(--spin-color);
   border-radius:11px;
   background:#24193e;
   color:#fff8eb;
-  font-size:clamp(.88rem,4.6vw,1.16rem);
-  font-weight:900;
-  text-shadow:none;
-  box-shadow:0 0 12px color-mix(in srgb,var(--spin-color),transparent 48%);
+  font:700 clamp(.9rem,4.5vw,1.18rem)/1.2 var(--display-font);
+  text-align:center;
+  overflow-wrap:anywhere;
 }
+.opening-rarity:empty { visibility:hidden; }
 .wheel-disc { --wheel-motion:cubic-bezier(.12,.62,.13,1); }
 .spinning .wheel-disc { animation-timing-function:var(--wheel-motion); }
 .wheel-slot span {
