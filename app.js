@@ -12,6 +12,7 @@ const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const SPIN_MS=2400,RESULT_MS=900;
+const rockMatchPairs=4,rockMatchReward=2;
 // Match short, frequency-weighted listening levels across the game's sound cues.
 const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
@@ -588,6 +589,7 @@ function startOpening(){
 function openingView(){
  if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');
  if(phase==='revealed')return resultsView();
+ if(phase==='matching')return rockMatchView();
  const pack=pending.pack;
  return `<section class="opening-screen spinning" id="openingScreen" style="--foil:${pack.color};--spin-color:#c7a4fb;--spin-time:${SPIN_MS}ms">
    <div class="eyebrow">${pack.name} Rock Pack · ${pending.odds}</div>
@@ -688,9 +690,94 @@ function stopWinMusic(){clearTimeout(winStopTimer);for(const source of winSource
 
 function playWinMusic(){stopEffects();try{unlockSound();if(!audioMix)return;stopWinMusic();const now=audioCtx.currentTime,beat=60/128,bus=audioCtx.createGain();winMusicGain=bus;bus.gain.setValueAtTime(WIN_MUSIC_GAIN,now);bus.gain.setTargetAtTime(0,now+4.5,.18);bus.connect(audioMix);const note=(midi,start,length,volume=.12,type='triangle')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);g.gain.setValueAtTime(.001,now+start);g.gain.exponentialRampToValueAtTime(volume,now+start+.018);g.gain.exponentialRampToValueAtTime(.001,now+start+length);o.connect(g);g.connect(bus);winSources.add(o);o.onended=()=>winSources.delete(o);o.start(now+start);o.stop(now+start+length+.03);};const chords=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]];chords.forEach((chord,b)=>{chord.forEach(m=>note(m,b*beat*2,beat*1.85,.075,'sine'));note(chord[0]-12,b*beat*2,beat*1.7,.17,'sine');});[72,76,79,84,83,79,76,79,81,84,88,86,84,79,83,84].forEach((m,i)=>note(m,i*beat/2,beat*.46,.15,'triangle'));[72,76,79,84].forEach(m=>note(m,beat*8,1.05,.09,'sine'));winStopTimer=setTimeout(()=>{bus.disconnect();if(winMusicGain===bus)winMusicGain=null;},5500);}catch{}}
 
+function shuffleRockMatch(items){
+ const shuffled=[...items];
+ for(let i=shuffled.length-1;i>0;i--){
+  const another=Math.floor(E.random()*(i+1));
+  [shuffled[i],shuffled[another]]=[shuffled[another],shuffled[i]];
+ }
+ return shuffled;
+}
+function startRockMatch(){
+ if(view!=='opening'||phase!=='revealed'||pending?.pull.tier!==0||pending.rockMatch)return;
+ const pulled=byId[openingPull().itemId];
+ const rocks=[pulled.id];
+ const artKey=item=>item.image+':'+item.artIndex;
+ const usedArt=new Set([artKey(pulled)]);
+ for(const item of shuffleRockMatch(catalog.filter(item=>item.tier===0))){
+  const key=artKey(item);
+  if(usedArt.has(key))continue;
+  usedArt.add(key);
+  rocks.push(item.id);
+  if(rocks.length===rockMatchPairs)break;
+ }
+ pending.rockMatch={tiles:shuffleRockMatch([...rocks,...rocks]),open:[],matched:new Set(),message:'Flip two cards to find a pair.',complete:false};
+ phase='matching';
+ render();
+ $('#rockMatchTitle').focus({preventScroll:true});
+}
+function rockMatchView(){
+ const game=pending.rockMatch;
+ const pairs=game.matched.size/2;
+ return `<section class="rock-match" aria-labelledby="rockMatchTitle">
+  <header>
+   <h1 id="rockMatchTitle" tabindex="-1">${game.complete?'All pairs matched!':'Rock Match'}</h1>
+   <p>${game.complete?'You earned '+money(rockMatchReward*E.unitsPerCent)+' in virtual coins.':'Find all '+rockMatchPairs+' pairs to earn '+money(rockMatchReward*E.unitsPerCent)+' in virtual coins.'}</p>
+  </header>
+  <div class="rock-match-grid">${game.tiles.map((id,index)=>{
+   const matched=game.matched.has(index),visible=matched||game.open.includes(index);
+   const label=visible?byId[id].name+(matched?', matched':''):'Face-down card '+(index+1);
+   return `<button type="button" class="rock-match-tile" data-action="rock-match-flip" data-id="${index}" data-face="${visible}" data-matched="${matched}" aria-label="${escape(label)}" ${matched||game.complete?'disabled':visible||game.open.length===2?'aria-disabled="true"':''}>
+    ${visible?cardImage(byId[id]):'<span aria-hidden="true" class="rock-match-back">?</span>'}
+   </button>`;
+  }).join('')}</div>
+  <p class="rock-match-status" role="status">${pairs} of ${rockMatchPairs} pairs. ${escape(game.message)}</p>
+  <button class="${game.complete?'primary':'secondary'}" type="button" data-action="rock-match-back">${game.complete?'Back to card':'Exit Rock Match'}</button>
+ </section>`;
+}
+function flipRockMatch(index){
+ if(phase!=='matching')return;
+ const game=pending.rockMatch;
+ if(game.complete||game.open.length===2||game.open.includes(index)||game.matched.has(index)||!game.tiles[index])return;
+ game.open.push(index);
+ const [first,second]=game.open;
+ if(second===undefined){
+  game.message='Choose another card.';
+ }else if(game.tiles[first]===game.tiles[second]){
+  game.matched.add(first);
+  game.matched.add(second);
+  game.open=[];
+  game.complete=game.matched.size===game.tiles.length;
+  game.message=game.complete?'':'Pair found!';
+  if(game.complete){
+   E.creditReward(state,rockMatchReward);
+   save();
+   sound('coin');
+  }else sound('vault');
+ }else{
+  game.message='Try again.';
+  timers.push(setTimeout(()=>{
+   if(phase!=='matching'||pending?.rockMatch!==game)return;
+   game.open=[];
+   render();
+   $(`[data-action="rock-match-flip"][data-id="${index}"]`)?.focus({preventScroll:true});
+  },850));
+ }
+ render();
+ if(game.complete)$('#rockMatchTitle').focus({preventScroll:true});
+ else $(`[data-action="rock-match-flip"]:not(:disabled):not([aria-disabled="true"])`)?.focus({preventScroll:true});
+}
+function exitRockMatch(){
+ if(phase!=='matching')return;
+ phase='revealed';
+ render();
+ $('[data-action="keep-result"]')?.focus({preventScroll:true});
+}
+
 function resultsView(){
  const rock=openingPull(),item=byId[rock.itemId];
- return `<section class="results-screen ${item.tier===5?'grail-result':''}" style="--rarity:${E.rarityColors[item.tier]}">
+ const offer=rock.tier===0&&!pending.rockMatch;
+ return `<section data-rock-match="${offer}" class="results-screen ${item.tier===5?'grail-result':''}" style="--rarity:${E.rarityColors[item.tier]}">
   <div class="reveal-shade" aria-hidden="true"></div>
   <div class="eyebrow"><span class="reveal-rarity">${E.rarityNames[item.tier]}</span></div>
   <h1>${escape(item.name)}</h1>
@@ -704,6 +791,7 @@ function resultsView(){
    <button class="primary" data-action="keep-result">Keep card</button>
    <button class="secondary" data-action="vault">Inventory</button>
   </div>
+  ${offer?'<button class="secondary rock-match-offer" data-action="rock-match-start">Play Rock Match</button>':''}
  </section>`;
 }
 function showItem(id,uid){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;detailUid=uid;go('item');}
@@ -745,6 +833,9 @@ case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);b
 case 'favorite':{const v=state.vault.find(v=>v.uid===id);if(v){v.locked=!v.locked;save();render();}}break;
 case 'cancel-confirm':confirmAction='';render();break;
 case 'keep-result':go('packs');sound('vault');break;
+case 'rock-match-start':startRockMatch();break;
+case 'rock-match-flip':flipRockMatch(Number(id));break;
+case 'rock-match-back':exitRockMatch();break;
 case 'leaderboard-refresh':loadLeaderboard(true);break;
 case 'leaderboard-balance':toggleLeaderboardBalance();break;
 case 'leaderboard-toggle':if(window.TCGCloud?.user&&window.TCGCloud.ready&&window.TCGCloud.canPlay){if(!state.leaderboard&&!state.name.trim()){go('profile');notice('Save a collector name first, then join the leaderboard.');break;}state.leaderboard=!state.leaderboard;save();leaderboardLoaded=0;render();}else{go('profile');notice('Sign in and finish syncing to join the leaderboard.');}break;
@@ -756,8 +847,8 @@ document.addEventListener('input',e=>{if(e.target.id==='arenaCode'){e.target.val
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='arenaCode')$('[data-action="arena-join"]').click();if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','battle','leaderboard'].includes(target)){go(target);}});
 async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
- if(snapshot)return E.creditBattleReward(snapshot,cents);
- E.creditBattleReward(state,cents);updateHeader();return state;
+ if(snapshot)return E.creditReward(snapshot,cents);
+ E.creditReward(state,cents);updateHeader();return state;
  },validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 async function refreshWebApp(){
  try {
@@ -1083,7 +1174,7 @@ async function battleMove(action,target){
   arenaMatch=playerMatch;
   if(playerMatch.winner===0){
    playerMatch.reward=E.battleWinReward;
-   E.creditBattleReward(state,playerMatch.reward);
+   E.creditReward(state,playerMatch.reward);
    save();
   }
   if(playerMatch.winner===null){

@@ -3409,3 +3409,69 @@ body[data-view="battle"] #status { display:none; }
 .arena-effect[data-strike="frost"] { --effect-color:#a2eaff; }
 .arena-effect[data-strike="ember"] { --effect-color:#ff9a72; }
 .arena-effect[data-strike="moonlit"] { --effect-color:#c4adff; }
+
+body .results-screen[data-rock-match="true"] { grid-template-rows:auto auto minmax(0,1fr) auto auto; }
+:root body .rock-match-offer.secondary {
+  width:min(100%,620px);
+  justify-self:center;
+  min-height:39px;
+  --control-light:#d5ffda;
+  --control-fill:#80e2b3;
+}
+.rock-match {
+  width:min(100%,520px);
+  height:100%;
+  margin-inline:auto;
+  padding:clamp(8px,2dvh,20px);
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  justify-items:center;
+  align-items:center;
+  gap:clamp(5px,1.4dvh,12px);
+  overflow:auto;
+  border:2px solid #9e7ad4;
+  border-radius:20px;
+  text-align:center;
+  background:linear-gradient(#2b2052dc,#2b2052b5),url('crystal-canyon.webp') center / cover #2b2052;
+}
+.rock-match h1 { font:700 clamp(1.5rem,7vw,2.5rem)/1.1 var(--display-font); color:#ffe8a4; }
+.rock-match header p,.rock-match-status { margin-top:5px; font-size:clamp(.75rem,3.4vw,.94rem); color:#f4eaff; }
+.rock-match-grid {
+  display:grid;
+  align-content:center;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  width:min(100%,420px);
+  height:100%;
+  gap:clamp(4px,1.8vw,12px);
+  container-type:size;
+}
+:root body button.rock-match-tile {
+  display:grid;
+  place-items:center;
+  justify-self:center;
+  width:min(100%,calc((100cqh - 12px) * .36));
+  min-width:32px;
+  aspect-ratio:5 / 7;
+  padding:3px;
+  border:2px solid #201438;
+  border-radius:clamp(6px,2vw,12px);
+  --rock-button:radial-gradient(ellipse at 25% 10%,#9f72e2,#5d379d 70%);
+  --rock-button-text:#fff1c1;
+  background:var(--rock-button);
+  color:#fff1c1;
+  box-shadow:inset 0 0 0 2px #bba0ef,0 3px #171229;
+}
+.rock-match-back {
+  font:700 clamp(1.2rem,6vw,2.4rem)/1 var(--display-font);
+  text-shadow:0 2px #4c2679;
+}
+:root body button.rock-match-tile[data-face="true"] { --rock-button:#4c3775; }
+:root body button.rock-match-tile[data-matched="true"]:disabled {
+  opacity:1;
+  background:#457e73;
+  box-shadow:inset 0 0 0 2px #a6f5c9,0 3px #171229;
+}
+.rock-match-tile .cartoon-card { width:100%; height:100%; padding:2px; border-radius:5px; }
+.rock-match-tile :is(.cartoon-card-head,.cartoon-card-name,.cartoon-card-edition) { display:none; }
+.rock-match-tile .cartoon-card-art { border-width:1px; border-radius:3px; }
+.rock-match-status { min-height:1.35em; }
