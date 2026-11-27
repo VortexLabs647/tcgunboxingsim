@@ -26,17 +26,22 @@ function money(units){
  const precision=units%E.unitsPerCent===0?2:6;
  return '$'+(units/1000000).toFixed(precision);
 }
+function rateMoney(units){
+ const amount=(units/1000000).toFixed(8).replace(/0+$/,'');
+ return '$'+amount.padEnd(8,'0')+'/sec';
+}
 function updateMoney(){
- $('#rockBalance').textContent=money(state.balance*E.unitsPerCent+state.rockRemainder);
+ $('#rockBalance').textContent=money(state.balance*E.unitsPerCent);
  const rate=$('#incomeRate');
  if(rate){
   const income=E.activeRocks(state).reduce((sum,rock)=>sum+E.incomeRate(state,rock),0);
   const starter=state.vault.find(rock=>rock.uid===E.starterId);
   const boost=starter?E.incomeRate(state,starter):0;
   const starterRate=$('#starterRate');
-  if(starterRate)starterRate.textContent=boost?money(boost)+'/sec until you can open Opal':'Ready when your balance runs low';
-  rate.textContent=money(income+boost)+'/sec';
+  if(starterRate)starterRate.textContent=boost?rateMoney(boost):'On standby';
+  rate.textContent=rateMoney(income+boost);
  }
+ for(const button of $$('[data-action="buy-badge"]'))button.disabled=state.balance<E.badges[button.dataset.id].price;
  const openButton=$('.pack-open-action');
  if(openButton)openButton.disabled=!E.canAfford(state,selectedPack());
 }
@@ -69,7 +74,13 @@ function updateHeader(){
  updateMoney();
  $('#userInitials').textContent=(state.name||'Player').slice(0,2).toUpperCase();
 }
-function nav(){const links=[['packs','grid','Packs'],['vault','vault','Inventory'],['collection','card','Collection'],['leaderboard','star','Ranks'],['profile','user','Profile']];const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===view?'active':''}" ${key===view?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');$('#desktopNav').innerHTML=html;$('#bottomNav').innerHTML=html;}
+function nav(){
+ const active=['vault','collection'].includes(view)?'vault':view==='item'&&['vault','collection'].includes(previousView)?'vault':view;
+ const links=[['packs','grid','Packs'],['vault','card','Cards'],['leaderboard','star','Ranks'],['profile','user','Profile']];
+ const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===active?'active':''}" ${key===active?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');
+ $('#desktopNav').innerHTML=html;
+ $('#bottomNav').innerHTML=html;
+}
 function clearAnimation(){cancelAnimationFrame(wheelAudioFrame);stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
 function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','leaderboard','opening','item'].includes(next)?next:'packs';search='';confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
 function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();updateMoney();}
@@ -114,7 +125,7 @@ function editionPosition(pack,total){
 function packPanel(){
  const pack=selectedPack();
  const price=money(pack.price*E.unitsPerCent);
- return `<div class="selected-title"><h2>${pack.name} Rock Pack</h2></div>
+ return `<h2 class="sr-only">${pack.name} Rock Pack</h2>
    <div class="pack-quick-links" role="group" aria-label="Pack details">
      <button data-action="pack-details" data-id="odds" aria-haspopup="dialog"><span>Odds</span><small id="packOddsLabel">${odds}</small></button>
      <button data-action="pack-details" data-id="cards" aria-haspopup="dialog">Cards</button>
@@ -261,12 +272,12 @@ function selectPack(index, scroll = true) {
 function itemCard(item,own=null,itemChance=null,earning=false){
  return `<article class="item-card" style="--rarity:${E.rarityColors[item.tier]}">
   <button class="item-button" data-action="item" data-id="${item.id}" aria-label="View ${escape(item.name)}">
-   <div class="item-visual rocks">${cardImage(item)}${state.discovered.includes(item.id)?'<span class="item-badge">COLLECTED</span>':''}</div>
-   <div class="item-copy"><span class="rarity">${E.rarityNames[item.tier]}</span><h3>${escape(item.name)}</h3><p>${escape(item.detail)}</p>
+   <div class="item-visual rocks">${cardImage(item)}${state.discovered.includes(item.id)?'<span class="item-badge" aria-label="Collected" title="Collected">✓</span>':''}</div>
+   <div class="item-copy"><span class="rarity">${E.rarityNames[item.tier]}</span><h3>${escape(item.name)}</h3>
     ${itemChance===null?'':`<div class="item-value">${chance(itemChance,2)}</div>`}
    </div>
   </button>
-  ${own?`<p class="rock-rate">${own.uid===E.starterId?'<span id="starterRate"></span>':earning?money(E.incomeRate(state,own))+'/sec':'Idle'}</p>
+  ${own?`<p class="rock-rate">${own.uid===E.starterId?'<span id="starterRate"></span>':earning?rateMoney(E.incomeRate(state,own)):'Idle'}</p>
   <div class="item-actions rock-actions">
    <button data-action="favorite" data-id="${own.uid}" aria-label="${own.locked?'Unfavorite':'Favorite'} ${escape(item.name)}" aria-pressed="${!!own.locked}">${own.locked?'★':'☆'}</button>
    ${sellButton(own)}
@@ -281,21 +292,46 @@ function sellButton(rock){
 }
 function stats(values){return `<div class="stats">${values.map(([label,value])=>`<div class="stat"><small>${label}</small><strong>${value}</strong></div>`).join('')}</div>`;}
 function empty(title,description,button=true){return `<div class="empty"><h2>${title}</h2><p>${description}</p>${button?'<button class="primary" data-action="packs">Explore packs</button>':''}</div>`;}
+function cardsTabs(){
+ return `<nav class="card-tabs" aria-label="Card views">
+  <a class="secondary" href="#vault" ${view==='vault'?'aria-current="page"':''}>Inventory</a>
+  <a class="secondary" href="#collection" ${view==='collection'?'aria-current="page"':''}>Collection</a>
+ </nav>`;
+}
 function vaultView(){
  const earning=new Set(E.activeRocks(state).map(rock=>rock.uid));
  const owned=state.vault.filter(card=>byId[card.itemId]?.name.toLowerCase().includes(search.toLowerCase()));
  if(sort==='rarity')owned.sort((a,b)=>b.tier-a.tier);
- return `${heading('YOUR ROCK COLLECTION','YOUR <em>INVENTORY.</em>')}${stats([['Owned rocks',state.vault.length],['Rock income','<span id="incomeRate"></span>']])}
-  <p class="rock-income-note">Your 12 rarest distinct cards earn virtual money automatically, including up to 8 hours away. If you can’t afford Opal, the starter rock earns up to the cost of that pack in about 80 seconds.</p>
-  <div class="toolbar"><div class="search">${icon('search')}<input id="vaultSearch" placeholder="Search your rocks" aria-label="Search your rocks" value="${escape(search)}"></div>
-   <select id="sort" aria-label="Sort vault"><option value="recent">Newest first</option><option value="rarity" ${sort==='rarity'?'selected':''}>Rarest first</option></select></div>
-  ${owned.length?`<div class="item-grid">${owned.map(card=>itemCard(byId[card.itemId],card,null,earning.has(card.uid))).join('')}</div>`:empty(state.vault.length?'NO MATCHES.':'YOUR VAULT IS EMPTY.',state.vault.length?'Try another rock name.':'Open a pack to start collecting.')}`;
+ return `<section class="card-browser"><h1 class="sr-only">Inventory</h1>${cardsTabs()}
+  <div class="card-meta"><span>${state.vault.length} owned</span><span id="incomeRate"></span></div>
+  <div class="toolbar"><div class="search">${icon('search')}<input type="search" id="vaultSearch" placeholder="Find a rock" aria-label="Search inventory" value="${escape(search)}"></div>
+   <select id="sort" aria-label="Sort inventory"><option value="recent">Newest</option><option value="rarity" ${sort==='rarity'?'selected':''}>Rarest</option></select></div>
+  ${owned.length?`<div class="item-grid">${owned.map(card=>itemCard(byId[card.itemId],card,null,earning.has(card.uid))).join('')}</div>`:empty(state.vault.length?'No matches':'Inventory is empty',state.vault.length?'Try another name.':'Open a pack to start collecting.',!state.vault.length)}</section>`;
 }
 function collectionView(){
  const cards=catalog.filter(item=>item.name.toLowerCase().includes(search.toLowerCase()));
- return `${heading('ROCKS & MINERALS','THE <em>COLLECTION.</em>')}
-  <div class="toolbar"><div class="search">${icon('search')}<input id="collectionSearch" placeholder="Find a rock" aria-label="Find a rock" value="${escape(search)}"></div></div>
-  ${cards.length?`<div class="item-grid">${cards.map(item=>itemCard(item)).join('')}</div>`:empty('NO MATCHES.','Try another rock name.',false)}`;
+ return `<section class="card-browser"><h1 class="sr-only">Collection</h1>${cardsTabs()}
+  <div class="card-meta"><span>${state.discovered.length} / ${catalog.length} discovered</span></div>
+  <div class="toolbar"><div class="search">${icon('search')}<input type="search" id="collectionSearch" placeholder="Find a rock" aria-label="Search collection" value="${escape(search)}"></div></div>
+  ${cards.length?`<div class="item-grid">${cards.map(item=>itemCard(item)).join('')}</div>`:empty('No matches','Try another name.',false)}</section>`;
+}
+function renderBadgeShop(){
+ $('#badgeList').innerHTML=`<p class="badge-summary">Rock income boost <strong>+${E.badgeBoost(state)}%</strong></p>
+  ${Object.entries(E.badges).map(([id,badge])=>`<article class="badge-row">
+   <div class="badge-stone badge-${id}" aria-hidden="true"></div>
+   <div><h3>${badge.name}</h3><p>+${badge.boost}% rock income</p></div>
+   ${state.badges.includes(id)?'<span class="badge-owned">Owned</span>':`<button class="primary" data-action="buy-badge" data-id="${id}" aria-label="Buy ${badge.name} badge for ${money(badge.price*E.unitsPerCent)}">${money(badge.price*E.unitsPerCent)}</button>`}
+  </article>`).join('')}
+  <p class="badge-footnote">One-time purchases with virtual balance. Boosts stack and apply offline. Starter rock has its own rate.</p>`;
+ updateMoney();
+}
+function buyBadge(id){
+ if(!E.buyBadge(state,id))return;
+ save();
+ renderBadgeShop();
+ $('#badgeShopTitle').focus();
+ $('#badgeStatus').textContent=E.badges[id].name+' badge purchased.';
+ sound('vault');
 }
 function profileSection(id,label,content){return `<details class="profile-fold content-card" data-profile-section="${id}" ${profileSections.has(id)?'open':''}><summary>${label}<span aria-hidden="true">+</span></summary><div class="profile-fold-body">${content}</div></details>`;}
 function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>PROFILE.</em></h1></div><div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('install','Install the app','<p>On iPhone, open this site in Safari. Tap Share, select <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong> if shown, then tap Add.</p><p>On Android, open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>')}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
@@ -303,7 +339,7 @@ function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>
 function itemView(){
  const item=byId[detailId];
  if(!item)return empty('CARD NOT FOUND.','Choose another rock.');
- return `<button class="secondary back-button" data-action="back-item">Back to ${previousView==='vault'?'vault':previousView==='packs'?'packs':'collection'}</button>
+ return `<button class="secondary back-button" data-action="back-item">Back to ${previousView==='vault'?'Inventory':previousView==='packs'?'packs':'collection'}</button>
   <div class="detail-page"><div class="detail-image rocks">${cardImage(item)}</div><div class="detail-content">
    <div class="eyebrow">${escape(item.detail)} · ${escape(item.number)}</div><h1>${escape(item.name)}</h1><p>${escape(item.lore)}</p>
    <span class="rarity" style="--rarity:${E.rarityColors[item.tier]}">${E.rarityNames[item.tier]}</span>
@@ -560,11 +596,17 @@ function resultsView(){
  </section>`;
 }
 function showItem(id){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;go('item');}
-window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('#packDetails[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
-function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus();if(pos!=null)el?.setSelectionRange(pos,pos);}
-document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','favorite','save-name','delete-confirm','leaderboard-toggle','leaderboard-balance'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
+window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('dialog[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
+function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus({preventScroll:true});if(pos!=null)el?.setSelectionRange(pos,pos);}
+document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','buy-badge','favorite','save-name','delete-confirm','leaderboard-toggle','leaderboard-balance'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':go(a);break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
+case 'badge-shop':
+ renderBadgeShop();
+ $('#badgeStatus').textContent='';
+ $('#badgeShop').showModal();
+ break;
+case 'buy-badge':buyBadge(id);break;
 case 'pack-details':openPackDetails(id);break;
 case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;$('#packOddsLabel').textContent=odds;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
 case 'sell-rock':sellRock(id);break;
@@ -585,7 +627,15 @@ document.addEventListener('input',e=>{if(e.target.id==='vaultSearch'||e.target.i
 document.addEventListener('change',e=>{if(e.target.id==='sort'){sort=e.target.value;render();}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','leaderboard'].includes(target)){go(target);}});
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};E.settleIncome(state);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true);if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};E.settleIncome(state);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true);if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+async function refreshWebApp(){
+ try {
+  const worker=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
+  const check=()=>{if(!document.hidden)worker.update().catch(()=>{});};
+  document.addEventListener('visibilitychange',check);
+  check();
+ }catch{}
+}
 init();
 setInterval(incomeTick,1000);
 window.addEventListener('pageshow',()=>incomeTick(true));
@@ -619,7 +669,6 @@ function leaderboardMembership(){
  const cloud=window.TCGCloud;
  const joined=!!state.leaderboard;
  return `<div class="rank-membership">
-  <p>${cloud?.user?'Show your collector name and pack count.':'Sign in to join the rankings.'}</p>
   <button class="secondary" data-action="${cloud?.user?'leaderboard-toggle':'profile'}" ${cloud?.user&&!cloud.canPlay?'disabled':''}>
    ${cloud?.user?(joined?'Leave leaderboard':'Join leaderboard'):'Sign in to join'}
   </button>
@@ -635,16 +684,16 @@ async function toggleLeaderboardBalance(){
  if(await cloud.flush())loadLeaderboard(true);
 }
 function leaderboardView(){
- return `${heading('THE COLLECTOR RANKINGS','THE <em>LEADERBOARD.</em>')}${leaderboardMembership()}
- <div class="rank-toolbar"><p>Top 50 by packs opened</p><button class="secondary" data-action="leaderboard-refresh">Refresh</button></div>
+ return `${ '<h1 class="compact-title">Ranks</h1>' }${leaderboardMembership()}
+ <div class="rank-toolbar"><button class="secondary" data-action="leaderboard-refresh">Refresh</button></div>
  <div id="leaderboardTables" aria-live="polite">${leaderboardContent()}</div>`;
 }
 function leaderboardContent(){
  if(leaderboardError)return `<div class="content-card"><p>${escape(leaderboardError)}</p><button class="secondary" data-action="leaderboard-refresh">Try again</button></div>`;
  if(!leaderboardRows)return '<p class="rank-loading">Loading rankings…</p>';
  const rows=leaderboardRows.opened;
- return `<section class="content-card rank-board"><h2>Packs opened</h2>${rows.length?`<table class="rank-table">
-   <thead><tr><th>Rank</th><th>Collector</th><th>Packs</th><th>Virtual balance</th></tr></thead>
+ return `<section class="content-card rank-board">${rows.length?`<table class="rank-table">
+   <thead><tr><th>Rank</th><th>Collector</th><th>Packs</th><th>Balance</th></tr></thead>
    <tbody>${rows.map((row,index)=>`<tr>
     <td><span class="rank-place rank-${index+1}">${index+1}</span></td><td>${escape(row.display_name)}</td>
     <td>${Number(row.packs_opened).toLocaleString('en-US')}</td>

@@ -2655,3 +2655,184 @@ html {
     }
   }
 }
+
+/* Shared phone sizing and illustrated controls for the browser and web app. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+button, .nav-link, .card-tabs a, summary { touch-action: manipulation; }
+input, select { font-size: max(16px, 1rem); }
+
+:root body :is(button, a.primary, a.secondary, .nav-link, .profile-fold > summary)
+  :is(svg) { flex-shrink: 0; }
+
+:root body :is(.primary,.secondary,.nav-link,.rock-odds-tabs button,.pack-quick-links button,
+ .balance-pill,.rock-actions button,.carousel-controls button,.pack-dialog header button,.account-tabs button,.profile-fold > summary)
+ :is(span,strong,small) { min-width: 0; }
+
+:root body :is(.primary,.secondary,.nav-link,.rock-odds-tabs button,.pack-quick-links button,
+ .balance-pill,.rock-actions button,.carousel-controls button,.pack-dialog header button,.account-tabs button,.profile-fold > summary):not(:disabled) {
+  font-family: var(--control-font,var(--interface-font));
+  font-weight: var(--control-weight,900);
+  text-align: center;
+  line-height: 1.13;
+  justify-content: center;
+  min-width: 0;
+  background:
+    linear-gradient(143deg,#fff9 0 13%,transparent 13% 82%,#23164221 82%),
+    linear-gradient(163deg,var(--control-light,#a491e4),var(--control-fill,#6f5caa) 67%);
+  color: var(--control-ink,#19132e);
+  border: 2px solid #17112b;
+  border-radius: var(--control-radius,12px);
+  box-shadow: inset 0 0 0 1px #fff6,inset 0 -3px #22143938,0 3px #100d22;
+  overflow-wrap: anywhere;
+}
+:root body :is(.primary,.secondary,.nav-link,.pack-quick-links button,.balance-pill,.rock-actions button,
+ .carousel-controls button,.pack-dialog header button):active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 3px #26174355,0 1px #100d22;
+}
+:where(.primary,.nav-link.active) {
+ --control-light:#fff4ae; --control-fill:#ffcd65; --control-font:var(--display-font); --control-weight:700;
+}
+:where([data-id="odds"],.rock-odds-tabs button,.nav-link[href="#leaderboard"]:not(.active)) {
+ --control-light:#e3cfff; --control-fill:#ac88f1;
+}
+:where([data-id="cards"],.nav-link[href="#vault"]:not(.active),[data-action="sell-rock"]) {
+ --control-light:#ffd1e8; --control-fill:#f793c3; --control-font:'Barlow Condensed',sans-serif;
+}
+:where(.nav-link[href="#packs"]:not(.active),.card-tabs a,.balance-pill) {
+ --control-light:#bafcea; --control-fill:#76dfbc;
+}
+:where(.nav-link[href="#profile"]:not(.active),[data-action="favorite"]) {
+ --control-light:#d8e3ff; --control-fill:#9caee7; --control-font:'DM Sans',sans-serif; --control-weight:700;
+}
+:where(.card-tabs a[aria-current],.rock-odds-tabs button.active) {
+ --control-light:#fff4ae; --control-fill:#ffcd65;
+}
+:where(.pack-open-action) { --control-radius: 17px; }
+:root body .balance-pill {
+ --control-radius:999px;
+ display: inline-flex;
+ align-items: center;
+ gap: 7px;
+ max-width: 54%;
+ min-height: 36px;
+ padding: 5px 11px;
+ white-space: nowrap;
+}
+.balance-pill strong { font: 900 clamp(.91rem,3.8vw,1.12rem)/1 var(--interface-font); font-variant-numeric: tabular-nums; }
+.balance-gem,.badge-stone {
+ background: conic-gradient(from 24deg,#fff5d1,#e5b7ff,#8362ce,#4b3c97,#dab2fd,#fff5d1);
+ clip-path: polygon(30% 0,70% 0,100% 39%,50% 100%,0 39%);
+}
+.balance-gem { width: 16px; height: 16px; flex: 0 0 16px; }
+.card-browser { max-width: 1100px; margin-inline: auto; }
+.card-tabs {
+ display: grid;
+ grid-template-columns: repeat(2,minmax(0,1fr));
+ gap: 8px;
+}
+.card-tabs a { min-height: 43px; padding: 7px 4px; margin-bottom: 3px; }
+.card-meta { display: flex; justify-content: space-between; gap: 5px; color: #daccef; font-size: .82rem; margin: 9px 1px; }
+.card-browser .toolbar {
+ display: flex;
+ align-items: stretch;
+ gap: 7px;
+ margin: 0 0 12px;
+}
+.card-browser .toolbar .search { flex: 1 1 0; min-width: 0; }
+.card-browser .toolbar select { flex: 0 1 132px; max-width: 42%; padding-inline-start: 8px; }
+.card-browser .search input { width: 100%; min-width: 0; }
+body :is(.card-browser,.rock-lineup) .item-grid { gap: 9px; }
+body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #706192; border-radius: 13px; box-shadow: none; min-width: 0; }
+:is(.card-browser,.rock-lineup) .item-visual { height: auto; aspect-ratio: 1 / 1.06; padding: 7px 9px; }
+:is(.card-browser,.rock-lineup) .item-visual .cartoon-card { height: 100%; width: auto; }
+:is(.card-browser,.rock-lineup) .item-copy { display: grid; gap: 2px; padding: 4px 8px 8px; text-align: center; }
+:is(.card-browser,.rock-lineup) .item-copy .rarity { justify-content: center; font-size: .61rem; }
+:is(.card-browser,.rock-lineup) .item-copy h3 { margin: 0; height: auto; min-height: 2.3em; white-space: normal; overflow-wrap: anywhere; line-height: 1.12; font-size: .87rem; }
+.item-badge { border-radius: 50%; background: #85e9bb; color: #182933; padding: 2px 5px; }
+.rock-actions { align-items: stretch; }
+.rock-actions [data-action="sell-rock"] { flex: 1 1 auto; min-height: 42px; white-space: nowrap; font-size: clamp(.69rem,3vw,.84rem); }
+.rock-actions [data-action="favorite"] { flex: 0 0 34px; min-height: 42px; }
+.rock-rate { text-align: center; }
+.compact-title { margin: 0 0 12px; font-size: 1.6rem; }
+.rank-membership { display: flex; flex-wrap: wrap; gap: 8px; }
+.rank-membership button { flex: 1 1 9em; padding: 7px 6px; }
+.rank-toolbar { justify-content: flex-end; }
+.rank-board { overflow-x: auto; }
+.rank-board .rank-table { table-layout: auto; }
+.rank-board .rank-table td { overflow-wrap: anywhere; }
+.pack-dialog-body .rock-odds-tabs { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.badge-summary { display:flex; justify-content:space-between; gap: 8px; margin: 0 0 12px; }
+.badge-summary strong { color:#8ef0c9; }
+.badge-row {
+ display:grid;
+ grid-template-columns: 36px minmax(0,1fr) auto;
+ align-items:center;
+ gap: 9px;
+ padding:9px 6px;
+ border-top:1px solid #9782c65c;
+}
+.badge-row h3,.badge-row p { margin:0; }
+.badge-row p,.badge-footnote { color:#dccff1; font-size:.8rem; }
+.badge-row button { min-width: 64px; min-height: 44px; padding: 6px; }
+.badge-stone { width: 34px; height: 36px; }
+.badge-quartz { filter: hue-rotate(65deg); }
+.badge-diamond { filter: hue-rotate(-69deg); }
+.badge-owned { color:#8ef0c9; font-size:.82rem; }
+.badge-footnote { margin: 10px 0 0; }
+@media (max-width:900px) {
+ body .topbar { height:54px; padding-block-start:0; }
+ body[data-view="opening"] { --opening-header:54px; }
+ body[data-view="packs"] .bottom-nav,body .bottom-nav { grid-template-columns:repeat(4,minmax(0,1fr)); }
+ body .bottom-nav .nav-link { font-size: .71rem; }
+ body:not([data-view="packs"],[data-view="opening"]) main { padding-bottom:78px; }
+ body .result-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+ body .result-actions button { font-size:clamp(.69rem,3vw,.88rem); padding:5px 3px; }
+ body .card-browser .item-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:380px) {
+ body .rank-board { padding: 9px; }
+ body .rank-board .rank-table :is(th,td) { font-size:.68rem; padding-inline:3px; }
+}
+
+/* Faceted fills and readable labels for the controls used most often. */
+:root body :is(.pack-room .pack-showcase .pack-quick-links button,
+ .pack-room .pack-open-action[data-action], .topbar .balance-pill,
+ .card-tabs a.secondary,.pack-dialog-body .rock-odds-tabs button,
+ .topbar .nav-link,.bottom-nav .nav-link,.item-actions.rock-actions button):not(:disabled) {
+  background:
+    linear-gradient(135deg,#fff9 0 11%,transparent 11% 72%,#31265327 72% 83%,transparent 83%),
+    linear-gradient(165deg,var(--control-light,#c7b9f1),var(--control-fill,#9384ce) 78%);
+  color: var(--control-ink,#19132e);
+  font-family: var(--control-font,var(--interface-font));
+  font-weight: var(--control-weight,900);
+  border: 2px solid #18132e;
+  border-radius: var(--control-radius,12px);
+  box-shadow: inset 0 0 0 1px #fff9,inset 0 -3px #251c4733,0 3px #110c22;
+}
+:root body .card-tabs a[aria-current] { --control-light: #fff4ae; --control-fill: #ffcd65; }
+:root body .pack-room .pack-showcase [data-id="odds"] { --control-radius: 13px 13px 8px 8px; }
+:root body .pack-room .pack-showcase [data-id="cards"] {
+  --control-radius: 8px 15px 8px 15px;
+  font-size: 1.02rem;
+  letter-spacing: .035em;
+}
+:root body .bottom-nav .nav-link:active,
+:root body .pack-room .pack-open-action[data-action]:active:not(:disabled) {
+  box-shadow: inset 0 2px 3px #26174355,0 1px #100d22;
+}
+:is(.card-browser,.rock-lineup) .item-visual .cartoon-card {
+  display: grid;
+  place-items: center;
+  padding: 5px;
+}
+:is(.card-browser,.rock-lineup) .item-visual .cartoon-card :is(.cartoon-card-head,.cartoon-card-name,.cartoon-card-edition) { display: none; }
+:is(.card-browser,.rock-lineup) .item-visual .cartoon-card .cartoon-card-art { height: auto; width: 100%; aspect-ratio: 1; }

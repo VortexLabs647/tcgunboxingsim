@@ -24,6 +24,25 @@ const productiveLimit=12,offlineSeconds=8*60*60;
 // One unit is $0.000001 in virtual currency.
 const unitsPerCent=10000;
 const passiveUnits=[1,2,3,4,5,6],starterUnits=250;
+const badges={
+ quartz:{name:'Quartz',price:5,boost:25},
+ amethyst:{name:'Amethyst',price:15,boost:50},
+ diamond:{name:'Diamond',price:35,boost:100}
+};
+function badgeBoost(state){
+ return Object.entries(badges).reduce((total,[id,badge])=>total+(state.badges.includes(id)?badge.boost:0),0);
+}
+function buyBadge(state,id,now=Date.now()){
+ if(!Object.hasOwn(badges,id)||state.badges.includes(id))return false;
+ settleIncome(state,now);
+ const badge=badges[id];
+ if(state.balance<badge.price)return false;
+ state.balance-=badge.price;
+ state.badges.push(id);
+ state.rockClock=Math.max(state.rockClock,now);
+ ensureStarterRock(state,now);
+ return true;
+}
 function saleValue(price,tier){
  return Math.max(1,Math.floor(price*salePercent[tier]/100));
 }
@@ -50,7 +69,7 @@ function starterShortfall(state){
 }
 function incomeRate(state,rock){
  if(rock.uid===starterId)return starterShortfall(state)>0?starterUnits:0;
- return passiveUnits[rock.tier];
+ return passiveUnits[rock.tier]*(100+badgeBoost(state))/100;
 }
 function credit(state,units){
  const total=state.rockRemainder+units;
@@ -64,6 +83,9 @@ function settleIncome(state,now=Date.now()){
  state.rockClock=now-(now-state.rockClock)%1000;
  let earned=0;
  for(const rock of activeRocks(state))earned+=passiveUnits[rock.tier]*seconds;
+ const boosted=earned*(100+badgeBoost(state))+state.badgeCarry;
+ earned=Math.floor(boosted/100);
+ state.badgeCarry=boosted%100;
  if(state.vault.some(rock=>rock.uid===starterId))earned+=Math.min(starterShortfall(state),starterUnits*seconds);
  credit(state,earned);
  return earned;
@@ -131,7 +153,7 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
 }
 
 function defaults(){
- return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,pricedPacks:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
+ return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
 }
 function migrate(old,catalog){
  const state={...defaults(),...old,version:4};
@@ -172,12 +194,14 @@ function validSave(state,catalog){
   ['opened','spent','sold','best','deposited'].every(key=>Number.isSafeInteger(state[key])&&state[key]>=0)&&
   (state.rockClock===undefined||Number.isSafeInteger(state.rockClock)&&state.rockClock>=0)&&
   (state.rockRemainder===undefined||Number.isSafeInteger(state.rockRemainder)&&state.rockRemainder>=0&&state.rockRemainder<unitsPerCent)&&
+  (state.badges===undefined||Array.isArray(state.badges)&&state.badges.length<=Object.keys(badges).length&&state.badges.every(id=>typeof id==='string'&&Object.hasOwn(badges,id)))&&
+  (state.badgeCarry===undefined||Number.isSafeInteger(state.badgeCarry)&&state.badgeCarry>=0&&state.badgeCarry<100)&&
   discoveries(state.discovered)&&(state.retiredDiscoveries===undefined||discoveries(state.retiredDiscoveries))&&
   typeof state.name==='string'&&state.name.length<=24&&Array.isArray(state.history)&&state.history.length<=150&&
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);
