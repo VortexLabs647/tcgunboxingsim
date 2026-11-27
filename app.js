@@ -6,8 +6,8 @@ const icon=n=>`<svg class="icon" aria-hidden="true"><use href="#i-${n}"/></svg>`
 const date=d=>new Date(d).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 const KEY='tcg-unboxing-sim-v2';
 let leaderboardLoaded=0,leaderboardLoading=false,leaderboardRows=null,leaderboardError='';
-const effectSources=new Set(),effectBuses=new Set();
-let lastCueTime=-Infinity,packCrinkleUntil=0,packCrinkleBuffer=null,audioMix=null,audioResuming=null,winSources=new Set(),winStopTimer=null;
+const effectBuses=new Map();
+let lastClickTime=-Infinity,packCrinkleUntil=0,packCrinkleBuffer=null,audioMix=null,audioResuming=null,winSources=new Set(),winStopTimer=null;
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
@@ -100,8 +100,34 @@ function nav(){
  $('#desktopNav').innerHTML=html;
  $('#bottomNav').innerHTML=html;
 }
-function clearAnimation(){cancelAnimationFrame(wheelAudioFrame);stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
-function go(next){stopWinMusic();stopEffects();if(view==='battle'&&next!=='battle'&&arenaMatch&&arenaMatch.winner!==null){clearArenaResult();arenaMatch=null;onlineRoom=null;arenaMessage='';}if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','battle','leaderboard','opening','item'].includes(next)?next:'packs';search='';confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
+function clearAnimation(audioOptions){
+ cancelAnimationFrame(wheelAudioFrame);
+ stopEffects(audioOptions);
+ timers.forEach(clearTimeout);
+ timers=[];
+ clearTimeout(carouselTimer);
+}
+function go(next){
+ stopWinMusic();
+ // The tap that triggered navigation is already playing when this runs.
+ const audioOptions={keepClick:true};
+ if(view==='opening'&&next!=='opening'){
+  clearAnimation(audioOptions);
+  pending=null;
+  phase='sealed';
+ }else stopEffects(audioOptions);
+ if(view==='battle'&&next!=='battle'&&arenaMatch&&arenaMatch.winner!==null){
+  clearArenaResult();
+  arenaMatch=null;
+  onlineRoom=null;
+  arenaMessage='';
+ }
+ view=['packs','vault','collection','profile','battle','leaderboard','opening','item'].includes(next)?next:'packs';
+ search='';confirmAction='';feedback='';notice('');
+ if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);
+ render();
+ window.scrollTo({top:0,behavior:'instant'});
+}
 function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='battle'?arenaView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();updateMoney();if(view==='battle')showArenaResult();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${kicker}</div><h1>${title}</h1></div></div>`;}
 function packArt(pack){
@@ -417,20 +443,20 @@ function sound(kind){
   if(!audioMix)return;
   const now=audioCtx.currentTime;
   if(kind==='pack-crinkle'&&now<packCrinkleUntil)return;
-  if(kind==='click'&&now-lastCueTime<.065)return;
-  lastCueTime=now;
+  if(kind==='click'){
+   if(now-lastClickTime<.07)return;
+   lastClickTime=now;
+  }
   const effectsBus=audioCtx.createGain();
   const cueSources=new Set();
   effectsBus.gain.value=CUE_GAIN[kind]??1;
   effectsBus.connect(audioMix);
-  effectBuses.add(effectsBus);
+  effectBuses.set(effectsBus,{kind,sources:cueSources});
 
   const trackEffect=source=>{
    cueSources.add(source);
-   effectSources.add(source);
    source.onended=()=>{
     cueSources.delete(source);
-    effectSources.delete(source);
     if(!cueSources.size&&effectBuses.delete(effectsBus))effectsBus.disconnect();
    };
   };
@@ -668,12 +694,14 @@ function reveal(){
  haptic(best>=4?[40,30,70]:30);
 
 }
-function stopEffects(){
- for(const source of effectSources){try{source.stop();source.disconnect();}catch{}}
- effectSources.clear();
- for(const bus of effectBuses)bus.disconnect();
- effectBuses.clear();
- lastCueTime=-Infinity;
+function stopEffects({keepClick=false}={}){
+ for(const [bus,{kind,sources}] of effectBuses){
+  if(keepClick&&kind==='click')continue;
+  effectBuses.delete(bus);
+  for(const source of sources){try{source.stop();source.disconnect();}catch{}}
+  bus.disconnect();
+ }
+ if(!keepClick)lastClickTime=-Infinity;
  packCrinkleUntil=0;
 }
 function stopWinMusic(){clearTimeout(winStopTimer);for(const source of winSources){try{source.stop();source.disconnect();}catch{}}winSources.clear();if(winMusicGain){try{winMusicGain.disconnect();}catch{}winMusicGain=null;}}
