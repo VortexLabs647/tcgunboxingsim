@@ -2933,15 +2933,177 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
 .arena-actions > *, .arena-reserves > * { flex:1 1 120px; padding:7px; }
 .join-room label { flex-basis:100%; }
 .join-room input { flex:1 1 145px; min-width:0; }
-.arena-board { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
-.fighter { display:grid; gap:6px; justify-items:center; text-align:center; padding:8px 5px; min-width:0; }
-.arena .fighter h2 { margin:0; font-size:.96rem; }
-.fighter .cartoon-card { width:min(84%,139px); height:auto; aspect-ratio:5 / 7; }
-.fighter progress { width:90%; height:12px; accent-color:#8aedb6; }
-.fighter strong { font-size:.83rem; }
-.fighter small { color:#e4d5ff; font-size:.71rem; }
-.arena-turn strong { color:#ffcf72; }
-.arena-hint { color:#dfcff3; font-size:.79rem; }
 .room-code { width:100%; margin:0 0 9px; font-family:monospace; }
 .card-training { margin-top:12px; }
 .card-training button { min-height:44px; }
+
+.arena-match { max-width:545px; }
+.arena-board {
+  --arena-violet:#eab0ff;
+  --arena-mint:#87f9d6;
+  position:relative;
+  isolation:isolate;
+  display:grid;
+  grid-template-rows:auto minmax(39px,8dvh) auto;
+  padding:clamp(10px,2dvh,20px) clamp(7px,3vw,18px);
+  overflow:hidden;
+  border:2px solid #8d72b5;
+  border-radius:24px;
+  background:
+    radial-gradient(ellipse at 50% 3%,#782fbe72,transparent 51%),
+    radial-gradient(ellipse at 50% 100%,#035b766b,transparent 53%),
+    linear-gradient(180deg,#16112a52,#15112ada 47%,#140e2a29),
+    url('crystal-canyon.webp') center 55% / cover #21183f;
+  box-shadow:inset 0 0 0 2px #18142e,0 6px 0 #141128;
+}
+.arena-lane {
+  position:absolute;
+  z-index:-1;
+  inset:8% 29%;
+  display:grid;
+  place-items:center;
+  color:#f3b5fc80;
+  clip-path:polygon(13% 0,87% 0,100% 100%,0 100%);
+  background:
+    repeating-linear-gradient(180deg,transparent 0 23px,#110d2f54 24px 26px),
+    linear-gradient(90deg,#241a45 0 5%,#a586c64f 6% 9%,#292042d9 10% 90%,#a586c64f 91% 94%,#241a45 95%);
+}
+.arena-lane span {
+  width:35px;
+  aspect-ratio:1;
+  transform:rotate(45deg) skew(-8deg,-8deg);
+  border:2px solid currentColor;
+  border-radius:7px;
+  background:#342451;
+  box-shadow:inset 0 0 0 5px #292042, inset 0 0 20px currentColor,0 0 18px #ea8cff3b;
+}
+.arena-team {
+  --team-accent:var(--arena-violet);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  gap:clamp(4px,2.5vw,13px);
+}
+.arena-team--player { --team-accent:var(--arena-mint); grid-row:3; }
+.arena-fighter-info {
+  min-width:0;
+  align-self:center;
+  padding:6px clamp(4px,1.7vw,10px);
+  border:1px solid color-mix(in srgb,var(--team-accent),transparent 55%);
+  border-left:3px solid var(--team-accent);
+  border-radius:8px 13px 13px 8px;
+  background:#1e1636f2;
+  box-shadow:0 3px 0 #13102aad;
+}
+.arena-fighter-info h2 { margin:0 0 2px; color:var(--team-accent); font-size:.85rem; }
+.arena-fighter-info strong { display:block; font-size:clamp(.73rem,2.8vw,1.02rem); line-height:1.12; overflow-wrap:anywhere; }
+.arena-fighter-info progress { display:block; width:100%; height:8px; margin-block:6px 4px; accent-color:var(--team-accent); }
+.arena-fighter-info small { display:block; color:#f0e8ff; font-size:clamp(.62rem,2.4vw,.78rem); line-height:1.2; }
+.arena-fighter {
+  grid-column:2;
+  display:grid;
+  justify-items:center;
+  gap:2px;
+  position:relative;
+  width:clamp(69px,min(27vw,14dvh),124px);
+  filter:drop-shadow(0 3px 1px #150c2c) drop-shadow(0 0 10px color-mix(in srgb,var(--team-accent),transparent 44%));
+}
+.arena-fighter::before {
+  content:'';
+  position:absolute;
+  z-index:-1;
+  inset:auto -16% -1% -16%;
+  height:16%;
+  border-radius:50%;
+  background:var(--team-accent);
+  outline:3px solid #30264b;
+  box-shadow:0 5px #18132d;
+}
+.arena-fighter[data-guard="true"] .cartoon-card { outline:3px solid #afffff; box-shadow:0 0 15px #99fbff; }
+.arena-fighter .cartoon-card { width:100%; height:auto; padding:clamp(3px,1vw,6px); }
+.arena-fighter .cartoon-card-edition { display:none; }
+.arena-fighter .cartoon-card-head { color:#25163d; }
+.arena-fighter .cartoon-card-name { overflow:hidden; text-overflow:ellipsis; color:#25163d; text-shadow:none; }
+.arena-fighter > b {
+  z-index:1;
+  margin-top:-10px;
+  padding:3px 7px;
+  border:2px solid #26203f;
+  border-radius:8px;
+  background:var(--team-accent);
+  color:#201538;
+  font-size:.73rem;
+  line-height:1;
+  white-space:nowrap;
+}
+.arena-backup { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px; }
+:root body .arena-team :is(button,span).arena-reserve {
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:clamp(35px,10vw,47px);
+  height:clamp(49px,14vw,65px);
+  padding:2px;
+  border:1px solid #a48bc0;
+  border-radius:8px;
+  background:#241b40;
+  box-shadow:0 2px 0 #130f2b;
+}
+:root body .arena-team button.arena-reserve:enabled { border-color:var(--arena-mint); }
+.arena-reserve[data-defeated="true"] { opacity:.45; }
+.arena-reserve .cartoon-card { width:100%; height:100%; padding:2px; border-radius:5px; }
+.arena-reserve .cartoon-card-art { border-width:1px; border-radius:3px; }
+.arena-reserve :is(.cartoon-card-head,.cartoon-card-name,.cartoon-card-edition) { display:none; }
+.arena-match .arena-turn { display:flex; flex-wrap:wrap; gap:4px 9px; align-items:center; min-height:23px; margin:12px 0 7px; font-size:.86rem; }
+.arena-turn strong { color:#ffdb91; }
+.arena-match .arena-actions { display:grid; grid-template-columns:3fr 2fr; margin:8px 0; }
+:root body .arena-match [data-id="strike"] { --control-light:#fff3b8; --control-fill:#ffca70; }
+:root body .arena-match [data-id="guard"] { --control-light:#dcfaff; --control-fill:#92c8ff; }
+.arena-hint { color:#dfcff3; font-size:.79rem; }
+.arena-effects { position:absolute; inset:0; pointer-events:none; z-index:3; }
+.arena-effect { position:absolute; translate:-50% -50%; }
+.arena-effect[data-color="mint"] { --effect-color:#6dffcc; }
+.arena-effect[data-color="violet"] { --effect-color:#e69cff; }
+.arena-effect--shot { width:36px; height:60px; filter:drop-shadow(0 0 8px var(--effect-color)); }
+.arena-effect--shot::before {
+  content:'';
+  display:block;
+  width:100%; height:100%;
+  background:linear-gradient(180deg,#fffbd7,var(--effect-color) 35%,transparent);
+  clip-path:polygon(50% 0,90% 19%,100% 32%,67% 50%,55% 100%,37% 61%,0 35%,12% 16%);
+}
+.arena-effect--shot[data-direction="down"]::before { rotate:180deg; }
+.arena-effect--burst {
+  width:90px; aspect-ratio:1;
+  background:radial-gradient(#fffbe0 0 17%,var(--effect-color) 26% 48%,#ffda9b);
+  clip-path:polygon(51% 0,59% 29%,83% 8%,76% 35%,100% 38%,80% 57%,99% 79%,69% 73%,63% 100%,50% 74%,25% 91%,28% 66%,0 57%,23% 44%,4% 17%,34% 32%);
+}
+.arena-effect--damage {
+  z-index:1;
+  color:#fff1a9;
+  font:900 clamp(30px,9vw,45px)/1 Fredoka,sans-serif;
+  -webkit-text-stroke:1px #2c153d;
+  text-shadow:0 3px 0 #291639,0 0 12px #ff645d;
+}
+.arena-effect--shield,.arena-effect--swap {
+  display:grid;
+  place-items:center;
+  width:94px; aspect-ratio:1;
+  color:#fff;
+  border:3px solid #b2fff7;
+  border-radius:50%;
+  background:#82daf551;
+  box-shadow:inset 0 0 16px #c5ffff,0 0 17px #8ae8f9;
+  text-shadow:0 2px 3px #221343,0 0 5px #24215f;
+  font-weight:900;
+}
+.arena-effect--swap { border-color:var(--effect-color); background:#39294ad9; }
+@media (max-height:690px) {
+  .arena-board { grid-template-rows:auto minmax(26px,6dvh) auto; }
+  .arena-match .arena-header { margin-bottom:7px; }
+}
+@media (max-height:630px) and (max-width:900px) {
+  .arena-board { grid-template-rows:auto minmax(23px,4dvh) auto; padding-block:9px; }
+  .arena-fighter { width:clamp(62px,min(28vw,11.8dvh),100px); }
+  .arena-match .arena-turn { margin-top:8px; }
+}

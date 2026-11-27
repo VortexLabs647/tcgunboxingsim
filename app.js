@@ -13,7 +13,7 @@ const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
 // Match short, frequency-weighted listening levels across the game's sound cues.
-const CUE_GAIN = {tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
+const CUE_GAIN = {'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -427,6 +427,14 @@ function sound(kind){
     tone(460,0,.055,.02,'triangle');
     tone(620,.025,.04,.012);
     break;
+   case 'arena-hit':
+    tone(205,0,.14,.056,'triangle',73);
+    tone(1250,0,.066,.028,'triangle',510);
+    break;
+   case 'arena-guard':
+    tone(560,0,.09,.033,'triangle');
+    tone(835,.035,.13,.028,'sine');
+    break;
    case 'wheel':
     tone(310,0,.034,.022,'triangle',155);
     tone(2280,0,.026,.018,'triangle',1300);
@@ -768,28 +776,114 @@ function battleBoard(){
  const match=arenaMatch,side=onlineRoom?.side??0,other=1-side;
  const own=match.teams[side][match.active[side]];
  const canMove=!arenaBusy&&match.winner===null&&match.turn===side;
+ const note=match.note.replace(/^Team ([12])\b/,(_,team)=>Number(team)-1===side?'You':'Opponent');
  const status=match.winner!==null?(match.winner===side?'You won!':'Opponent wins.'):match.turn===side?'Your turn':'Opponent’s turn';
- const fighter=(team,title)=>{
+ const roster=(team,position,title)=>{
   const card=match.teams[team][match.active[team]];
   const item=byId[card.itemId];
-  return `<article class="content-card fighter"><h2>${title}</h2>
-   ${item?cardImage(item):'<span>Rock card</span>'}<strong>${escape(item?.name||'Rock')}</strong>
+  return `<article class="arena-team arena-team--${position}" data-arena-team="${team}">
+   <div class="arena-fighter-info"><h2>${title}</h2><strong>${escape(item?.name||'Rock')}</strong>
    <progress max="${card.maxHp}" value="${card.hp}" aria-label="${title} health"></progress>
-   <small>${card.hp}/${card.maxHp} HP · ${card.damage} ATK${card.guard?' · Guarded':card.focus?' · Focused':''}</small>
+   <small>${card.hp}/${card.maxHp} HP${card.guard?' · Guarded':card.focus?' · Focused':''}</small></div>
+   <div class="arena-fighter" data-guard="${card.guard}">${item?cardImage(item):'<span>Rock card</span>'}<b>${card.damage+(card.focus?3:0)} ATK</b></div>
+   <div class="arena-backup" aria-label="${title} reserves">${match.teams[team].map((card,index)=>{
+    if(index===match.active[team])return '';
+    const reserve=byId[card.itemId];
+    const art=reserve?cardImage(reserve):'<span>Rock card</span>';
+    const label=`${reserve?.name||'Rock'} · ${card.hp} HP`;
+    return team===side&&match.winner===null?`<button class="arena-reserve" data-action="arena-move" data-id="swap" data-target="${index}" aria-label="Switch to ${escape(label)}" title="Switch to ${escape(label)}" ${canMove&&card.hp>0?'':'disabled'}>${art}</button>`:
+     `<span class="arena-reserve" data-defeated="${card.hp===0}" title="${escape(label)}">${art}</span>`;
+   }).join('')}</div>
   </article>`;
  };
- return `<section class="arena">
-  <div class="arena-header"><h1>${onlineRoom?'Private match':'AI battle'}</h1><button class="secondary" data-action="arena-leave">${match.winner===null?'Leave':'Done'}</button></div>
-  <div class="arena-board">${fighter(side,'Your rock')}${fighter(other,'Opponent')}</div>
-  <p class="arena-turn" role="status"><strong>${status}</strong> <span>${escape(arenaMessage||match.note)}</span></p>
+ return `<section class="arena arena-match">
+  <div class="arena-header"><h1>${onlineRoom?'Private match':'Rock Arena'}</h1><button class="secondary" data-action="arena-leave">${match.winner===null?'Leave':'Done'}</button></div>
+  <div class="arena-board" aria-label="Battlefield">${roster(other,'opponent',onlineRoom?'Opponent':'AI')}
+   <div class="arena-lane" aria-hidden="true"><span></span></div>
+   ${roster(side,'player','You')}<div class="arena-effects" aria-hidden="true"></div>
+  </div>
+  <p id="arenaStatus" class="arena-turn" role="status"><strong>${status}</strong> <span>${escape(arenaMessage||note)}</span></p>
   ${match.winner===null?`<div class="arena-actions">
    <button class="primary" data-action="arena-move" data-id="strike" ${canMove?'':'disabled'}>Strike · ${own.damage+(own.focus?3:0)}</button>
    <button class="secondary" data-action="arena-move" data-id="guard" ${canMove&&!own.focus?'':'disabled'}>Guard</button>
   </div>
-  ${match.teams[side].length>1?`<div class="arena-reserves">${match.teams[side].map((card,index)=>
-   index===match.active[side]?'':`<button class="secondary" data-action="arena-move" data-id="swap" data-target="${index}" ${canMove&&card.hp>0?'':'disabled'}>Switch · ${escape(byId[card.itemId]?.name||'Rock')} · ${card.hp} HP</button>`).join('')}</div>`:''}
-  <p class="arena-hint">Guard cuts the next hit in half and adds 3 damage to your next strike. Switching uses a turn.</p>`:''}
+  <p class="arena-hint">Guard halves the next hit and adds 3 damage to your next strike.${match.teams[side].length>1?' Tap a reserve card to switch.':''}</p>`:''}
  </section>`;
+}
+function lockArenaActions(){
+ for(const button of $$('[data-action="arena-move"]'))button.disabled=true;
+}
+function arenaAnimation(element,keyframes,duration,easing='ease-out'){
+ return element.animate(keyframes,{duration,easing,fill:'none'}).finished.catch(()=>{});
+}
+async function animateArenaMove(before,after){
+ if(view!=='battle'||document.hidden||after?.revision!==before?.revision+1||before.winner!==null)return;
+ const effects=$('.arena-effects');
+ if(!effects?.animate)return;
+ const side=before.turn,other=1-side;
+ const actor=$(`[data-arena-team="${side}"] .arena-fighter`);
+ const rival=$(`[data-arena-team="${other}"] .arena-fighter`);
+ if(!actor||!rival)return;
+ const own=before.teams[side][before.active[side]];
+ const target=before.teams[other][before.active[other]];
+ const loss=target.hp-after.teams[other][before.active[other]].hp;
+ const switched=before.active[side]!==after.active[side];
+ const guarded=!own.focus&&after.teams[side][before.active[side]].guard;
+ if(!(loss>0||switched||guarded))return;
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const color=actor.closest('.arena-team--player')?'mint':'violet';
+ const board=effects.getBoundingClientRect();
+ const center=element=>{
+  const rect=element.getBoundingClientRect();
+  return {x:rect.left+rect.width/2-board.left,y:rect.top+rect.height/2-board.top};
+ };
+ const spawn=(className,position,label='')=>{
+  const effect=document.createElement('span');
+  effect.className='arena-effect arena-effect--'+className;
+  effect.dataset.color=color;
+  effect.style.left=position.x+'px';
+  effect.style.top=position.y+'px';
+  effect.textContent=label;
+  effects.append(effect);
+  return effect;
+ };
+ const from=center(actor),to=center(rival);
+ if(loss>0){
+  const direction=Math.sign(to.y-from.y);
+  if(!reduced){
+   const projectile=spawn('shot',from);
+   projectile.dataset.direction=direction>0?'down':'up';
+   const travel=`translate(${to.x-from.x}px,${to.y-from.y}px)`;
+   await Promise.all([
+    arenaAnimation(actor,[{transform:'translateY(0)'},{transform:`translateY(${-direction*9}px)`,offset:.26},{transform:`translateY(${direction*13}px)`,offset:.56},{transform:'translateY(0)'}],310),
+    arenaAnimation(projectile,[{opacity:0,transform:'scale(.4)'},{opacity:1,offset:.27},{opacity:1,transform:travel+' scale(1.08)'}],280,'cubic-bezier(.64,.04,.9,.48)')
+   ]);
+   projectile.remove();
+  }
+  if(!effects.isConnected)return;
+  const remaining=after.teams[other][before.active[other]].hp;
+  const meter=$('progress',rival.closest('.arena-team'));
+  meter.value=remaining;
+  $('small',rival.closest('.arena-team')).textContent=`${remaining}/${target.maxHp} HP${target.focus?' · Focused':''}`;
+  rival.dataset.guard='false';
+  sound('arena-hit');
+  const damage=spawn('damage',to,`−${loss}`);
+  const impact=spawn(target.guard?'shield':'burst',to);
+  await Promise.all([
+   arenaAnimation(rival,reduced?[{filter:'brightness(1.4)'},{filter:'none'}]:[
+    {transform:`translateY(${direction*11}px) rotate(${direction*7}deg)`,filter:'brightness(1.65)'},
+    {transform:'translateY(-2px) rotate(-3deg)',offset:.48},{transform:'none',filter:remaining?'none':'grayscale(.8)'}],reduced?170:295),
+   arenaAnimation(damage,reduced?[{opacity:1},{opacity:1}]:[{opacity:1,transform:'translateY(3px) scale(.85)'},{opacity:1,transform:'translateY(-22px) scale(1.13)',offset:.45},{opacity:0,transform:'translateY(-46px)'}],reduced?260:430),
+   arenaAnimation(impact,reduced?[{opacity:.8},{opacity:0}]:[{opacity:1,scale:.38},{opacity:0,scale:1.5,rotate:'28deg'}],reduced?180:340)
+  ]);
+  damage.remove();
+  impact.remove();
+ }else{
+  sound('arena-guard');
+  const effect=spawn(guarded?'shield':'swap',from,guarded?'GUARD':'SWITCH');
+  await arenaAnimation(effect,reduced?[{opacity:1},{opacity:0}]:[{opacity:.3,scale:.74},{opacity:1,scale:1.06,offset:.32},{opacity:0,scale:1.2}],reduced?160:380);
+  effect.remove();
+ }
 }
 async function onlineAction(operation,extra={}){
  const cloud=battleCloud();
@@ -798,8 +892,9 @@ async function onlineAction(operation,extra={}){
   $('#arenaStatus').textContent='Enter the 16-character room code.';
   return;
  }
- const account=cloud.user.id;
+ const account=cloud.user.id,previousRoom=onlineRoom,previousMatch=arenaMatch;
  arenaBusy=true;
+ if(operation==='move')lockArenaActions();
  try {
   if(['create','join'].includes(operation)){
    if(!cloud.canPlay||!await cloud.flush())throw Error('Sync your cards first.');
@@ -808,6 +903,10 @@ async function onlineAction(operation,extra={}){
   const result=await cloud.battle({operation,room_code:onlineRoom?.code,...extra});
   if(cloud.user?.id!==account)return;
   const changed=onlineRoom?.waiting!==result?.waiting||arenaMatch?.revision!==result?.match?.revision||arenaMatch?.winner!==result?.match?.winner;
+  if(previousMatch&&previousRoom?.code===result?.code&&!result.waiting){
+   await animateArenaMove(previousMatch,result.match);
+   if(cloud.user?.id!==account||onlineRoom!==previousRoom)return;
+  }
   onlineRoom=result;
   arenaMatch=result&&!result.waiting?result.match:null;
   const hadMessage=!!arenaMessage;
@@ -822,17 +921,38 @@ async function onlineAction(operation,extra={}){
    onlineRoom=null;arenaMatch=null;
    if(view==='battle')render();
   }
-  const status=$('#arenaStatus,.arena-turn span');
+  if(view==='battle'&&operation==='move'){arenaBusy=false;render();}
+  const status=$('.arena-turn span,#arenaStatus:not(.arena-turn)');
   if(status)status.textContent=arenaMessage;
  }finally{arenaBusy=false;}
 }
-function battleMove(action,target){
+async function battleMove(action,target){
+ if(arenaBusy||!arenaMatch)return;
  if(onlineRoom){
-  onlineAction('move',{action,target,expected:arenaMatch?.revision});
- }else if(arenaMatch&&A.move(arenaMatch,0,action,target)){
-  if(arenaMatch.winner===null)A.aiMove(arenaMatch);
-  sound(arenaMatch.winner===0?'land':'tick');
-  render();
+  onlineAction('move',{action,target,expected:arenaMatch.revision});
+  return;
+ }
+ const before=arenaMatch,playerMatch=structuredClone(before);
+ if(!A.move(playerMatch,0,action,target))return;
+ arenaBusy=true;
+ lockArenaActions();
+ try{
+  await animateArenaMove(before,playerMatch);
+  if(arenaMatch!==before)return;
+  arenaMatch=playerMatch;
+  if(view==='battle')render();
+  if(playerMatch.winner===null){
+   const enemyMatch=structuredClone(playerMatch);
+   if(A.aiMove(enemyMatch)){
+    await animateArenaMove(playerMatch,enemyMatch);
+    if(arenaMatch!==playerMatch)return;
+    arenaMatch=enemyMatch;
+   }
+  }
+  if(arenaMatch.winner===0&&view==='battle')sound('land');
+ }finally{
+  arenaBusy=false;
+  if(view==='battle'&&arenaMatch)render();
  }
 }
 function leaveArena(){
