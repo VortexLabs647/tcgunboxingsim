@@ -18,7 +18,14 @@ const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='idle',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
 function selectedPack(){return packs[selectedIndex];}
-function notice(message){$('#status').textContent=message;}
+function notice(message){
+ if(view==='battle'){
+  const status=$('.arena-turn span,#arenaStatus:not(.arena-turn)');
+  if(status&&message)status.textContent=message;
+  return;
+ }
+ $('#status').textContent=message;
+}
 function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
 function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
@@ -51,6 +58,7 @@ function updateMoney(){
 }
 let incomeNeedsSave=false,lastIncomeSave=0,incomeNoticeTimer,rockNoticeTimer;
 function showAwayIncome(earned){
+ if(view==='battle')return;
  const message='Rocks earned '+money(earned)+' while you were away.';
  notice(message);
  clearTimeout(incomeNoticeTimer);
@@ -760,11 +768,11 @@ const battleCloud=()=>window.TCGCloud;
 
 function arenaView(){
  if(onlineRoom?.waiting)return `<section class="arena content-card">
-  <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} cards.</p>
+  <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} ${onlineRoom.match.teams[0].length===1?'card':'cards'}.</p>
   <input class="room-code" readonly aria-label="Room code" value="${escape(onlineRoom.joinCode||onlineRoom.code)}">
   <button class="secondary" data-action="arena-copy">Copy code</button>
   <button class="secondary" data-action="arena-leave">Close room</button>
-  <p id="arenaStatus" role="status">${escape(arenaMessage||'Waiting for Player 2…')}</p>
+  <p id="arenaStatus" role="status">${escape(arenaMessage||'Waiting for your opponent…')}</p>
  </section>`;
  if(arenaMatch)return arenaMatch.winner===null?battleBoard():battleResult();
 
@@ -793,10 +801,10 @@ function teamOptions(){
  const cards=state.vault.filter(card=>byId[card.itemId]?.name.toLowerCase().includes(query));
  return cards.map(card=>{
   const {damage,hp}=E.cardStats(card);
-  const ability=A.abilityFor(card);
+  const moves=A.movesFor(card);
   const equipped=arenaTeam.has(card.uid);
   return `<button class="secondary team-option" data-action="arena-pick" data-id="${escape(card.uid)}" aria-pressed="${equipped}">
-   ${cardImage(byId[card.itemId])}<span><b>${escape(byId[card.itemId].name)}</b><small>Lv ${E.cardLevel(card)} · ${damage} ATK · ${hp} HP</small><small>${ability.name}</small><small class="team-equipped" aria-hidden="true">${equipped?'✓ Equipped':'＋ Equip'}</small></span></button>`;
+   ${cardImage(byId[card.itemId])}<span><b>${escape(byId[card.itemId].name)}</b><small>Lv ${E.cardLevel(card)} · ${damage} ATK · ${hp} HP</small><small>${escape(moves.attack)}</small><small>${escape(moves.special)}</small><small class="team-equipped" aria-hidden="true">${equipped?'✓ Equipped':'＋ Equip'}</small></span></button>`;
  }).join('')||'<p>No matching cards.</p>';
 }
 function pickArenaCard(uid){
@@ -835,9 +843,11 @@ function aiBattle(){
 function battleBoard(){
  const match=arenaMatch,side=onlineRoom?.side??0,other=1-side;
  const own=match.teams[side][match.active[side]];
- const ability=match.rules===2?A.abilityFor(own):null;
+ const rival=match.teams[other][match.active[other]];
+ const ability=match.rules>=2?A.abilityFor(own,match.rules):null;
+ const attack=match.rules===3?A.movesFor(own).attack:'Strike';
  const canMove=!arenaBusy&&match.winner===null&&match.turn===side;
- const note=match.note.replace(/^Team ([12])\b/,(_,team)=>Number(team)-1===side?'You':'Opponent');
+ const note=A.battleNote(match,side);
  const status=match.winner!==null?(match.winner===side?'You won!':'Opponent wins.'):match.turn===side?'Your turn':'Opponent’s turn';
  const roster=(team,position,title)=>{
   const card=match.teams[team][match.active[team]];
@@ -865,11 +875,11 @@ function battleBoard(){
   </div>
   <p id="arenaStatus" class="arena-turn" role="status"><strong>${status}</strong> <span>${escape(arenaMessage||note)}</span></p>
   ${match.winner===null?`<div class="arena-actions" data-abilities="${!!ability}">
-   <button class="primary" data-action="arena-move" data-id="strike" ${canMove?'':'disabled'}>Strike · ${own.damage+(own.focus?3:0)}</button>
+   <button class="primary" data-action="arena-move" data-id="strike" ${canMove?'':'disabled'}><span>${escape(attack)}</span><small>${A.attackPower(own,rival,match.rules)} power</small></button>
    <button class="secondary" data-action="arena-move" data-id="guard" ${canMove&&!own.focus?'':'disabled'} title="Halves the next hit and adds 3 damage to your next strike">Guard</button>
-   ${ability?`<button class="secondary" data-action="arena-move" data-id="ability" aria-describedby="abilityDescription" ${canMove&&A.canUseAbility(own)?'':'disabled'}>${ability.name}${own.abilityUsed?' · Used':''}</button>`:''}
+   ${ability?`<button class="secondary" data-action="arena-move" data-id="ability" aria-describedby="abilityDescription" ${canMove&&A.canUseAbility(own,match.rules)?'':'disabled'}><span>${escape(ability.name)}</span>${own.abilityUsed?'<small>Used</small>':''}</button>`:''}
   </div>
-  ${ability?`<p class="arena-hint" id="abilityDescription">${ability.description} Once per card.</p>`:'<p class="arena-hint">Guard halves the next hit and adds 3 damage to your next strike.</p>'}`:''}
+  ${ability?`<p class="arena-hint" id="abilityDescription">${ability.description} Once per battle for each card.</p>`:'<p class="arena-hint">Guard halves the next hit and adds 3 damage to your next strike.</p>'}`:''}
  </section>`;
 }
 function battleResult(){
@@ -879,7 +889,7 @@ function battleResult(){
  const reason=match.note==='Opponent left the match.'?'Your opponent left the match.':won?'Your team won the battle.':'The opposing team won the battle.';
  return `<section class="arena arena-result" data-won="${won}" aria-labelledby="battleOutcome">
   <div class="arena-result-art">${art?cardImage(art):''}</div>
-  <h1 id="battleOutcome" tabindex="-1">${won?'You won!':'You lost'}</h1>
+  <h1 id="battleOutcome" tabindex="-1">${won?'You won!':'You lost.'}</h1>
   <p>${reason}</p>
   <div class="arena-actions">
    ${won?'<button class="primary" data-action="packs">Back to Packs</button>':`${onlineRoom?'':'<button class="primary" data-action="arena-ai">Play again</button>'}<button class="secondary" data-action="arena-leave">Back to Battle</button>`}
@@ -925,7 +935,8 @@ async function animateArenaMove(before,after){
  const target=before.teams[other][before.active[other]];
  const nextOwn=after.teams[side][before.active[side]],nextTarget=after.teams[other][before.active[other]];
  const loss=target.hp-nextTarget.hp,healed=nextOwn.hp-own.hp;
- const ability=after.lastMove?.ability?A.abilityFor(own):null;
+ const ability=after.lastMove?.ability?A.abilityFor(own,before.rules):null;
+ const style=before.rules===3?A.movesFor(own).style:null;
  const switched=before.active[side]!==after.active[side];
  const guarded=nextOwn.guard&&(!own.focus||!own.guard);
  if(!(ability||loss>0||switched||guarded))return;
@@ -941,6 +952,7 @@ async function animateArenaMove(before,after){
   effect.className='arena-effect arena-effect--'+className;
   effect.dataset.color=color;
   if(ability)effect.dataset.ability=ability.id;
+  else if(style)effect.dataset.strike=style;
   effect.style.left=position.x+'px';
   effect.style.top=position.y+'px';
   effect.textContent=label;
@@ -977,6 +989,7 @@ async function animateArenaMove(before,after){
   }
   if(!effects.isConnected)return;
   const remaining=nextTarget.hp;
+  updateFighter(actor,nextOwn);
   updateFighter(rival,nextTarget);
   sound('arena-hit');
   const damage=spawn('damage',to,`−${loss}`);

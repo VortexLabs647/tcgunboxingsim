@@ -46,6 +46,76 @@ as $$
 $$;
 revoke all on function rock_arena.deck(uuid,text[]) from public,anon,authenticated;
 
+-- Mineral move names and effects match the player-facing list in arena.js.
+create or replace function rock_arena.moves_for(item_id text)
+returns table(attack text, special text, effect text)
+language sql immutable set search_path=pg_catalog
+as $$
+ with mineral as (
+  select regexp_replace(substr(item_id,6),'-(sunlit|frost|ember|moonlit)$','') as name,
+   case
+    when item_id like '%-sunlit' then 'Solar '
+    when item_id like '%-frost' then 'Icy '
+    when item_id like '%-ember' then 'Blazing '
+    when item_id like '%-moonlit' then 'Lunar '
+    else ''
+   end as prefix
+ )
+ select mineral.prefix||coalesce(m.attack,'Rock Strike'),
+  mineral.prefix||coalesce(m.special,'Crystal Shell'),coalesce(m.effect,'bulwark')
+ from mineral left join (values
+  ('granite','Bedrock Bash','Mountain Mantle','bulwark'),
+  ('sandstone','Dune Sweep','Dune Rebuild','renew'),
+  ('basalt','Lava Roll','Caldera Crash','meteor'),
+  ('calcite','Double Ray','Facet Split','fracture'),
+  ('agate','Band Whip','Ribbon Draw','prism'),
+  ('opal','Color Ripple','Rainbow Return','prism'),
+  ('fluorite','Cube Volley','Cleavage Wave','fracture'),
+  ('jasper','Red Mesa Ram','Mesa Rampart','bulwark'),
+  ('amethyst','Violet Volley','Geode Bloom','renew'),
+  ('sapphire','Blue Comet','Cobalt Break','fracture'),
+  ('emerald','Canopy Lance','Green Spring','renew'),
+  ('pyrite','Gilded Rattle','Fool’s Flare','meteor'),
+  ('obsidian','Glass Sweep','Blackglass Edge','fracture'),
+  ('diamond','Brilliant Glint','Adamant Cut','fracture'),
+  ('garnet','Crimson Pulse','Scarlet Surge','meteor'),
+  ('tourmaline','Color Column','Rift Current','prism'),
+  ('chalk','Dust Dash','Powder Patch','renew'),
+  ('rose-quartz','Petal Pulse','Rosestone Rest','renew'),
+  ('azurite','Azure Ripple','Blue Vein Draw','prism'),
+  ('malachite','Verdant Spiral','Coiled Shell','bulwark'),
+  ('smoky-quartz','Mist Jab','Smokescreen Shell','bulwark'),
+  ('citrine','Amber Flash','Honeylight Flare','meteor'),
+  ('marble','Veined Ram','Pillar Brace','bulwark'),
+  ('slate','Shingle Sweep','Sheet Split','fracture'),
+  ('tiger-eye','Cat’s-Eye Glint','Golden Pounce','meteor'),
+  ('lapis-lazuli','Star Fleck','Midnight Absorb','prism'),
+  ('lepidolite','Mica Flutter','Lilac Mend','renew'),
+  ('copper','Copper Coil','Conductive Draw','prism'),
+  ('cinnabar','Vermilion Flick','Red Sparkfall','meteor'),
+  ('peridot','Olivine Skim','Meadow Recharge','renew'),
+  ('onyx','Shadow Slab','Nocturne Wall','bulwark'),
+  ('labradorite','Spectral Sweep','Aurora Return','prism'),
+  ('desert-rose','Gypsum Gust','Sand Petal Shelter','bulwark'),
+  ('galena','Silver Clatter','Leadline Crack','fracture'),
+  ('bismuth','Staircase Skip','Hopper Guard','bulwark'),
+  ('rutilated-quartz','Gold Thread','Needle Ray','fracture'),
+  ('pumice','Foam Skip','Floating Rebound','renew'),
+  ('magnetite','Lodestone Tug','Polar Pull','prism'),
+  ('celestite','Sky Shard','Cloudwell','renew'),
+  ('bornite','Peacock Sweep','Iridescent Burst','meteor'),
+  ('serpentinite','Serpent Slide','Scale Shield','bulwark'),
+  ('rhodonite','Pink Fault','Manganese Mend','renew'),
+  ('sugilite','Grape Glimmer','Purple Tide','prism'),
+  ('turquoise','Canyon Dart','Oasis Refill','renew'),
+  ('moonstone','Adularia Arc','Tidal Return','prism'),
+  ('morganite','Peach Beam','Dawn Shelter','bulwark'),
+  ('aquamarine','Sea Spray','Breaker Surge','meteor'),
+  ('spinel','Octahedral Snap','Vertex Break','fracture')
+ ) as m(name,attack,special,effect) on m.name=mineral.name
+$$;
+revoke all on function rock_arena.moves_for(text) from public,anon,authenticated;
+
 create or replace function rock_arena.play(
  operation text, room_code text, cards text[], action text, target integer, expected integer
 ) returns jsonb
@@ -68,6 +138,8 @@ declare
  ability integer;
  ability_id text;
  ability_name text;
+ moves record;
+ named_moves boolean;
  bonus integer;
  healed integer;
  detail text;
@@ -95,7 +167,7 @@ begin
     insert into rock_arena.rooms(code,join_code,host,match)
     values(left(replace(gen_random_uuid()::text,'-',''),16),lpad(floor(random()*10000)::int::text,4,'0'),actor,
      jsonb_build_object('teams',jsonb_build_array(team,'[]'::jsonb),'active',jsonb_build_array(0,0),
-      'turn',0,'revision',0,'rules',2,'winner',null,'note','Waiting for Player 2.'))
+      'turn',0,'revision',0,'rules',3,'winner',null,'note','Waiting for your opponent.'))
     on conflict do nothing returning * into room;
     exit when found;
    end loop;
@@ -162,11 +234,19 @@ begin
    rival_path:=array['teams',other::text,rival_active::text];
    own:=game#>own_path;
    rival:=game#>rival_path;
-   if action='ability' and game->>'rules'='2' and not coalesce((own->>'abilityUsed')::boolean,false) then
-    select sum(ascii(substr(own->>'itemId',n,1))) % 5 into ability
-    from generate_series(1,length(own->>'itemId')) as letters(n);
-    ability_id:=(array['fracture','meteor','renew','bulwark','prism'])[ability+1];
-    ability_name:=(array['Fracture','Meteor Crash','Crystal Renewal','Crystal Shell','Prism Siphon'])[ability+1];
+   named_moves:=coalesce(game->>'rules'='3',false);
+   if named_moves then select * into moves from rock_arena.moves_for(own->>'itemId'); end if;
+   if action='ability' and game->>'rules' in ('2','3') and not coalesce((own->>'abilityUsed')::boolean,false) then
+    if named_moves then
+     ability_id:=moves.effect;
+     ability_name:=moves.special;
+     ability:=array_position(array['fracture','meteor','renew','bulwark','prism'],ability_id)-1;
+    else
+     select sum(ascii(substr(own->>'itemId',n,1))) % 5 into ability
+     from generate_series(1,length(own->>'itemId')) as letters(n);
+     ability_id:=(array['fracture','meteor','renew','bulwark','prism'])[ability+1];
+     ability_name:=(array['Fracture','Meteor Crash','Crystal Renewal','Crystal Shell','Prism Siphon'])[ability+1];
+    end if;
     bonus:=(array[2,4,0,0,1])[ability+1];
     healed:=least((own->>'maxHp')::int-(own->>'hp')::int,(array[0,0,5,2,3])[ability+1]);
     if bonus=0 and healed=0 and (ability<>3 or ((own->>'guard')::boolean and (own->>'focus')::boolean)) then
@@ -181,15 +261,34 @@ begin
     damage:=0;
     if action='strike' or bonus>0 then
      damage:=(own->>'damage')::int+case when (own->>'focus')::boolean then 3 else 0 end+coalesce(bonus,0);
+     if named_moves and action='strike' then
+      damage:=damage+case when
+       (moves.effect='fracture' and (rival->>'guard')::boolean) or
+       (moves.effect='meteor' and rival->>'hp'=rival->>'maxHp') or
+       (moves.effect='renew' and (own->>'hp')::int*2<=(own->>'maxHp')::int) or
+       (moves.effect='bulwark' and (own->>'guard')::boolean) or
+       (moves.effect='prism' and (rival->>'hp')::int*2<(rival->>'maxHp')::int)
+       then 1 else 0 end;
+     end if;
      if (rival->>'guard')::boolean and ability is distinct from 0 then damage:=(damage+1)/2; end if;
+     if named_moves then damage:=least(damage,(rival->>'hp')::int); end if;
      own:=own||jsonb_build_object('focus',false);
      rival:=rival||jsonb_build_object('guard',false,'hp',greatest(0,(rival->>'hp')::int-damage));
     end if;
     game:=jsonb_set(jsonb_set(game,own_path,own),rival_path,rival);
-    detail:=concat_ws(' · ',case when damage>0 then damage||' damage' end,
-     case when healed>0 then healed||' HP restored' end,case when ability=3 then 'shield raised' end);
-    if action='ability' then game:=game||jsonb_build_object('note',format('Team %s used %s. %s',side+1,ability_name,detail));
-    else game:=game||jsonb_build_object('note',format('Team %s struck. %s',side+1,detail)); end if;
+    if named_moves then
+     detail:=concat_ws(' ',format('Team %s used %s.',side+1,coalesce(ability_name,moves.attack)),
+      case when damage>0 then format('Dealt %s damage.',damage) end,
+      case when healed>0 then format('Restored %s HP.',healed) end,
+      case when ability=3 then 'Raised a shield.' end);
+    else
+     detail:=concat_ws(' ',case when action='ability' then format('Team %s used %s.',side+1,ability_name)
+                               else format('Team %s struck.',side+1) end,
+      case when damage>0 then format('Dealt %s damage.',damage) end,
+      case when healed>0 then format('Restored %s HP.',healed) end,
+      case when ability=3 then 'Raised a shield.' end);
+    end if;
+    game:=game||jsonb_build_object('note',detail);
     if (rival->>'hp')::int=0 then
      select min(ordinality::int)-1 into reserve
      from jsonb_array_elements(game#>array['teams',other::text]) with ordinality as slot(card,ordinality)
@@ -208,7 +307,7 @@ begin
     raise exception 'That action is unavailable.';
    end if;
    room.match:=game||jsonb_build_object('turn',other,'revision',expected+1,
-    'lastMove',jsonb_build_object('action',action,'ability',ability_id));
+    'lastMove',jsonb_build_object('action',action,'ability',ability_id,'side',side));
    update rock_arena.rooms set match=room.match,expires_at=now()+interval '2 hours' where code=room.code;
   elsif operation is null or operation not in ('state','join') then
    raise exception 'Unknown match action.';

@@ -2,37 +2,142 @@
 'use strict';
 
 const abilities=[
- {id:'fracture',name:'Fracture',description:'Strike for +2 damage through shields.',bonus:2,pierce:true},
- {id:'meteor',name:'Meteor Crash',description:'Strike for +4 damage.',bonus:4},
- {id:'renew',name:'Crystal Renewal',description:'Restore up to 5 HP.',heal:5},
- {id:'bulwark',name:'Crystal Shell',description:'Restore up to 2 HP, guard and focus.',heal:2,guard:true},
- {id:'prism',name:'Prism Siphon',description:'Strike for +1 damage and restore up to 3 HP.',bonus:1,heal:3}
+ {id:'fracture',name:'Fracture',description:'Deals 2 extra damage and bypasses shields.',bonus:2,pierce:true},
+ {id:'meteor',name:'Meteor Crash',description:'Deals 4 extra damage.',bonus:4},
+ {id:'renew',name:'Crystal Renewal',description:'Restores up to 5 HP.',heal:5},
+ {id:'bulwark',name:'Crystal Shell',description:'Restores up to 2 HP, raises a shield, and builds focus.',heal:2,guard:true},
+ {id:'prism',name:'Prism Siphon',description:'Deals 1 extra damage and restores up to 3 HP.',bonus:1,heal:3}
 ];
-function abilityFor(card){
+const minerals={
+ "granite":["Bedrock Bash","Mountain Mantle","bulwark"],
+ "sandstone":["Dune Sweep","Dune Rebuild","renew"],
+ "basalt":["Lava Roll","Caldera Crash","meteor"],
+ "calcite":["Double Ray","Facet Split","fracture"],
+ "agate":["Band Whip","Ribbon Draw","prism"],
+ "opal":["Color Ripple","Rainbow Return","prism"],
+ "fluorite":["Cube Volley","Cleavage Wave","fracture"],
+ "jasper":["Red Mesa Ram","Mesa Rampart","bulwark"],
+ "amethyst":["Violet Volley","Geode Bloom","renew"],
+ "sapphire":["Blue Comet","Cobalt Break","fracture"],
+ "emerald":["Canopy Lance","Green Spring","renew"],
+ "pyrite":["Gilded Rattle","Fool’s Flare","meteor"],
+ "obsidian":["Glass Sweep","Blackglass Edge","fracture"],
+ "diamond":["Brilliant Glint","Adamant Cut","fracture"],
+ "garnet":["Crimson Pulse","Scarlet Surge","meteor"],
+ "tourmaline":["Color Column","Rift Current","prism"],
+ "chalk":["Dust Dash","Powder Patch","renew"],
+ "rose-quartz":["Petal Pulse","Rosestone Rest","renew"],
+ "azurite":["Azure Ripple","Blue Vein Draw","prism"],
+ "malachite":["Verdant Spiral","Coiled Shell","bulwark"],
+ "smoky-quartz":["Mist Jab","Smokescreen Shell","bulwark"],
+ "citrine":["Amber Flash","Honeylight Flare","meteor"],
+ "marble":["Veined Ram","Pillar Brace","bulwark"],
+ "slate":["Shingle Sweep","Sheet Split","fracture"],
+ "tiger-eye":["Cat’s-Eye Glint","Golden Pounce","meteor"],
+ "lapis-lazuli":["Star Fleck","Midnight Absorb","prism"],
+ "lepidolite":["Mica Flutter","Lilac Mend","renew"],
+ "copper":["Copper Coil","Conductive Draw","prism"],
+ "cinnabar":["Vermilion Flick","Red Sparkfall","meteor"],
+ "peridot":["Olivine Skim","Meadow Recharge","renew"],
+ "onyx":["Shadow Slab","Nocturne Wall","bulwark"],
+ "labradorite":["Spectral Sweep","Aurora Return","prism"],
+ "desert-rose":["Gypsum Gust","Sand Petal Shelter","bulwark"],
+ "galena":["Silver Clatter","Leadline Crack","fracture"],
+ "bismuth":["Staircase Skip","Hopper Guard","bulwark"],
+ "rutilated-quartz":["Gold Thread","Needle Ray","fracture"],
+ "pumice":["Foam Skip","Floating Rebound","renew"],
+ "magnetite":["Lodestone Tug","Polar Pull","prism"],
+ "celestite":["Sky Shard","Cloudwell","renew"],
+ "bornite":["Peacock Sweep","Iridescent Burst","meteor"],
+ "serpentinite":["Serpent Slide","Scale Shield","bulwark"],
+ "rhodonite":["Pink Fault","Manganese Mend","renew"],
+ "sugilite":["Grape Glimmer","Purple Tide","prism"],
+ "turquoise":["Canyon Dart","Oasis Refill","renew"],
+ "moonstone":["Adularia Arc","Tidal Return","prism"],
+ "morganite":["Peach Beam","Dawn Shelter","bulwark"],
+ "aquamarine":["Sea Spray","Breaker Surge","meteor"],
+ "spinel":["Octahedral Snap","Vertex Break","fracture"]
+};
+const finishStyles={
+ sunlit:['Solar','sunlit'],frost:['Icy','frost'],ember:['Blazing','ember'],moonlit:['Lunar','moonlit']
+};
+function movesFor(card){
+ const mineral=card.itemId.slice(5);
+ const suffix=Object.keys(finishStyles).find(finish=>mineral.endsWith('-'+finish));
+ const base=suffix?mineral.slice(0,-suffix.length-1):mineral;
+ const moves=minerals[base];
+ if(!moves)return {attack:'Rock Strike',special:'Crystal Shell',effect:'bulwark',style:'stone'};
+ const [prefix,style]=finishStyles[suffix]||['','stone'];
+ return {attack:prefix?prefix+' '+moves[0]:moves[0],special:prefix?prefix+' '+moves[1]:moves[1],effect:moves[2],style};
+}
+function abilityFor(card,rules=3){
+ if(rules>=3){
+  const moves=movesFor(card);
+  return {...abilities.find(ability=>ability.id===moves.effect),name:moves.special};
+ }
+
  const key=[...card.itemId].reduce((sum,char)=>sum+char.charCodeAt(0),0);
  return abilities[key%abilities.length];
 }
-function canUseAbility(card){
- const ability=abilityFor(card);
+function canUseAbility(card,rules){
+ const ability=abilityFor(card,rules);
  return !card.abilityUsed&&(ability.bonus||card.hp<card.maxHp||(ability.guard&&(!card.guard||!card.focus)));
 }
-function hitDamage(own,rival,ability){
- const damage=own.damage+(own.focus?3:0)+(ability?.bonus||0);
- return rival.guard&&!ability?.pierce?Math.ceil(damage/2):damage;
+function moveNote(actor,name,damage,healed,guarded){
+ const effects=[
+  damage>0?'Dealt '+damage+' damage.':'',
+  healed>0?'Restored '+healed+' HP.':'',
+  guarded?'Raised a shield.':''
+ ].filter(Boolean);
+ return [actor+' used '+name+'.',...effects].join(' ');
+}
+function battleNote(match,side){
+ return match.note.replace(/^Team ([12]) (starts\.|.+)$/,(note,team,rest)=>{
+  const own=Number(team)-1===side;
+  if(rest==='starts.')return own?'You go first.':'Your opponent goes first.';
+  // Finish the sentences in older private rooms, too.
+  const parts=rest.split(/\.\s+/);
+  if(match.rules!==3&&parts.length>1){
+   parts[1]=parts[1].split(' · ').map(effect=>{
+    const damage=effect.match(/^(\d+) damage$/);
+    const heal=effect.match(/^(\d+) HP restored$/);
+    if(damage)return 'Dealt '+damage[1]+' damage.';
+    if(heal)return 'Restored '+heal[1]+' HP.';
+    return effect==='shield raised'?'Raised a shield.':effect;
+   }).join(' ');
+   rest=parts.join('. ');
+  }
+  return (own?'You':'Your opponent')+' '+rest;
+ });
+}
+function attackPower(own,rival,rules){
+ const base=own.damage+(own.focus?3:0);
+ if(rules<3||!rules)return base;
+ const effect=movesFor(own).effect;
+ const guardedHit=rival.guard&&effect==='fracture';
+ const bonus=(effect==='meteor'&&rival.hp===rival.maxHp)||
+  (effect==='renew'&&own.hp*2<=own.maxHp)||
+  (effect==='bulwark'&&own.guard)||
+  (effect==='prism'&&rival.hp*2<rival.maxHp);
+ return base+Number(guardedHit||bonus);
+}
+function hitDamage(own,rival,rules,ability){
+ const power=ability?own.damage+(own.focus?3:0)+ability.bonus:attackPower(own,rival,rules);
+ return rival.guard&&!ability?.pierce?Math.ceil(power/2):power;
 }
 function combatCard(card,engine){
  const {damage,hp}=engine.cardStats(card);
  return {itemId:card.itemId,level:engine.cardLevel(card),damage,hp,maxHp:hp,guard:false,focus:false};
 }
 function newMatch(first,second){
- return {teams:[first,second],active:[0,0],turn:0,revision:0,rules:2,winner:null,note:'Choose an action.'};
+ return {teams:[first,second],active:[0,0],turn:0,revision:0,rules:3,winner:null,note:'Choose an action.'};
 }
 function move(match,side,action,target){
  if(match.winner!==null||match.turn!==side)return false;
  const other=1-side;
  const own=match.teams[side][match.active[side]];
  const rival=match.teams[other][match.active[other]];
- const ability=action==='ability'&&match.rules===2&&canUseAbility(own)?abilityFor(own):null;
+ const ability=action==='ability'&&match.rules>=2&&canUseAbility(own,match.rules)?abilityFor(own,match.rules):null;
  let damage=0,healed=0;
  if(action==='strike'||ability){
   if(ability){
@@ -42,7 +147,7 @@ function move(match,side,action,target){
    if(ability.guard)own.guard=own.focus=true;
   }
   if(!ability||ability.bonus){
-   damage=hitDamage(own,rival,ability);
+   damage=Math.min(rival.hp,hitDamage(own,rival,match.rules,ability));
    own.focus=false;
    rival.guard=false;
    rival.hp=Math.max(0,rival.hp-damage);
@@ -52,8 +157,8 @@ function move(match,side,action,target){
     else match.active[other]=reserve;
    }
   }
-  const detail=[damage?`${damage} damage`:'',healed?`${healed} HP restored`:'',ability?.guard?'shield raised':''].filter(Boolean).join(' · ');
-  match.note=`Team ${side+1}${ability?' used '+ability.name:' struck'}. ${detail}`;
+  const name=ability?.name||movesFor(own).attack;
+  match.note=moveNote('Team '+(side+1),name,damage,healed,ability?.guard);
  }else if(action==='guard'&&!own.focus){
   own.guard=true;
   own.focus=true;
@@ -62,7 +167,7 @@ function move(match,side,action,target){
   match.active[side]=target;
   match.note=(side===0?'Team 1':'Team 2')+' switched rocks.';
  }else return false;
- match.lastMove={action,ability:ability?.id??null};
+ match.lastMove={action,ability:ability?.id??null,side};
  match.turn=other;
  match.revision++;
  return true;
@@ -70,10 +175,10 @@ function move(match,side,action,target){
 function aiMove(match){
  const own=match.teams[1][match.active[1]];
  const rival=match.teams[0][match.active[0]];
- const power=hitDamage(own,rival);
+ const power=hitDamage(own,rival,match.rules);
  if(rival.hp<=power)return move(match,1,'strike');
- if(match.rules===2&&canUseAbility(own)){
-  const ability=abilityFor(own);
+ if(match.rules>=2&&canUseAbility(own,match.rules)){
+  const ability=abilityFor(own,match.rules);
   if(ability.bonus||own.maxHp-own.hp>=3||(ability.guard&&own.hp<=rival.damage+2))return move(match,1,'ability');
  }
  if(own.focus)return move(match,1,'strike');
@@ -83,7 +188,7 @@ function aiMove(match){
  return move(match,1,'strike');
 }
 
-const arena={abilityFor,canUseAbility,combatCard,newMatch,move,aiMove};
+const arena={movesFor,attackPower,battleNote,abilityFor,canUseAbility,combatCard,newMatch,move,aiMove};
 if(typeof module!=='undefined'&&module.exports)module.exports=arena;
 else root.TCGArena=arena;
 })(typeof window==='undefined'?globalThis:window);

@@ -3401,3 +3401,11 @@ body .results-screen .result.rocks {
   .card-training button { flex:1 1 135px; padding-inline:8px; }
   .detail-lore { margin-top:9px; }
 }
+
+body[data-view="battle"] #status { display:none; }
+.arena-match .arena-actions button { flex-direction:column; gap:2px; }
+.arena-match .arena-actions small { font-size:.72em; }
+.arena-effect[data-strike="sunlit"] { --effect-color:#ffd776; }
+.arena-effect[data-strike="frost"] { --effect-color:#a2eaff; }
+.arena-effect[data-strike="ember"] { --effect-color:#ff9a72; }
+.arena-effect[data-strike="moonlit"] { --effect-color:#c4adff; }
