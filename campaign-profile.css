@@ -697,16 +697,98 @@ body #app .second-chance-offer {
   width:min(100%,620px);
   justify-self:center;
   min-height:40px;
-  background:linear-gradient(140deg,#c6fce3,#a5def0 55%,#e9bcf2);
-  color:#273348;
+  border:2px solid #452c69;
+  background:
+    linear-gradient(#ffffe85c,transparent 59%,#7e4a9e33),
+    linear-gradient(105deg,#ff929f 0%,#ffbe81 17%,#fff294 32%,#aff29c 49%,#8be7f7 66%,#b6adff 82%,#f4b5ef 100%);
+  color:#302042;
+  text-shadow:0 1px #fff9;
+  box-shadow:inset 0 2px #fff9,0 3px #26183d;
 }
 .second-chance-caption,.second-chance-outcome { margin:0; text-align:center; font-size:.82rem; color:#fff0da; }
 .second-chance-outcome .opening-result { margin:4px 0 0; }
-.second-chance-screen .wheel-disc::before {
-  background:radial-gradient(circle,transparent 46%,#ffd9bd54 74%,transparent 76%);
+body .opening-screen.spinning.second-chance-screen {
+  isolation:isolate;
+  background:
+    radial-gradient(ellipse 21% 8% at 0% 101%,#ddc4ff 97%,transparent 100%),
+    radial-gradient(ellipse 22% 9% at 100% 100%,#ddc4ff 97%,transparent 100%),
+    radial-gradient(ellipse 27% 10% at 6% 104%,#b794f7 97%,transparent 100%),
+    radial-gradient(ellipse 29% 11% at 96% 105%,#b794f7 97%,transparent 100%),
+    radial-gradient(ellipse at 50% 47%,#b459f0 5%,transparent 69%),
+    repeating-conic-gradient(from 15deg at 50% 47%,#8f56eb50 0 8deg,transparent 8deg 32deg),
+    linear-gradient(145deg,#3a2c90,#1e206c);
 }
-.second-chance-screen .wheel-slot:first-child .wheel-label { top:-25cqw; font-size:clamp(.54rem,4.5cqw,.98rem); text-wrap:balance; max-width:36cqw; }
-.second-chance-screen .wheel-slot:first-child .wheel-label b { white-space:normal; }
+.second-chance-screen .eyebrow { color:#fcf0cb; }
+.second-chance-screen .opening-stage .card-wheel {
+  width:min(96cqw,91cqh,505px);
+  filter:drop-shadow(0 4px #3f1a45) drop-shadow(0 0 19px #f29eff);
+}
+.second-chance-screen .wheel-rim {
+  border-color:#6a321f;
+  box-shadow:inset 0 0 0 .9cqw #fff4b5,inset 0 0 0 2.1cqw #ffbe41,0 0 0 .3cqw #4e2136;
+}
+.second-chance-screen .wheel-rim-star { font-size:6.7cqw; color:#ffdf35; }
+.second-chance-screen .wheel-disc {
+  background:
+    radial-gradient(circle,#ffe96873,transparent 49%,#50203b27 85%),
+    var(--wheel-colors);
+  box-shadow:0 0 0 .4cqw #e28229,inset 0 0 0 .57cqw #fff8b89c;
+}
+.second-chance-screen .wheel-disc::before {
+  background:
+    conic-gradient(from var(--half-slice),#42222d 0 1.2deg,transparent 1.2deg calc(var(--winner-break) - 1.2deg),#42222d calc(var(--winner-break) - 1.2deg) calc(var(--winner-break) + 1.2deg),transparent calc(var(--winner-break) + 1.2deg) 358.8deg,#42222d 358.8deg),
+    repeating-conic-gradient(from 2deg,#fff6a723 0 7deg,transparent 7deg 18deg);
+}
+.second-chance-screen .wheel-slot[data-outcome] .wheel-label {
+  top:-28.5cqw;
+  width:var(--slot-room);
+  gap:1.3cqw;
+  line-height:.98;
+  -webkit-text-stroke:1.6cqw var(--wheel-ink);
+  text-shadow:0 .85cqw var(--wheel-ink);
+  color:#fff8ca;
+  white-space:normal;
+}
+.second-chance-screen [data-outcome="chance"] {
+  --wheel-ink:#154929;
+}
+.second-chance-screen [data-outcome="chance"] .wheel-label { font-size:calc(var(--slot-room)*.26); }
+.second-chance-screen [data-outcome="fail"] { --wheel-ink:#661525; }
+.second-chance-screen [data-outcome="fail"] .wheel-label { font-size:11cqw; }
+.second-chance-screen [data-outcome] .wheel-label i {
+  display:grid;
+  place-items:center;
+  position:relative;
+  width:13.8cqw;
+  height:13.8cqw;
+  font-size:10.5cqw;
+  font-weight:700;
+  filter:drop-shadow(0 0 1.95cqw #ffe683);
+}
+.second-chance-screen [data-outcome="chance"] .wheel-label i {
+  border:.7cqw solid #e2ff8e;
+  border-left-color:transparent;
+  border-radius:50%;
+  background:radial-gradient(#eff8838f,transparent 76%);
+}
+.second-chance-screen [data-outcome="chance"] i::after {
+  content:'';
+  position:absolute;
+  right:-1.35cqw;
+  top:3.1cqw;
+  width:3.2cqw;
+  height:3.9cqw;
+  background:#f5ffbc;
+  clip-path:polygon(0 0,100% 50%,0 100%);
+  transform:rotate(65deg);
+}
+.second-chance-screen [data-outcome="fail"] .wheel-label i {
+  font-size:16cqw;
+  line-height:.8;
+  color:#ff5554;
+  -webkit-text-stroke:1.23cqw #fff1c2;
+  filter:drop-shadow(0 .68cqw #7d1e2c) drop-shadow(0 0 1.8cqw #ffcf5a);
+}
 
 .campaign-team-dialog { max-height:min(76dvh,620px); }
 .campaign-team-dialog[open] {

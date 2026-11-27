@@ -638,8 +638,8 @@ function raritySpinner(){
  const wedges=slots.map(tier=>({label:E.rarityNames[tier],symbol:wheelSymbols[tier],color:wheelColors[tier],size,tier}));
  return wheelMarkup(wedges,slots.indexOf(openingPull().tier));
 }
-function wheelMarkup(wedges,winner){
- const origin=-wedges[0].size/2;
+function wheelMarkup(wedges,winner,secondChance=false){
+ const origin=-wedges[0].size/2-(secondChance?90:0);
  let cursor=0;
  const slices=wedges.map(wedge=>{
   const start=cursor;
@@ -647,13 +647,14 @@ function wheelMarkup(wedges,winner){
   return {...wedge,start,end:cursor,middle:origin+(start+cursor)/2};
  });
  const stops=slices.map(({color,start,end})=>`${color} ${start}deg ${end}deg`).join(',');
- const rotation=1800+(360-slices[winner].middle)%360;
+ const rotation=1800+((360-slices[winner].middle)%360);
+ const stars=secondChance?[34,87,132,180,228,273,326]:slices.map(({end})=>origin+end);
  return `<div class="card-wheel" aria-hidden="true" data-landing-index="${winner}" style="--slice:${360/slices.length}deg;--half-slice:${origin}deg">
    <div class="wheel-rim"></div>
-   ${slices.map(({end})=>`<i class="wheel-rim-star" style="--star-angle:${origin+end}deg">★</i>`).join('')}
+   ${stars.map(angle=>`<i class="wheel-rim-star" style="--star-angle:${angle}deg">★</i>`).join('')}
    <div class="wheel-pointer"></div>
    <div class="wheel-disc" style="--wheel-stop:${rotation}deg;--wheel-colors:conic-gradient(from ${origin}deg,${stops})">
-     ${slices.map(({label,symbol,middle,tier})=>`<div class="wheel-slot" ${tier===undefined?'':`data-tier="${tier}"`} style="--slot-angle:${middle}deg">
+     ${slices.map(({label,symbol,middle,tier,outcome,size})=>`<div class="wheel-slot" ${outcome?`data-outcome="${outcome}"`:`data-tier="${tier}"`} style="--slot-angle:${middle}deg${outcome?';--slot-room:'+Math.min(35,13+size*.17)+'cqw':''}">
        <span class="wheel-label"><b>${label}</b><i>${symbol}</i></span>
      </div>`).join('')}
    </div>
@@ -770,13 +771,13 @@ function startSecondChance(){
 function secondChanceView(){
  const {odds,won}=pending.secondChance;
  const wedges=[
-  {label:'Second Chance',symbol:'★',color:'#18aa8a',size:odds*3.6},
-  {label:'Fail',symbol:'×',color:'#8269aa',size:(100-odds)*3.6}
+  {label:'2nd Chance',symbol:'★',color:'#19d64a',size:odds*3.6,outcome:'chance'},
+  {label:'Fail',symbol:'×',color:'#ff3349',size:(100-odds)*3.6,outcome:'fail'}
  ];
- return `<section class="opening-screen spinning second-chance-screen" id="openingScreen" aria-labelledby="secondChanceTitle" style="--spin-time:${SPIN_MS}ms;--spin-color:#a7f4d4">
+ return `<section class="opening-screen spinning second-chance-screen" id="openingScreen" aria-labelledby="secondChanceTitle" style="--spin-time:${SPIN_MS}ms;--spin-color:#ffe48a;--winner-break:${wedges[0].size}deg">
   <div class="eyebrow">Free extra spin · ${escape(pending.pack.name)} Pack</div>
   <h1 id="secondChanceTitle" tabindex="-1">Second Chance</h1>
-  <div class="opening-stage">${wheelMarkup(wedges,won?0:1)}</div>
+  <div class="opening-stage">${wheelMarkup(wedges,won?0:1,true)}</div>
   <div class="second-chance-outcome">
    <p>Second Chance ${odds}% · Fail ${100-odds}%</p>
    <p class="opening-result" role="status"><strong class="opening-rarity"></strong></p>
@@ -1090,7 +1091,6 @@ function battleBoard(){
  return `<section class="arena arena-match">
   <div class="arena-header"><h1>${onlineRoom?'Private match':match.levelIndex!==undefined?'Level '+(match.levelIndex+1)+' · '+E.arenaLevels[match.levelIndex].name:'Rock Arena'}</h1><button class="secondary" data-action="arena-leave">${match.winner===null?'Leave':'Done'}</button></div>
   <div class="arena-board" aria-label="Battlefield">${roster(other,'opponent',onlineRoom?'Opponent':'AI')}
-   <div class="arena-lane" aria-hidden="true"><span></span></div>
    ${roster(side,'player','You')}<div class="arena-effects" aria-hidden="true"></div>
   </div>
   <p id="arenaStatus" class="arena-turn" role="status"><strong>${status}</strong> <span>${escape(arenaMessage||note)}</span></p>
