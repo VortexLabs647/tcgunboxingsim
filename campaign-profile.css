@@ -929,3 +929,51 @@ body #app .campaign-team-dialog .team-option { min-height:88px; overflow:hidden;
   .profile-team { gap:4px; }
   .profile-team-name { font-size:.65rem; }
 }
+
+.arena-fighter > .cartoon-card[data-knocked-out="true"] { visibility:hidden; }
+.arena-knockout {
+  position:absolute;
+  z-index:3;
+  isolation:isolate;
+  pointer-events:none;
+}
+.arena-knockout-pickaxe {
+  position:absolute;
+  z-index:3;
+  left:50%;
+  top:43%;
+  width:155%;
+  max-width:none;
+  aspect-ratio:420 / 384;
+  object-fit:contain;
+  translate:-49% -55%;
+  transform-origin:35% 78%;
+  transform:rotate(-42deg) scale(1.08);
+  filter:drop-shadow(0 2px #24173e) drop-shadow(0 0 8px #72f1f1);
+}
+.arena-knockout-piece {
+  position:absolute;
+  inset:0;
+}
+.arena-knockout-piece .cartoon-card { width:100%; height:100%; }
+.arena-knockout-piece[data-side="left"] {
+  clip-path:polygon(0 0,73% 0,59% 26%,65% 32%,44% 55%,49% 61%,24% 100%,0 100%);
+}
+.arena-knockout-piece[data-side="right"] {
+  clip-path:polygon(73% 0,100% 0,100% 100%,24% 100%,49% 61%,44% 55%,65% 32%,59% 26%);
+}
+.arena-knockout-crack {
+  position:absolute;
+  inset:0;
+  background:#fff2a6;
+  clip-path:polygon(70% 0,77% 0,62% 26%,68% 32%,47% 55%,53% 61%,28% 100%,20% 100%,45% 61%,40% 55%,61% 32%,55% 26%);
+}
+.arena-knockout--reduced {
+  background:#653c9a83;
+  border:2px solid #fff1a4;
+  border-radius:8px;
+}
+.arena-knockout--reduced .arena-knockout-pickaxe {
+  width:100%;
+  transform:none;
+}

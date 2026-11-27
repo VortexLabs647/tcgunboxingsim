@@ -13,7 +13,7 @@ const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const SPIN_MS=2400,RESULT_MS=900;
 // Match short, frequency-weighted listening levels across the game's sound cues.
-const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-select':4.5,'pack-open':5.5, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
+const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, 'arena-chip':4.8, tick:21.5, click:14.4, 'pack-select':4.5,'pack-open':5.5, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='idle',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -552,6 +552,11 @@ function sound(kind){
    case 'arena-hit':
     tone(205,0,.14,.056,'triangle',73);
     tone(1250,0,.066,.028,'triangle',510);
+    break;
+   case 'arena-chip':
+    tone(228,0,.07,.045,'triangle',100);
+    tone(1510,.01,.085,.039,'triangle',680);
+    tone(2180,.052,.11,.022,'sine',1160);
     break;
    case 'arena-guard':
     tone(560,0,.09,.033,'triangle');
@@ -1154,6 +1159,63 @@ function lockArenaActions(){
 function arenaAnimation(element,keyframes,duration,easing='ease-out'){
  return element.animate(keyframes,{duration,easing,fill:'none'}).finished.catch(()=>{});
 }
+async function animateRockKnockout(fighter,reduced){
+ const card=$('.cartoon-card',fighter);
+ if(!card||!fighter.isConnected)return;
+ const stage=document.createElement('span');
+ stage.className='arena-knockout';
+ stage.setAttribute('aria-hidden','true');
+ Object.assign(stage.style,{left:card.offsetLeft+'px',top:card.offsetTop+'px',width:card.offsetWidth+'px',height:card.offsetHeight+'px'});
+ const pickaxe=document.createElement('img');
+ pickaxe.className='arena-knockout-pickaxe';
+ pickaxe.src='levels-pickaxe.webp';
+ pickaxe.alt='';
+ stage.append(pickaxe);
+ fighter.append(stage);
+ try{
+  if(reduced){
+   stage.classList.add('arena-knockout--reduced');
+   sound('arena-chip');
+   await arenaAnimation(stage,[{opacity:1},{opacity:1},{opacity:0}],225);
+   return;
+  }
+  await arenaAnimation(pickaxe,[
+   {opacity:0,transform:'translate(55%,-48%) rotate(58deg) scale(.76)'},
+   {opacity:1,transform:'translate(44%,-35%) rotate(46deg)',offset:.37},
+   {opacity:1,transform:'translate(12%,-6%) rotate(-18deg)',offset:.80},
+   {opacity:1,transform:'rotate(-42deg) scale(1.08)'}
+  ],255,'ease-in');
+  if(!stage.isConnected)return;
+  sound('arena-chip');
+  card.dataset.knockedOut='true';
+  const crack=document.createElement('span');
+  crack.className='arena-knockout-crack';
+  stage.append(crack);
+  const pieces=['left','right'].map((side,index)=>{
+   const piece=document.createElement('span');
+   const copy=card.cloneNode(true);
+   delete copy.dataset.knockedOut;
+   piece.className='arena-knockout-piece';
+   piece.dataset.side=side;
+   piece.append(copy);
+   stage.prepend(piece);
+   const direction=index===0?-1:1;
+   return arenaAnimation(piece,[
+    {opacity:1,transform:'none'},
+    {opacity:1,transform:`translate(${direction*18}%,-9%) rotate(${direction*10}deg)`,offset:.32},
+    {opacity:0,transform:`translate(${direction*54}%,48%) rotate(${direction*34}deg) scale(.82)`}
+   ],365,'cubic-bezier(.22,.66,.44,1)');
+  });
+  await Promise.all([
+   ...pieces,
+   arenaAnimation(crack,[{opacity:1},{opacity:.8,offset:.29},{opacity:0}],230),
+   arenaAnimation(pickaxe,[
+    {opacity:1,transform:'rotate(-42deg) scale(1.08)'},
+    {opacity:0,transform:'translate(-34%,28%) rotate(-71deg) scale(.83)'}
+   ],270)
+  ]);
+ }finally{stage.remove();}
+}
 const arenaAttackArt={
  boulder:0,ribbon:1,fracture:2,bulwark:3,prism:4,ring:5,shard:6,comet:7,volley:8,renew:9,meteor:0
 };
@@ -1320,6 +1382,7 @@ async function animateArenaMove(before,after){
   damage.remove();
   impact.remove();
   [...sparks,...shocks].forEach(effect=>effect.remove());
+  if(remaining===0&&effects.isConnected)await animateRockKnockout(rival,reduced);
  }else if(guarded||switched){
   sound('arena-guard');
   const effect=spawn(guarded?'shield':'swap',from,guarded?'GUARD':'SWITCH');
