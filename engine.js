@@ -50,8 +50,12 @@ function packRank(rock){
 }
 function cardLevel(rock){return rock.level??1;}
 function cardStats(rock){
- const bonus=cardLevel(rock)-1;
- return {damage:3+rock.tier+bonus*2,hp:12+rock.tier*2+bonus*3};
+ const levels=cardLevel(rock)-1;
+ const rank=packRank(rock);
+ return {
+  damage:3+rock.tier+levels*2+rank,
+  hp:12+rock.tier*2+levels*3+rank*3
+ };
 }
 function upgradeCost(rock){return 1+rock.tier+cardLevel(rock);}
 function upgradeRock(state,uid,now=Date.now()){

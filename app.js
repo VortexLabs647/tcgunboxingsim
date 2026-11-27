@@ -407,14 +407,17 @@ function itemView(){
  const item=byId[detailId];
  const owned=state.vault.find(card=>card.uid===detailUid&&card.itemId===detailId);
  if(!item)return empty('CARD NOT FOUND.','Choose another rock.');
+ const source=owned&&packs.find(pack=>pack.id===owned.packId);
+ const stats=owned&&E.cardStats(owned);
  return `<button class="secondary back-button" data-action="back-item">Back to ${previousView==='vault'?'Inventory':previousView==='packs'?'packs':'collection'}</button>
   <div class="detail-page"><div class="detail-image rocks">${cardImage(item)}</div><div class="detail-content">
    <div class="detail-kicker"><span class="rarity" style="--rarity:${E.rarityColors[item.tier]}">${E.rarityNames[item.tier]}</span><span>${escape(item.number)}</span></div>
    <h1>${escape(item.name)}</h1>
    ${owned?`<div class="card-training">
-    <p>Lv ${E.cardLevel(owned)} · ${E.cardStats(owned).damage} ATK · ${E.cardStats(owned).hp} HP</p>
+    <p>Lv ${E.cardLevel(owned)} · ${stats.damage} ATK · ${stats.hp} HP</p>
     ${E.cardLevel(owned)<E.maxLevel?`<button class="primary" data-action="upgrade-rock" data-id="${escape(owned.uid)}">Level up · ${money(E.upgradeCost(owned)*E.unitsPerCent)}</button>`:'<p>Max level</p>'}
    </div>`:''}
+   ${source?.index?`<p class="detail-lore">${source.name} pack bonus · +${source.index} ATK · +${source.index*3} HP</p>`:''}
    <p class="detail-lore">${escape(item.lore)}</p>
   </div></div>`;
 }

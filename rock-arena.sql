@@ -32,14 +32,16 @@ create or replace function rock_arena.deck(player uuid, cards text[]) returns js
 language sql stable set search_path=pg_catalog
 as $$
  select jsonb_agg(jsonb_build_object(
-  'itemId',card->>'itemId','level',level,'damage',3+tier+2*(level-1),
-  'hp',12+tier*2+(level-1)*3,'maxHp',12+tier*2+(level-1)*3,'guard',false,'focus',false
+  'itemId',card->>'itemId','level',level,'damage',3+tier+2*(level-1)+pack_rank,
+  'hp',12+tier*2+3*(level-1)+3*pack_rank,
+  'maxHp',12+tier*2+3*(level-1)+3*pack_rank,'guard',false,'focus',false
  ) order by requested.ordinality)
  from public.game_saves as save
  cross join lateral jsonb_array_elements(save.state->'vault') as card
  join unnest(cards) with ordinality as requested(uid,ordinality) on requested.uid=card->>'uid'
  cross join lateral (
-  select (card->>'tier')::int as tier,coalesce((card->>'level')::int,1) as level
+  select (card->>'tier')::int as tier,coalesce((card->>'level')::int,1) as level,
+   coalesce(substring(card->>'packId' from '^rocks-([0-8])$')::int,0) as pack_rank
   where card->>'tier' ~ '^[0-5]$' and coalesce(card->>'level','1') ~ '^[1-5]$'
  ) as stats
  where save.user_id=player and card->>'itemId' ~ '^rock-[a-z0-9-]{1,80}$'
