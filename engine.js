@@ -7,6 +7,21 @@ const salePercent=[20,35,60,100,150,300];
 const startingBalance=10;
 const winRewardMin=1,winRewardMax=50;
 const starterId='starter-granite';
+const arenaLevels=[
+ {name:'Pebble Trail',reward:4,enemies:[['chalk',1,0]],practice:true},
+ {name:'Sandstone Steps',reward:6,enemies:[['sandstone',1,1]]},
+ {name:'Agate Pass',reward:8,enemies:[['agate',2,1]]},
+ {name:'Basalt Gate',reward:12,enemies:[['basalt',2,2],['jasper',1,1]],boss:true},
+ {name:'Amethyst Hollow',reward:15,enemies:[['amethyst',2,3],['fluorite',2,2]]},
+ {name:'Obsidian Rift',reward:20,enemies:[['obsidian',3,4],['malachite',2,3]]},
+ {name:'Garnet Furnace',reward:25,enemies:[['garnet',3,5],['pyrite',3,4]]},
+ {name:'Sapphire Summit',reward:35,enemies:[['sapphire',3,6],['labradorite',3,5],['onyx',2,4]],boss:true},
+ {name:'Moonstone Basin',reward:45,enemies:[['moonstone',4,7],['morganite',3,6],['celestite',3,6]]},
+ {name:'Emerald Citadel',reward:60,enemies:[['emerald',4,8],['aquamarine',4,8],['copper',4,7]]},
+ {name:'Celestial Vault',reward:80,enemies:[['spinel',4,10],['bismuth',4,9],['tourmaline',4,9]]},
+ {name:'Zenith Crown',reward:125,enemies:[['diamond',5,12],['spinel',5,11],['sugilite',5,10]],boss:true}
+];
+const arenaPlayReward=2;
 const foilColors=['#fa3d7d','#3e8bff','#b052ff','#24dfad','#ff4c3d','#ffbf20','#5f63ff','#37d9ff','#ffb54a','#65efc0','#c267fa','#7297ff','#c54670','#ff734b','#d3edff','#ffdd7b'];
 const rarityNames=['Common','Uncommon','Rare','Epic','Legendary','Grail'];
 const rarityColors=['#88a3cb','#41dfb0','#439cff','#aa5bff','#ff4c60','#ffcf36'];
@@ -118,6 +133,16 @@ function creditReward(state,cents){
  credit(state,cents*unitsPerCent);
  return state;
 }
+function finishArenaLevel(state,index,won){
+ const level=arenaLevels[index];
+ if(!level||index>state.arenaCleared)return {participation:0,clear:0};
+ const participation=index===state.arenaPlayed?arenaPlayReward:0;
+ const clear=won&&index===state.arenaCleared?level.reward:0;
+ if(participation)state.arenaPlayed++;
+ if(clear)state.arenaCleared++;
+ creditReward(state,participation+clear);
+ return {participation,clear};
+}
 function settleIncome(state,now=Date.now()){
  const seconds=Math.min(offlineSeconds,Math.floor((now-state.rockClock)/1000));
  if(seconds<=0)return 0;
@@ -201,7 +226,7 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
 }
 
 function defaults(){
- return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,packPremium:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,bestDropScore:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
+ return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,packPremium:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,bestDropScore:0,arenaCleared:0,arenaPlayed:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
 }
 function migrate(old,catalog){
  const state={...defaults(),...old,version:4};
@@ -232,6 +257,12 @@ function migrate(old,catalog){
  state.preferences={category:'rocks',packIndex:Number.isInteger(index)?Math.max(0,Math.min(names.length-1,index)):0};
  return state;
 }
+function validArenaProgress(state){
+ const cleared=state.arenaCleared===undefined?0:state.arenaCleared;
+ const played=state.arenaPlayed===undefined?0:state.arenaPlayed;
+ return Number.isInteger(cleared)&&Number.isInteger(played)&&cleared>=0&&
+  cleared<=played&&played<=cleared+1&&played<=arenaLevels.length;
+}
 function validSave(state,catalog){
  if(!state||![1,2,3,4].includes(state.version))return false;
  const activeIds=new Set(catalog.map(card=>card.id));
@@ -247,6 +278,7 @@ function validSave(state,catalog){
   new Set(state.vault.map(card=>card.uid)).size===state.vault.length&&
   (state.retiredCards===undefined||cardList(state.retiredCards))&&
   ['opened','spent','sold','best','deposited'].every(key=>Number.isSafeInteger(state[key])&&state[key]>=0)&&
+  validArenaProgress(state)&&
   (state.bestDropScore===undefined||[0,10,20,30].includes(state.bestDropScore))&&
   (state.rockClock===undefined||Number.isSafeInteger(state.rockClock)&&state.rockClock>=0)&&
   (state.rockRemainder===undefined||Number.isSafeInteger(state.rockRemainder)&&state.rockRemainder>=0&&state.rockRemainder<unitsPerCent)&&
@@ -258,7 +290,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={packRank,winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={arenaLevels,arenaPlayReward,finishArenaLevel,packRank,winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);

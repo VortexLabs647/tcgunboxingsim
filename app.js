@@ -29,7 +29,7 @@ function notice(message){
  $('#status').textContent=message;
 }
 function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
-function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
+function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaLevelIndex=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
 
 function money(units){
@@ -604,23 +604,26 @@ function openingView(){
 
 function openingPull(){return pending.pull;}
 
+const wheelColors=['#a7afd9','#49dd29','#0795ff','#b939f6','#ffb813','#f23441'];
+const wheelSymbols=['★','◆','⬢','♛','✪','🏆'];
 function raritySpinner(){
  const hero=openingPull();
  const slots=E.oddsPresets[pending.odds].flatMap((weight,tier)=>weight>0?[tier]:[]);
  const angle=360/slots.length;
  const landings=slots.flatMap((tier,index)=>tier===hero.tier?[index]:[]);
  const landingIndex=landings[Math.floor(E.random()*landings.length)];
- const stops=slots.map((tier,index)=>`${E.rarityColors[tier]} ${index*angle}deg ${(index+1)*angle}deg`).join(',');
+ const stops=slots.map((tier,index)=>`${wheelColors[tier]} ${index*angle}deg ${(index+1)*angle}deg`).join(',');
  const rotation=1800+(360-landingIndex*angle)%360;
  return `<div class="card-wheel" aria-hidden="true" data-landing-index="${landingIndex}" style="--slice:${angle}deg;--half-slice:${-angle/2}deg">
    <div class="wheel-rim"></div>
+   ${slots.map((_,index)=>`<i class="wheel-rim-star" style="--star-angle:${(index+.5)*angle}deg">★</i>`).join('')}
    <div class="wheel-pointer"></div>
    <div class="wheel-disc" style="--wheel-stop:${rotation}deg;--wheel-colors:conic-gradient(from ${-angle/2}deg,${stops})">
      ${slots.map((tier,i)=>`<div class="wheel-slot" data-tier="${tier}" style="--slot-angle:${i*angle}deg">
-       <span>${E.rarityNames[tier]}</span>
+       <span class="wheel-label"><b>${E.rarityNames[tier]}</b><i>${wheelSymbols[tier]}</i></span>
      </div>`).join('')}
    </div>
-   <div class="wheel-hub"><span></span></div>
+   <div class="wheel-hub"><span>★</span></div>
  </div>`;
 }
 
@@ -936,6 +939,10 @@ case 'badge-shop':
  break;
 case 'buy-badge':buyBadge(id);break;
 case 'arena-pick':pickArenaCard(id);break;
+case 'arena-mode':setArenaMode(id);break;
+case 'arena-level':selectArenaLevel(Number(id));break;
+case 'arena-start-level':startArenaLevel();break;
+case 'arena-next-level':if(arenaMatch?.winner===0)startArenaLevel(arenaMatch.levelIndex+1);break;
 case 'arena-ai':aiBattle();break;
 case 'arena-create':onlineAction('create');break;
 case 'arena-join':onlineAction('join',{room_code:$('#arenaCode').value.trim()});break;
@@ -983,6 +990,7 @@ async function refreshWebApp(){
 }
 
 let arenaMatch=null,onlineRoom=null,arenaBusy=false,arenaMessage='',arenaFilter='',arenaResultTimer=null,presentedResult=null;
+let arenaMode='levels',arenaLevelIndex=null;
 const arenaTeam=new Set();
 const battleCloud=()=>window.TCGCloud;
 
@@ -998,23 +1006,73 @@ function arenaView(){
 
  for(const uid of arenaTeam)if(!state.vault.some(card=>card.uid===uid))arenaTeam.delete(uid);
  const cloud=battleCloud(),locked=arenaTeam.size===0||arenaBusy;
- return `<section class="arena">
-  <h1>Rock Arena</h1><p>Equip up to three cards. Win for ${winRewardRange()} in virtual coins.</p>
+ return `<section class="arena arena-lobby">
+  <h1>Rock Arena</h1>
+  <div class="arena-mode-tabs" role="group" aria-label="Battle mode">
+   <button class="secondary" data-action="arena-mode" data-id="levels" aria-pressed="${arenaMode==='levels'}">Levels</button>
+   <button class="secondary" data-action="arena-mode" data-id="quick" aria-pressed="${arenaMode==='quick'}">Quick Battle</button>
+  </div>
+  ${arenaMode==='levels'?arenaLevelsView():`<p>Play AI or challenge a friend. Wins earn ${winRewardRange()} in virtual coins.</p>`}
   ${state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
    <div class="search">${icon('search')}<input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}"></div>
    <div class="team-list" id="arenaTeam">${teamOptions()}</div>
    <p id="teamCount" role="status">${arenaTeam.size} / 3 equipped</p>`:
    '<p>Open a pack to get your first battle card.</p>'}
-  <div class="arena-actions"><button class="primary" data-action="arena-ai" ${locked?'disabled':''}>Battle AI</button>
-  ${cloud?.user?`<button class="secondary" data-action="arena-create" ${locked||!cloud.canPlay?'disabled':''}>Create private room</button>`:
-   '<a href="#profile" class="secondary">Sign in for online play</a>'}</div>
-  ${cloud?.user?`<div class="join-room">
-   <label for="arenaCode">Room code</label>
-   <input id="arenaCode" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="4-digit code">
-   <button class="secondary" data-action="arena-join" ${locked||!cloud.canPlay?'disabled':''}>Join room</button>
-  </div>`:''}
+  ${arenaMode==='levels'?`<div class="arena-actions"><button class="primary" data-action="arena-start-level" ${locked||cloud?.user&&!cloud.canPlay?'disabled':''}>Battle Level ${selectedArenaLevel()+1}</button></div>`:`
+   <div class="arena-actions"><button class="primary" data-action="arena-ai" ${locked?'disabled':''}>Battle AI</button>
+   ${cloud?.user?`<button class="secondary" data-action="arena-create" ${locked||!cloud.canPlay?'disabled':''}>Create private room</button>`:
+    '<a href="#profile" class="secondary">Sign in for online play</a>'}</div>
+   ${cloud?.user?`<div class="join-room">
+    <label for="arenaCode">Room code</label>
+    <input id="arenaCode" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="4-digit code">
+    <button class="secondary" data-action="arena-join" ${locked||!cloud.canPlay?'disabled':''}>Join room</button>
+   </div>`:''}`}
   <p id="arenaStatus" role="status">${escape(arenaMessage)}</p>
  </section>`;
+}
+function selectedArenaLevel(){
+ return Math.min(arenaLevelIndex??state.arenaCleared,state.arenaCleared,E.arenaLevels.length-1);
+}
+function setArenaMode(mode){
+ if(!['levels','quick'].includes(mode)||mode===arenaMode)return;
+ arenaMode=mode;
+ render();
+ $(`[data-action="arena-mode"][data-id="${mode}"]`).focus({preventScroll:true});
+}
+function selectArenaLevel(index){
+ if(!E.arenaLevels[index]||index>state.arenaCleared)return;
+ arenaLevelIndex=index;
+ render();
+ $(`[data-action="arena-level"][data-id="${index}"]`).focus({preventScroll:true});
+}
+function arenaLevelsView(){
+ const index=selectedArenaLevel(),level=E.arenaLevels[index];
+ const firstBattle=index===state.arenaPlayed,uncleared=index===state.arenaCleared;
+ return `<section class="arena-levels" aria-label="Campaign levels">
+  <div class="arena-level-heading"><strong>Battle Levels</strong><span>${state.arenaCleared} / ${E.arenaLevels.length} cleared</span></div>
+  <div class="arena-level-grid">${E.arenaLevels.map((stage,id)=>{
+   const cleared=id<state.arenaCleared,locked=id>state.arenaCleared;
+   const status=cleared?'cleared':locked?'locked':'unlocked';
+   return `<button type="button" class="secondary" data-action="arena-level" data-id="${id}" data-cleared="${cleared}" data-boss="${!!stage.boss}" aria-pressed="${id===index}" aria-label="Level ${id+1}, ${stage.name}, ${status}" ${locked?'disabled':''}><b>${id+1}</b><span aria-hidden="true">${cleared?'✓':stage.boss?'★':''}</span></button>`;
+  }).join('')}</div>
+  <div class="arena-level-info">
+   <h2>${level.name}${level.boss?' <span>Boss</span>':''}</h2>
+   <p>${level.enemies.length} opponent ${level.enemies.length===1?'card':'cards'} · ${level.enemies.map(([name])=>escape(byId['rock-'+name].name)).join(', ')}</p>
+   <p>${uncleared?`First clear ${money(level.reward*E.unitsPerCent)}${firstBattle?' · First finished battle '+money(E.arenaPlayReward*E.unitsPerCent):''}`:'First-clear reward collected'}</p>
+  </div>
+ </section>`;
+}
+function startArenaLevel(index=selectedArenaLevel()){
+ const level=E.arenaLevels[index],cloud=battleCloud();
+ if(!level||index>state.arenaCleared||arenaBusy||cloud?.user&&!cloud.canPlay)return;
+ const cards=state.vault.filter(card=>arenaTeam.has(card.uid));
+ if(!cards.length)return;
+ const enemy=A.campaignTeam(level,byId,E);
+ clearArenaResult();
+ arenaLevelIndex=index;
+ arenaMatch={...A.newMatch(cards.map(card=>A.combatCard(card,E)),enemy),levelIndex:index};
+ render();
+ window.scrollTo({top:0,behavior:'instant'});
 }
 function teamOptions(){
  const query=arenaFilter.trim().toLowerCase();
@@ -1042,9 +1100,11 @@ function pickArenaCard(uid){
  }
  $('#teamCount').textContent=arenaTeam.size+' / 3 equipped';
  const cloud=battleCloud();
- for(const action of ['ai','create','join']){
+ for(const action of ['ai','create','join','start-level']){
   const button=$(`[data-action="arena-${action}"]`);
-  if(button)button.disabled=!arenaTeam.size||arenaBusy||(action!=='ai'&&!cloud?.canPlay);
+  if(!button)continue;
+  const needsSync=action==='start-level'?cloud?.user:action!=='ai';
+  button.disabled=!arenaTeam.size||arenaBusy||(needsSync&&!cloud?.canPlay);
  }
 }
 function aiBattle(){
@@ -1084,7 +1144,7 @@ function battleBoard(){
   </article>`;
  };
  return `<section class="arena arena-match">
-  <div class="arena-header"><h1>${onlineRoom?'Private match':'Rock Arena'}</h1><button class="secondary" data-action="arena-leave">${match.winner===null?'Leave':'Done'}</button></div>
+  <div class="arena-header"><h1>${onlineRoom?'Private match':match.levelIndex!==undefined?'Level '+(match.levelIndex+1)+' · '+E.arenaLevels[match.levelIndex].name:'Rock Arena'}</h1><button class="secondary" data-action="arena-leave">${match.winner===null?'Leave':'Done'}</button></div>
   <div class="arena-board" aria-label="Battlefield">${roster(other,'opponent',onlineRoom?'Opponent':'AI')}
    <div class="arena-lane" aria-hidden="true"><span></span></div>
    ${roster(side,'player','You')}<div class="arena-effects" aria-hidden="true"></div>
@@ -1102,17 +1162,26 @@ function battleResult(){
  const match=arenaMatch,side=onlineRoom?.side??0,won=match.winner===side;
  const card=match.teams[match.winner][match.active[match.winner]];
  const art=byId[card.itemId];
- const reason=match.note==='Opponent left the match.'?'Your opponent left the match.':won?'Your team won the battle.':'The opposing team won the battle.';
  const reward=won?match.reward:0;
+ const isLevel=match.levelIndex!==undefined;
+ const nextLevel=match.levelIndex+1;
+ const campaign=match.levelRewards;
+ const winMessage=nextLevel===E.arenaLevels.length?'Campaign complete.':'Level cleared.';
+ const reason=isLevel
+  ? (won?winMessage:'Try a different team or strategy.')
+  : match.note==='Opponent left the match.'?'Your opponent left the match.':won?'Your team won the battle.':'The opposing team won the battle.';
  return `<section class="arena arena-result" data-won="${won}" aria-labelledby="battleOutcome">
   <div class="arena-result-art">${art?cardImage(art):''}</div>
   <h1 id="battleOutcome" tabindex="-1">${won?'You won!':'You lost.'}</h1>
   <p>${reason}</p>
+  ${campaign?.participation?`<p class="arena-hint">First finished battle · +${money(campaign.participation*E.unitsPerCent)} in virtual coins</p>`:''}
+  ${campaign?.clear?`<p class="arena-hint">First-clear reward · +${money(campaign.clear*E.unitsPerCent)} in virtual coins</p>`:''}
   ${reward?`<p class="arena-hint">Win reward · ${money(reward*E.unitsPerCent)} in virtual coins</p>`:''}
   <div class="arena-actions">
-   ${won?'<button class="primary" data-action="packs">Back to Packs</button>':`${onlineRoom?'':'<button class="primary" data-action="arena-ai">Play again</button>'}<button class="secondary" data-action="arena-leave">Back to Battle</button>`}
+   ${isLevel?`${!won?'<button class="primary" data-action="arena-start-level">Try again</button>':nextLevel<E.arenaLevels.length?'<button class="primary" data-action="arena-next-level">Next level</button>':''}<button class="secondary" data-action="arena-leave">Back to Levels</button>`:
+    won?'<button class="primary" data-action="packs">Back to Packs</button>':`${onlineRoom?'':'<button class="primary" data-action="arena-ai">Play again</button>'}<button class="secondary" data-action="arena-leave">Back to Battle</button>`}
   </div>
-  ${won?'<div class="victory-timer" aria-hidden="true"><span></span></div>':''}
+  ${won&&!isLevel?'<div class="victory-timer" aria-hidden="true"><span></span></div>':''}
   <p id="arenaStatus" role="status">${escape(arenaMessage)}</p>
  </section>`;
 }
@@ -1131,7 +1200,7 @@ function showArenaResult(){
  result.focus({preventScroll:true});
  window.scrollTo({top:0,behavior:'instant'});
  sound(won?'arena-win':'arena-loss');
- if(won)arenaResultTimer=setTimeout(()=>{
+ if(won&&match.levelIndex===undefined)arenaResultTimer=setTimeout(()=>{
   if(view==='battle'&&arenaMatch===match)go('packs');
  },4200);
 }
@@ -1141,6 +1210,9 @@ function lockArenaActions(){
 function arenaAnimation(element,keyframes,duration,easing='ease-out'){
  return element.animate(keyframes,{duration,easing,fill:'none'}).finished.catch(()=>{});
 }
+const arenaAttackArt={
+ boulder:0,ribbon:1,fracture:2,bulwark:3,prism:4,ring:5,shard:6,comet:7,volley:8,renew:9,meteor:0
+};
 async function animateArenaMove(before,after){
  if(view!=='battle'||document.hidden||after?.revision!==before?.revision+1||before.winner!==null)return;
  const effects=$('.arena-effects');
@@ -1178,6 +1250,19 @@ async function animateArenaMove(before,after){
   effects.append(effect);
   return effect;
  };
+ const illustratedImpact=(position,motif)=>{
+  const sprite=spawn('illustrated',position);
+  const tile=arenaAttackArt[motif];
+  sprite.style.setProperty('--sprite-x',tile%5*25+'%');
+  sprite.style.setProperty('--sprite-y',tile<5?'12%':'88%');
+  const frames=reduced?[{opacity:.9},{opacity:.9},{opacity:0}]:[
+   {opacity:0,scale:.58},
+   {opacity:1,scale:1.05,offset:.23},
+   {opacity:.94,scale:1.08,offset:.68},
+   {opacity:0,scale:1.18}
+  ];
+  return arenaAnimation(sprite,frames,reduced?230:480).then(()=>sprite.remove());
+ };
  const from=center(actor),to=center(rival);
  const updateFighter=(fighter,card)=>{
   const team=fighter.closest('.arena-team');
@@ -1193,7 +1278,8 @@ async function animateArenaMove(before,after){
   const aura=reduced?null:spawn('aura',from);
   await Promise.all([
    arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.7},{opacity:1,scale:1.04,offset:.28},{opacity:0,scale:1.15}],reduced?230:400),
-   aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.75,offset:.35},{opacity:0,scale:1+visual.spread/45,rotate:visual.bend+'deg'}],400)
+   aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.75,offset:.35},{opacity:0,scale:1+visual.spread/45,rotate:visual.bend+'deg'}],400),
+   loss===0&&illustratedImpact(from,visual.motif)
   ]);
   charge.remove();
   aura?.remove();
@@ -1239,6 +1325,7 @@ async function animateArenaMove(before,after){
     const angle=index/sparks.length*2*Math.PI+visual.hue*Math.PI/180,radius=visual.spread+(remaining?0:20);
     return arenaAnimation(spark,[{opacity:1,transform:'none'},{opacity:0,transform:`translate(${Math.cos(angle)*radius}px,${Math.sin(angle)*radius}px) rotate(110deg)`}],remaining?320:430);
    }),
+   illustratedImpact(to,visual.motif),
    arenaAnimation(impact,reduced?[{opacity:.8},{opacity:0}]:[{opacity:1,scale:.38},{opacity:0,scale:1.5,rotate:'28deg'}],reduced?180:340)
   ]);
   damage.remove();
@@ -1308,7 +1395,7 @@ async function battleMove(action,target){
   await animateArenaMove(before,playerMatch);
   if(arenaMatch!==before)return;
   arenaMatch=playerMatch;
-  if(playerMatch.winner===0){
+  if(playerMatch.winner===0&&playerMatch.levelIndex===undefined){
    playerMatch.reward=E.rollWinReward();
    E.creditReward(state,playerMatch.reward);
    save();
@@ -1322,6 +1409,11 @@ async function battleMove(action,target){
     arenaMatch=enemyMatch;
    }
   }
+  if(arenaMatch.winner!==null&&arenaMatch.levelIndex!==undefined){
+   const result=E.finishArenaLevel(state,arenaMatch.levelIndex,arenaMatch.winner===0);
+   arenaMatch.levelRewards=result;
+   if(result.participation||result.clear)save();
+  }
  }finally{
   arenaBusy=false;
   if(view==='battle'&&arenaMatch)render();
@@ -1330,6 +1422,7 @@ async function battleMove(action,target){
 function leaveArena(){
  if(onlineRoom&&(!arenaMatch||arenaMatch.winner===null)){onlineAction('leave');return;}
  clearArenaResult();
+ if(arenaMatch?.levelIndex!==undefined&&arenaMatch.winner===0)arenaLevelIndex=null;
  onlineRoom=null;arenaMatch=null;arenaMessage='';render();
 }
 async function copyRoomCode(){

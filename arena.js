@@ -136,6 +136,17 @@ function combatCard(card,engine){
  const {damage,hp}=engine.cardStats(card);
  return {itemId:card.itemId,level:engine.cardLevel(card),damage,hp,maxHp:hp,guard:false,focus:false};
 }
+function campaignTeam(stage,catalogById,engine){
+ return stage.enemies.map(([name,level,rank])=>{
+  const item=catalogById['rock-'+name];
+  const rival=combatCard({itemId:item.id,tier:item.tier,level,packId:'rocks-'+rank},engine);
+  if(stage.practice){
+   rival.damage=2;
+   rival.hp=rival.maxHp=9;
+  }
+  return rival;
+ });
+}
 function aiTeam(cards,catalog,packCount,engine,rng=engine.random){
  const direction=rng()<.5?-1:1;
  const used=new Set();
@@ -224,7 +235,7 @@ function aiMove(match){
  return move(match,1,'strike');
 }
 
-const arena={movesFor,moveVisual,aiTeam,attackPower,battleNote,abilityFor,canUseAbility,combatCard,newMatch,move,aiMove};
+const arena={campaignTeam,movesFor,moveVisual,aiTeam,attackPower,battleNote,abilityFor,canUseAbility,combatCard,newMatch,move,aiMove};
 if(typeof module!=='undefined'&&module.exports)module.exports=arena;
 else root.TCGArena=arena;
 })(typeof window==='undefined'?globalThis:window);
