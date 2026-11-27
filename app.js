@@ -718,7 +718,7 @@ case 'buy-badge':buyBadge(id);break;
 case 'arena-pick':pickArenaCard(id);break;
 case 'arena-ai':aiBattle();break;
 case 'arena-create':onlineAction('create');break;
-case 'arena-join':onlineAction('join',{room_code:$('#arenaCode').value.trim().toLowerCase()});break;
+case 'arena-join':onlineAction('join',{room_code:$('#arenaCode').value.trim()});break;
 case 'arena-copy':copyRoomCode();break;
 case 'arena-leave':leaveArena();break;
 case 'arena-move':battleMove(id,b.dataset.target===undefined?null:Number(b.dataset.target));break;
@@ -741,8 +741,8 @@ case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Ent
 case 'delete-start':profileSections.add('delete');confirmAction='delete';render();$('.delete-details').scrollIntoView({block:'nearest'});break;
 case 'delete-confirm':{state=E.defaults();selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
 }});
-document.addEventListener('input',e=>{if(e.target.id==='arenaFilter'){arenaFilter=e.target.value;$('#arenaTeam').innerHTML=teamOptions();return;}if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
+document.addEventListener('input',e=>{if(e.target.id==='arenaCode'){e.target.value=e.target.value.replace(/[^0-9]/g,'').slice(0,4);return;}if(e.target.id==='arenaFilter'){arenaFilter=e.target.value;$('#arenaTeam').innerHTML=teamOptions();return;}if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='arenaCode')$('[data-action="arena-join"]').click();if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','battle','leaderboard'].includes(target)){go(target);}});
 async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 async function refreshWebApp(){
@@ -761,7 +761,7 @@ const battleCloud=()=>window.TCGCloud;
 function arenaView(){
  if(onlineRoom?.waiting)return `<section class="arena content-card">
   <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} cards.</p>
-  <input class="room-code" readonly aria-label="Room code" value="${escape(onlineRoom.code)}">
+  <input class="room-code" readonly aria-label="Room code" value="${escape(onlineRoom.joinCode||onlineRoom.code)}">
   <button class="secondary" data-action="arena-copy">Copy code</button>
   <button class="secondary" data-action="arena-leave">Close room</button>
   <p id="arenaStatus" role="status">${escape(arenaMessage||'Waiting for Player 2…')}</p>
@@ -782,7 +782,7 @@ function arenaView(){
    '<a href="#profile" class="secondary">Sign in for online play</a>'}</div>
   ${cloud?.user?`<div class="join-room">
    <label for="arenaCode">Room code</label>
-   <input id="arenaCode" type="text" minlength="16" maxlength="16" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Enter a friend’s code">
+   <input id="arenaCode" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="4-digit code">
    <button class="secondary" data-action="arena-join" ${locked||!cloud.canPlay?'disabled':''}>Join room</button>
   </div>`:''}
   <p id="arenaStatus" role="status">${escape(arenaMessage)}</p>
@@ -1006,8 +1006,8 @@ async function animateArenaMove(before,after){
 async function onlineAction(operation,extra={}){
  const cloud=battleCloud();
  if(arenaBusy||!cloud?.user)return;
- if(operation==='join'&&!/^[0-9a-f]{16}$/.test(extra.room_code)){
-  $('#arenaStatus').textContent='Enter the 16-character room code.';
+ if(operation==='join'&&!/^[0-9]{4}$/.test(extra.room_code)){
+  $('#arenaStatus').textContent='Enter a 4-digit room code.';
   return;
  }
  const account=cloud.user.id,previousRoom=onlineRoom,previousMatch=arenaMatch;
@@ -1020,6 +1020,7 @@ async function onlineAction(operation,extra={}){
   }
   const result=await cloud.battle({operation,room_code:onlineRoom?.code,...extra});
   if(cloud.user?.id!==account)return;
+  if(result?.error)throw Error(result.error);
   const changed=onlineRoom?.waiting!==result?.waiting||arenaMatch?.revision!==result?.match?.revision||arenaMatch?.winner!==result?.match?.winner;
   if(previousMatch&&previousRoom?.code===result?.code&&!result.waiting){
    await animateArenaMove(previousMatch,result.match);

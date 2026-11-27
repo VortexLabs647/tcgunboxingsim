@@ -3269,7 +3269,12 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
 :root body :is(.toolbar,.arena) .search .icon { top:50%; transform:translateY(-50%); color:#554082; pointer-events:none; }
 :root body :is(.toolbar .search,.arena .search,.arena .join-room) input::placeholder { color:#594679; opacity:1; }
 :root body :is(.toolbar,.arena) .search:focus-within { outline:2px solid #99f4d8; outline-offset:2px; }
-:root body .arena .room-code { letter-spacing:.06em; font-family:monospace; }
+:root body .arena .room-code {
+  font:700 clamp(1.35rem,7vw,2rem)/1.2 var(--display-font);
+  letter-spacing:.14em;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+}
 :root body .team-option.secondary { align-items:flex-start; }
 :root body .team-option[aria-pressed="true"] {
   --control-light:#e4ffed;

@@ -14,6 +14,19 @@ revoke all on rock_arena.rooms from public, anon, authenticated;
 create index if not exists rock_rooms_host on rock_arena.rooms(host);
 create index if not exists rock_rooms_expires on rock_arena.rooms(expires_at);
 
+-- Keep invite codes separate from the stable room IDs used during matches.
+alter table rock_arena.rooms add column if not exists join_code text;
+create unique index if not exists rock_rooms_join_code on rock_arena.rooms(join_code)
+ where join_code is not null;
+
+create table if not exists rock_arena.join_attempts (
+ actor uuid primary key references auth.users(id) on delete cascade,
+ started_at timestamptz not null,
+ attempts integer not null
+);
+alter table rock_arena.join_attempts enable row level security;
+revoke all on rock_arena.join_attempts from public, anon, authenticated;
+
 -- Stats come from the signed-in player's synced inventory, never from the request.
 create or replace function rock_arena.deck(player uuid, cards text[]) returns jsonb
 language sql stable set search_path=pg_catalog
@@ -59,6 +72,8 @@ declare
  healed integer;
  detail text;
  reserve integer;
+ short_code boolean;
+ attempts integer;
 begin
  if actor is null then raise exception 'Sign in to play online' using errcode='42501'; end if;
  if operation in ('create','join') then
@@ -76,25 +91,52 @@ begin
   perform pg_advisory_xact_lock(hashtextextended(actor::text,0));
   delete from rock_arena.rooms where expires_at<now();
   if (select count(*) from rock_arena.rooms where host=actor and match->'winner'='null'::jsonb)<3 then
-   insert into rock_arena.rooms(code,host,match)
-   values(left(replace(gen_random_uuid()::text,'-',''),16),actor,
-    jsonb_build_object('teams',jsonb_build_array(team,'[]'::jsonb),'active',jsonb_build_array(0,0),
-     'turn',0,'revision',0,'rules',2,'winner',null,'note','Waiting for Player 2.'))
-   returning * into room;
+   for attempt in 1..100 loop
+    insert into rock_arena.rooms(code,join_code,host,match)
+    values(left(replace(gen_random_uuid()::text,'-',''),16),lpad(floor(random()*10000)::int::text,4,'0'),actor,
+     jsonb_build_object('teams',jsonb_build_array(team,'[]'::jsonb),'active',jsonb_build_array(0,0),
+      'turn',0,'revision',0,'rules',2,'winner',null,'note','Waiting for Player 2.'))
+    on conflict do nothing returning * into room;
+    exit when found;
+   end loop;
+   if room.code is null then raise exception 'All room codes are busy. Try again shortly.'; end if;
   else
    raise exception 'You already have three open rooms.';
   end if;
   side:=0;
  else
-  if room_code is null or room_code !~ '^[0-9a-f]{16}$' then raise exception 'Enter a valid room code.'; end if;
-  select * into room from rock_arena.rooms where code=room_code and expires_at>now() for update;
-  if not found then raise exception 'Room closed or expired.'; end if;
+  short_code:=operation='join' and room_code ~ '^[0-9]{4}$';
+  if short_code then
+   insert into rock_arena.join_attempts as history(actor,started_at,attempts)
+   values(actor,now(),1)
+   on conflict on constraint join_attempts_pkey do update set
+    started_at=case when history.started_at<=now()-interval '1 minute' then now() else history.started_at end,
+    attempts=case when history.started_at<=now()-interval '1 minute' then 1 else history.attempts+1 end
+   where history.started_at<=now()-interval '1 minute' or history.attempts<8
+   returning history.attempts into attempts;
+   -- Return a normal response so failed guesses still count after the transaction commits.
+   if attempts is null then return jsonb_build_object('error','Too many attempts. Try again in a minute.'); end if;
+   select * into room from rock_arena.rooms where join_code=room_code and expires_at>now() for update;
+  elsif room_code ~ '^[0-9a-f]{16}$' then
+   select * into room from rock_arena.rooms where code=room_code and expires_at>now() for update;
+  else
+   raise exception 'Enter a valid room code.';
+  end if;
+  if room.code is null then
+   if short_code then return jsonb_build_object('error','Room code not found or expired.'); end if;
+   raise exception 'Room closed or expired.';
+  end if;
   if room.host=actor then side:=0; elsif room.guest=actor then side:=1; end if;
 
   if operation='join' and side is null then
-   if room.guest is not null or room.match->'winner'<>'null'::jsonb then raise exception 'Room is full or closed.'; end if;
+   if room.guest is not null or room.match->'winner'<>'null'::jsonb then
+    if short_code then return jsonb_build_object('error','Room is full or closed.'); end if;
+    raise exception 'Room is full or closed.';
+   end if;
    if jsonb_array_length(room.match#>'{teams,0}')<>cardinality(cards) then
-    raise exception 'This room needs a team of % cards.',jsonb_array_length(room.match#>'{teams,0}');
+    detail:=format('This room needs a team of %s cards.',jsonb_array_length(room.match#>'{teams,0}'));
+    if short_code then return jsonb_build_object('error',detail); end if;
+    raise exception '%',detail;
    end if;
    room.guest:=actor;
    room.match:=jsonb_set(room.match,'{teams,1}',team)||jsonb_build_object('revision',1,'note','Team 1 starts.');
@@ -172,7 +214,7 @@ begin
    raise exception 'Unknown match action.';
   end if;
  end if;
- return jsonb_build_object('code',room.code,'side',side,'waiting',room.guest is null,'match',room.match);
+ return jsonb_build_object('code',room.code,'joinCode',room.join_code,'side',side,'waiting',room.guest is null,'match',room.match);
 end
 $$;
 revoke all on function rock_arena.play(text,text,text[],text,integer,integer) from public,anon,authenticated;
