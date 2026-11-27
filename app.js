@@ -28,12 +28,12 @@ function notice(message){
  $('#status').textContent=message;
 }
 function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
-function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
+function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='idle';clearArenaResult();onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
 
 function money(units){
  const precision=units%E.unitsPerCent===0?2:6;
- return '$'+(units/1000000).toFixed(precision);
+ return '$'+(units/1000000).toLocaleString('en-US',{minimumFractionDigits:precision,maximumFractionDigits:precision});
 }
 function rateMoney(units){
  const amount=(units/1000000).toFixed(8).replace(/0+$/,'');
@@ -140,7 +140,7 @@ function go(next){
 function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='battle'?arenaView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();updateMoney();if(view==='battle')showArenaResult();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${kicker}</div><h1>${title}</h1></div></div>`;}
 function packArt(pack){
- return `<div class="foil rocks" data-edition="${pack.name}" style="--foil:${pack.color};--print-position:${(pack.index+1)*100/9}%"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo pack-print" aria-hidden="true"></div><div class="foil-art">${[...pack.cover.slice(1),pack.cover[0]].map((id,index)=>cardImage(byId[id],'art-'+index)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title pack-print" aria-hidden="true"></div></div></div>`;
+ return `<div class="foil rocks" data-edition="${pack.name}" style="--foil:${pack.color};--print-position:${(pack.index+1)*100/9}%"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo pack-print" aria-hidden="true"></div><div class="foil-art">${[...pack.cover.slice(1),pack.cover[0]].map((id,index)=>cardImage(byId[id],'art-'+index)).join('')}</div><div class="foil-crest" aria-hidden="true"></div>${pack.index<9?`<div class="foil-title pack-print" aria-hidden="true"></div>`:`<div class="foil-edition-name" aria-hidden="true">${pack.name}</div>`}</div></div>`;
 }
 
 function packsView(){
@@ -224,7 +224,8 @@ function oddsView(){
 function scrollToPack(rail, choice, smooth = false) {
   // Use layout coordinates so the pack's visual scale does not shift its snap point.
   const left = choice.offsetLeft - (rail.clientWidth - choice.offsetWidth) / 2;
-  const animate = smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const nearby = Math.abs(left - rail.scrollLeft) <= rail.clientWidth;
+  const animate = smooth && nearby && !matchMedia('(prefers-reduced-motion: reduce)').matches;
   programmaticPackScroll.add(rail);
   rail.scrollTo({ left, behavior: animate ? 'smooth' : 'instant' });
 }
@@ -305,7 +306,7 @@ function bindCarousel() {
 
 function selectPack(index, scroll = true) {
   const before = selectedIndex;
-  selectedIndex = Math.max(0, Math.min(8, Number(index)));
+  selectedIndex = Math.max(0, Math.min(packs.length-1, Number(index)));
   if (before !== selectedIndex) sound('pack-crinkle');
   save();
 
@@ -603,9 +604,7 @@ function openingPull(){return pending.pull;}
 
 function raritySpinner(){
  const hero=openingPull();
- const oddsWeights=E.oddsPresets[pending.odds];
- const tiers=oddsWeights.flatMap((weight,tier)=>weight>0?[tier]:[]);
- const slots=tiers.length===2?Array.from({length:8},(_,index)=>tiers[index%2]):tiers;
+ const slots=E.oddsPresets[pending.odds].flatMap((weight,tier)=>weight>0?[tier]:[]);
  const angle=360/slots.length;
  const landings=slots.flatMap((tier,index)=>tier===hero.tier?[index]:[]);
  const landingIndex=landings[Math.floor(E.random()*landings.length)];
@@ -853,7 +852,7 @@ case 'delete-confirm':{state=E.defaults();selectedIndex=0;save();go('profile');f
 document.addEventListener('input',e=>{if(e.target.id==='arenaCode'){e.target.value=e.target.value.replace(/[^0-9]/g,'').slice(0,4);return;}if(e.target.id==='arenaFilter'){arenaFilter=e.target.value;$('#arenaTeam').innerHTML=teamOptions();return;}if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='arenaCode')$('[data-action="arena-join"]').click();if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','battle','leaderboard'].includes(target)){go(target);}});
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
  if(snapshot)return E.creditReward(snapshot,cents);
  E.creditReward(state,cents);updateHeader();return state;
  },validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
@@ -883,7 +882,7 @@ function arenaView(){
  for(const uid of arenaTeam)if(!state.vault.some(card=>card.uid===uid))arenaTeam.delete(uid);
  const cloud=battleCloud(),locked=arenaTeam.size===0||arenaBusy;
  return `<section class="arena">
-  <h1>Rock Arena</h1><p>Choose up to three owned cards. Win to earn ${winRewardRange()} in virtual coins.</p>
+  <h1>Rock Arena</h1><p>Equip up to three cards. Win for ${winRewardRange()} in virtual coins.</p>
   ${state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
    <div class="search">${icon('search')}<input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}"></div>
    <div class="team-list" id="arenaTeam">${teamOptions()}</div>
@@ -936,11 +935,7 @@ function aiBattle(){
  const cards=state.vault.filter(card=>arenaTeam.has(card.uid));
  if(!cards.length)return;
  const first=cards.map(card=>A.combatCard(card,E));
- const second=cards.map((card,index)=>{
-  const pool=catalog.filter(item=>item.tier===card.tier&&item.id!==card.itemId);
-  const rival=pool[Math.floor(E.random()*pool.length)]||catalog[index];
-  return A.combatCard({itemId:rival.id,tier:card.tier,level:E.cardLevel(card)},E);
- });
+ const second=A.aiTeam(cards,catalog,packs.length,E);
  arenaMatch=A.newMatch(first,second);
  render();
 }
@@ -1042,7 +1037,7 @@ async function animateArenaMove(before,after){
  const nextOwn=after.teams[side][before.active[side]],nextTarget=after.teams[other][before.active[other]];
  const loss=target.hp-nextTarget.hp,healed=nextOwn.hp-own.hp;
  const ability=after.lastMove?.ability?A.abilityFor(own,before.rules):null;
- const style=before.rules===3?A.movesFor(own).style:null;
+ const visual=A.moveVisual(own,!!ability);
  const switched=before.active[side]!==after.active[side];
  const guarded=nextOwn.guard&&(!own.focus||!own.guard);
  if(!(ability||loss>0||switched||guarded))return;
@@ -1058,7 +1053,8 @@ async function animateArenaMove(before,after){
   effect.className='arena-effect arena-effect--'+className;
   effect.dataset.color=color;
   if(ability)effect.dataset.ability=ability.id;
-  else if(style)effect.dataset.strike=style;
+  effect.dataset.motif=visual.motif;
+  effect.style.setProperty('--move-hue',String(visual.hue));
   effect.style.left=position.x+'px';
   effect.style.top=position.y+'px';
   effect.textContent=label;
@@ -1077,21 +1073,37 @@ async function animateArenaMove(before,after){
   updateFighter(actor,nextOwn);
   sound('arena-special');
   const charge=spawn('charge',from,healed>0?`+${healed} HP`:ability.name);
-  await arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.7},{opacity:1,scale:1.04,offset:.28},{opacity:0,scale:1.15}],reduced?230:400);
+  const aura=reduced?null:spawn('aura',from);
+  await Promise.all([
+   arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.7},{opacity:1,scale:1.04,offset:.28},{opacity:0,scale:1.15}],reduced?230:400),
+   aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.75,offset:.35},{opacity:0,scale:1+visual.spread/45,rotate:visual.bend+'deg'}],400)
+  ]);
   charge.remove();
+  aura?.remove();
   if(!effects.isConnected)return;
  }
  if(loss>0){
   const direction=Math.sign(to.y-from.y);
   if(!reduced){
-   const projectile=spawn('shot',from);
-   projectile.dataset.direction=direction>0?'down':'up';
-   const travel=`translate(${to.x-from.x}px,${to.y-from.y}px)`;
+   const dx=to.x-from.x,dy=to.y-from.y;
+   const paths={
+    shard:[0],fracture:[-1,0,1],comet:[.5],meteor:[-1],ring:[0],boulder:[-.6],
+    ribbon:[-1,1],volley:[-1,0,1],prism:[-1,1],renew:[0],bulwark:[0]
+   };
+   const projectiles=paths[visual.motif].map(lane=>{
+    const projectile=spawn('shot',from);
+    projectile.dataset.direction=direction>0?'down':'up';
+    const bend=lane*visual.bend;
+    return arenaAnimation(projectile,[
+     {opacity:0,transform:'scale(.35)'},
+     {opacity:1,offset:.48,transform:`translate(${dx*.5+bend}px,${dy*.48}px) scale(.9)`},
+     {opacity:1,transform:`translate(${dx}px,${dy}px) scale(1.08)`}
+    ],280,'ease-in').then(()=>projectile.remove());
+   });
    await Promise.all([
     arenaAnimation(actor,[{transform:'translateY(0)'},{transform:`translateY(${-direction*9}px)`,offset:.26},{transform:`translateY(${direction*13}px)`,offset:.56},{transform:'translateY(0)'}],310),
-    arenaAnimation(projectile,[{opacity:0,transform:'scale(.4)'},{opacity:1,offset:.27},{opacity:1,transform:travel+' scale(1.08)'}],280,'cubic-bezier(.64,.04,.9,.48)')
+    ...projectiles
    ]);
-   projectile.remove();
   }
   if(!effects.isConnected)return;
   const remaining=nextTarget.hp;
@@ -1107,7 +1119,7 @@ async function animateArenaMove(before,after){
     {transform:'translateY(-2px) rotate(-3deg)',offset:.48},{transform:'none',filter:remaining?'none':'grayscale(.8)'}],reduced?170:295),
    arenaAnimation(damage,reduced?[{opacity:1},{opacity:1}]:[{opacity:1,transform:'translateY(3px) scale(.85)'},{opacity:1,transform:'translateY(-22px) scale(1.13)',offset:.45},{opacity:0,transform:'translateY(-46px)'}],reduced?260:430),
    ...sparks.map((spark,index)=>{
-    const angle=index/sparks.length*2*Math.PI,radius=remaining?42:66;
+    const angle=index/sparks.length*2*Math.PI+visual.hue*Math.PI/180,radius=visual.spread+(remaining?0:20);
     return arenaAnimation(spark,[{opacity:1,transform:'none'},{opacity:0,transform:`translate(${Math.cos(angle)*radius}px,${Math.sin(angle)*radius}px) rotate(110deg)`}],remaining?320:430);
    }),
    arenaAnimation(impact,reduced?[{opacity:.8},{opacity:0}]:[{opacity:1,scale:.38},{opacity:0,scale:1.5,rotate:'28deg'}],reduced?180:340)
@@ -1232,7 +1244,7 @@ document.addEventListener('visibilitychange',()=>{
  incomeTick(true,!document.hidden);
  if(document.hidden){stopEffects();stopWinMusic();}
 });
-function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===8;}
+function updateCarouselControls(){const prev=$('[data-action="previous-pack"]'),next=$('[data-action="next-pack"]');if(prev)prev.disabled=selectedIndex===0;if(next)next.disabled=selectedIndex===packs.length-1;}
 function updatePackPanel(){
  $('#packPanel').innerHTML=packPanel();
 }

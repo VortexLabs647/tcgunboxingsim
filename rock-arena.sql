@@ -105,7 +105,7 @@ as $$
  join unnest(cards) with ordinality as requested(uid,ordinality) on requested.uid=card->>'uid'
  cross join lateral (
   select (card->>'tier')::int as tier,coalesce((card->>'level')::int,1) as level,
-   coalesce(substring(card->>'packId' from '^rocks-([0-8])$')::int,0) as pack_rank
+   coalesce(substring(card->>'packId' from '^rocks-([0-9]|1[0-5])$')::int,0) as pack_rank
   where card->>'tier' ~ '^[0-5]$' and coalesce(card->>'level','1') ~ '^[1-5]$'
  ) as stats
  where save.user_id=player and card->>'itemId' ~ '^rock-[a-z0-9-]{1,80}$'

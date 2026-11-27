@@ -1,25 +1,27 @@
 (function(root){
 'use strict';
 
-const names=['Opal','Sapphire','Amethyst','Emerald','Ruby','Gold','Obsidian','Diamond','Sovereign'];
-const packPrices=[2,4,6,10,15,25,40,65,100];
+const names=['Opal','Sapphire','Amethyst','Emerald','Ruby','Gold','Obsidian','Diamond','Sovereign','Aurora','Geode','Nebula','Eclipse','Nova','Celestial','Zenith'];
+const packPrices=[2,4,6,10,15,25,40,65,100,500,2500,10000,50000,100000,500000,1000000];
 const salePercent=[20,35,60,100,150,300];
 const startingBalance=10;
 const winRewardMin=1,winRewardMax=50;
 const starterId='starter-granite';
-const foilColors=['#fa3d7d','#3e8bff','#b052ff','#24dfad','#ff4c3d','#ffbf20','#5f63ff','#37d9ff','#ffb54a'];
+const foilColors=['#fa3d7d','#3e8bff','#b052ff','#24dfad','#ff4c3d','#ffbf20','#5f63ff','#37d9ff','#ffb54a','#65efc0','#c267fa','#7297ff','#c54670','#ff734b','#d3edff','#ffdd7b'];
 const rarityNames=['Common','Uncommon','Rare','Epic','Legendary','Grail'];
 const rarityColors=['#88a3cb','#41dfb0','#439cff','#aa5bff','#ff4c60','#ffcf36'];
 const covers=[
  ['opal','agate','calcite'],['sapphire','fluorite','basalt'],['amethyst','calcite','agate'],
  ['emerald','fluorite','granite'],['garnet','jasper','sandstone'],['pyrite','agate','sandstone'],
- ['obsidian','basalt','tourmaline'],['diamond','calcite','sapphire'],['tourmaline','garnet','emerald']
+ ['obsidian','basalt','tourmaline'],['diamond','calcite','sapphire'],['tourmaline','garnet','emerald'],
+ ['labradorite','opal','fluorite'],['amethyst','calcite','agate'],['sapphire','lapis-lazuli','spinel'],
+ ['obsidian','moonstone','onyx'],['citrine-sunlit','garnet','pyrite'],['celestite','aquamarine','diamond'],
+ ['spinel-moonlit','tourmaline','opal']
 ];
-const signatureCards=['opal','sapphire','amethyst','emerald','jasper','pyrite','obsidian','diamond','tourmaline'];
+const signatureCards=['opal','sapphire','amethyst','emerald','jasper','pyrite','obsidian','diamond','tourmaline','labradorite','amethyst','lapis-lazuli','moonstone','citrine-sunlit','celestite','spinel-moonlit'];
 const oddsPresets={
- Balanced:[34,25,19,12,8,2],
- Explorer:[24,29,22,15,8,2],
- '50/50':[50,0,0,0,50,0]
+ Balanced:[28,24,22,14,9,3],
+ Explorer:[18,24,24,18,12,4]
 };
 const productiveLimit=12,offlineSeconds=8*60*60;
 // One unit is $0.000001 in virtual currency.
@@ -46,8 +48,9 @@ function buyBadge(state,id,now=Date.now()){
 }
 const maxLevel=5;
 function packRank(rock){
- const match=/^rocks-([0-8])$/.exec(rock.packId);
- return Number(match?.[1]??0);
+ const match=/^rocks-(0|[1-9][0-9]?)$/.exec(rock.packId);
+ const rank=Number(match?.[1]??0);
+ return rank<names.length?rank:0;
 }
 function cardLevel(rock){return rock.level??1;}
 function cardStats(rock){
@@ -212,8 +215,7 @@ function migrate(old,catalog){
  if(old.pricedPacks!==true){
   for(const rock of state.vault){
    if(rock.value>0)continue;
-   const match=/^rocks-([0-8])$/.exec(rock.packId);
-   rock.value=saleValue(packPrices[Number(match?.[1]??0)],rock.tier);
+   rock.value=saleValue(packPrices[packRank(rock)],rock.tier);
   }
   if(state.balance===0&&!state.vault.length)state.balance=startingBalance;
  }
@@ -255,7 +257,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={packRank,winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);

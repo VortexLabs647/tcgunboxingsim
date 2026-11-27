@@ -70,6 +70,13 @@ function movesFor(card){
  const [prefix,style]=finishStyles[suffix]||['','stone'];
  return {attack:prefix?prefix+' '+moves[0]:moves[0],special:prefix?prefix+' '+moves[1]:moves[1],effect:moves[2],style};
 }
+function moveVisual(card,special=false){
+ const moves=movesFor(card);
+ const name=special?moves.special:moves.attack;
+ const key=Array.from(name).reduce((hash,char)=>Math.imul(hash,31)+char.codePointAt(0)>>>0,0);
+ const motif=special?moves.effect:['shard','comet','ring','boulder','ribbon','volley'][key%6];
+ return {motif,hue:key/0x100000000*360,spread:25+(key%31),bend:14+(key%32)};
+}
 function abilityFor(card,rules=3){
  if(rules>=3){
   const moves=movesFor(card);
@@ -128,6 +135,35 @@ function hitDamage(own,rival,rules,ability){
 function combatCard(card,engine){
  const {damage,hp}=engine.cardStats(card);
  return {itemId:card.itemId,level:engine.cardLevel(card),damage,hp,maxHp:hp,guard:false,focus:false};
+}
+function aiTeam(cards,catalog,packCount,engine,rng=engine.random){
+ const direction=rng()<.5?-1:1;
+ const used=new Set();
+ return cards.map(card=>{
+  const level=engine.cardLevel(card),rank=engine.packRank(card);
+  const available=catalog.filter(item=>Math.abs(item.tier-card.tier)<=1&&item.id!==card.itemId);
+  const candidates=[];
+  for(const item of available){
+   for(let nextLevel=Math.max(1,level-1);nextLevel<=Math.min(engine.maxLevel,level+1);nextLevel++){
+    for(let nextRank=Math.max(0,rank-1);nextRank<=Math.min(packCount-1,rank+1);nextRank++){
+     const tierDelta=item.tier-card.tier,levelDelta=nextLevel-level,rankDelta=nextRank-rank;
+     const attack=tierDelta+levelDelta*2+rankDelta;
+     const health=tierDelta*2+levelDelta*3+rankDelta*3;
+     const difference=attack*3+health;
+     if(attack*health>0&&Math.abs(difference)<=15){
+      candidates.push({itemId:item.id,tier:item.tier,level:nextLevel,packId:'rocks-'+nextRank,difference});
+     }
+    }
+   }
+  }
+  const sameDirection=candidates.filter(item=>Math.sign(item.difference)===direction);
+  const pool=sameDirection.length?sameDirection:candidates;
+  const unique=pool.filter(item=>!used.has(item.itemId));
+  const choices=unique.length?unique:pool;
+  const rival=choices[Math.floor(rng()*choices.length)]||card;
+  used.add(rival.itemId);
+  return combatCard(rival,engine);
+ });
 }
 function newMatch(first,second){
  return {teams:[first,second],active:[0,0],turn:0,revision:0,rules:3,winner:null,note:'Choose an action.'};
@@ -188,7 +224,7 @@ function aiMove(match){
  return move(match,1,'strike');
 }
 
-const arena={movesFor,attackPower,battleNote,abilityFor,canUseAbility,combatCard,newMatch,move,aiMove};
+const arena={movesFor,moveVisual,aiTeam,attackPower,battleNote,abilityFor,canUseAbility,combatCard,newMatch,move,aiMove};
 if(typeof module!=='undefined'&&module.exports)module.exports=arena;
 else root.TCGArena=arena;
 })(typeof window==='undefined'?globalThis:window);
