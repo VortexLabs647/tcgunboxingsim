@@ -897,7 +897,14 @@ function campaignRank(){
 function campaignShield(rank){
  return `<span class="campaign-shield" aria-hidden="true"><span>RANK</span><b>${rank}</b></span>`;
 }
+let arenaArtPreload;
 function arenaView(){
+ arenaArtPreload??=['arena-attacks.webp','arena-elements.webp','levels-pickaxe.webp'].map(src=>{
+  const image=new Image();
+  image.src=src;
+  image.decode?.().catch(()=>{});
+  return image;
+ });
  if(onlineRoom?.waiting)return `<section class="arena content-card">
   <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} ${onlineRoom.match.teams[0].length===1?'card':'cards'}.</p>
   <input class="room-code" readonly aria-label="Room code" value="${escape(onlineRoom.joinCode||onlineRoom.code)}">
@@ -1155,23 +1162,26 @@ function showArenaResult(){
 }
 function lockArenaActions(){
  for(const button of $$('[data-action="arena-move"]'))button.disabled=true;
+ const turn=$('.arena-turn strong');
+ if(turn)turn.textContent='Resolving move…';
 }
-function arenaAnimation(element,keyframes,duration,easing='ease-out'){
- return element.animate(keyframes,{duration,easing,fill:'none'}).finished.catch(()=>{});
+function arenaAnimation(element,keyframes,duration,easing='ease-out',delay=0){
+ return element.animate(keyframes,{duration,easing,delay,fill:delay?'backwards':'none'}).finished.catch(()=>{});
 }
-async function animateRockKnockout(fighter,reduced){
+async function animateRockKnockout(fighter,effects,reduced){
  const card=$('.cartoon-card',fighter);
- if(!card||!fighter.isConnected)return;
+ if(!card||!effects.isConnected)return;
+ const bounds=card.getBoundingClientRect(),area=effects.getBoundingClientRect();
  const stage=document.createElement('span');
  stage.className='arena-knockout';
  stage.setAttribute('aria-hidden','true');
- Object.assign(stage.style,{left:card.offsetLeft+'px',top:card.offsetTop+'px',width:card.offsetWidth+'px',height:card.offsetHeight+'px'});
+ Object.assign(stage.style,{left:bounds.left-area.left+'px',top:bounds.top-area.top+'px',width:bounds.width+'px',height:bounds.height+'px'});
  const pickaxe=document.createElement('img');
  pickaxe.className='arena-knockout-pickaxe';
  pickaxe.src='levels-pickaxe.webp';
  pickaxe.alt='';
  stage.append(pickaxe);
- fighter.append(stage);
+ effects.append(stage);
  try{
   if(reduced){
    stage.classList.add('arena-knockout--reduced');
@@ -1179,40 +1189,37 @@ async function animateRockKnockout(fighter,reduced){
    await arenaAnimation(stage,[{opacity:1},{opacity:1},{opacity:0}],225);
    return;
   }
-  await arenaAnimation(pickaxe,[
-   {opacity:0,transform:'translate(55%,-48%) rotate(58deg) scale(.76)'},
-   {opacity:1,transform:'translate(44%,-35%) rotate(46deg)',offset:.37},
-   {opacity:1,transform:'translate(12%,-6%) rotate(-18deg)',offset:.80},
-   {opacity:1,transform:'rotate(-42deg) scale(1.08)'}
-  ],255,'ease-in');
+  const duration=400,contact=.46;
+  const swing=arenaAnimation(pickaxe,[
+   {opacity:0,transform:'translate(46%,-46%) rotate(43deg) scale(.87)'},
+   {opacity:1,transform:'translate(32%,-38%) rotate(35deg) scale(.97)',offset:.19,easing:'cubic-bezier(.52,.03,.74,.49)'},
+   {opacity:1,transform:'translate(0,0) rotate(-33deg) scale(1.06)',offset:contact,easing:'ease-out'},
+   {opacity:.95,transform:'translate(-23%,18%) rotate(-61deg) scale(1)',offset:.68},
+   {opacity:0,transform:'translate(-34%,35%) rotate(-70deg) scale(.86)'}
+  ],duration,'linear');
+  await arenaAnimation(stage,[{},{}],duration*contact,'linear');
   if(!stage.isConnected)return;
   sound('arena-chip');
-  card.dataset.knockedOut='true';
   const crack=document.createElement('span');
   crack.className='arena-knockout-crack';
   stage.append(crack);
   const pieces=['left','right'].map((side,index)=>{
    const piece=document.createElement('span');
-   const copy=card.cloneNode(true);
-   delete copy.dataset.knockedOut;
    piece.className='arena-knockout-piece';
    piece.dataset.side=side;
-   piece.append(copy);
+   piece.append(card.cloneNode(true));
    stage.prepend(piece);
    const direction=index===0?-1:1;
    return arenaAnimation(piece,[
-    {opacity:1,transform:'none'},
-    {opacity:1,transform:`translate(${direction*18}%,-9%) rotate(${direction*10}deg)`,offset:.32},
-    {opacity:0,transform:`translate(${direction*54}%,48%) rotate(${direction*34}deg) scale(.82)`}
-   ],365,'cubic-bezier(.22,.66,.44,1)');
+    {opacity:1,transform:'translate(0,0) rotate(0deg) scale(1)'},
+    {opacity:1,transform:`translate(${direction*17}%,-8%) rotate(${direction*9}deg) scale(1)`,offset:.37,easing:'ease-in'},
+    {opacity:0,transform:`translate(${direction*51}%,46%) rotate(${direction*27}deg) scale(.82)`}
+   ],335,'linear');
   });
+  fighter.dataset.knockedOut='true';
   await Promise.all([
-   ...pieces,
-   arenaAnimation(crack,[{opacity:1},{opacity:.8,offset:.29},{opacity:0}],230),
-   arenaAnimation(pickaxe,[
-    {opacity:1,transform:'rotate(-42deg) scale(1.08)'},
-    {opacity:0,transform:'translate(-34%,28%) rotate(-71deg) scale(.83)'}
-   ],270)
+   swing,...pieces,
+   arenaAnimation(crack,[{opacity:1},{opacity:.85,offset:.21},{opacity:0}],190)
   ]);
  }finally{stage.remove();}
 }
@@ -1252,6 +1259,7 @@ async function animateArenaMove(before,after){
  const guarded=nextOwn.guard&&(!own.focus||!own.guard);
  if(!(ability||loss>0||switched||guarded))return;
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const compact=matchMedia('(max-width: 600px)').matches;
  const color=actor.closest('.arena-team--player')?'mint':'violet';
  const board=effects.getBoundingClientRect();
  const center=element=>{
@@ -1301,8 +1309,8 @@ async function animateArenaMove(before,after){
   const charge=spawn('charge',from,healed>0?`+${healed} HP`:ability.name);
   const aura=reduced?null:spawn('aura',from);
   await Promise.all([
-   arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.7},{opacity:1,scale:1.04,offset:.28},{opacity:0,scale:1.15}],reduced?230:400),
-   aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.75,offset:.35},{opacity:0,scale:1+visual.spread/45,rotate:visual.bend+'deg'}],400),
+   arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.82},{opacity:1,scale:1,offset:.3},{opacity:0,scale:1.08}],reduced?175:225),
+   aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.6,offset:.4},{opacity:0,scale:1.18}],225),
    loss===0&&illustratedImpact(from)
   ]);
   charge.remove();
@@ -1318,37 +1326,36 @@ async function animateArenaMove(before,after){
     ribbon:[-1,1],volley:[-1,0,1],prism:[-1,1],renew:[0],bulwark:[0]
    };
    const windup=spawn('windup',from);
-   await Promise.all([
-    arenaAnimation(actor,[{transform:'scale(1)'},{transform:`translateY(${-direction*9}px) scale(.91,1.08)`,offset:.68},{transform:`translateY(${-direction*5}px) scale(.98,1.05)`}],137),
-    arenaAnimation(windup,[{opacity:0,scale:.35},{opacity:.95,scale:.76,offset:.68},{opacity:0,scale:1.08}],137)
-   ]);
-   windup.remove();
-   if(!effects.isConnected)return;
+   const launch=100,arrival=launch+motion.flight;
+   void arenaAnimation(windup,[{opacity:0,scale:.55},{opacity:.82,scale:.88,offset:.63},{opacity:0,scale:1.15}],launch+75).then(()=>windup.remove());
+   void arenaAnimation(actor,[
+    {transform:'translateY(0) scale(1)'},
+    {transform:`translateY(${-direction*8}px) scale(.95,1.04)`,offset:launch/(arrival+55),easing:'cubic-bezier(.28,.64,.46,1)'},
+    {transform:`translateY(${direction*13}px) scale(1.04,.96)`,offset:(launch+75)/(arrival+55),easing:'ease-out'},
+    {transform:'translateY(0) scale(1)'}
+   ],arrival+55,'linear');
    const shots=paths[visual.motif];
-   const trails=Array.from({length:shots.length>1?3:4},(_,i)=>i);
-   const projectiles=[...shots,...trails].map((lane,index)=>{
+   const trails=Array.from({length:compact?2:3},(_,i)=>i);
+   await Promise.all([...shots,...trails].map((lane,index)=>{
     const tracer=index>=shots.length;
     const piece=spawn(tracer?'tracer':'shot',from);
     piece.dataset.direction=direction>0?'down':'up';
-    const sideOffset=tracer?(lane-1.5)/3:lane;
+    const sideOffset=tracer?(lane-.9)/2:lane;
     const bend=sideOffset*motion.bend;
     const twist=motion.turn*(sideOffset<0?-1:1);
+    const lag=tracer?24+lane*17:0;
     const frame=(at,xOffset,rotation,scale,opacity)=>({
      offset:at,opacity,
      transform:`translate(${dx*at+xOffset}px,${dy*at}px) rotate(${rotation}deg) scale(${scale})`
     });
     const frames=[
-     frame(0,0,-twist,.31,0),
-     frame(.29,bend*.65,twist*.65,tracer ? .43 : .92,1),
-     frame(.64,visual.element==='lightning'?-bend:bend,twist,tracer ? .72 : 1.1,tracer ? .74 : 1),
-     frame(1,0,twist*1.2,1.15,tracer ? .08 : 1)
+     frame(0,0,-twist,.42,0),
+     frame(.22,bend*.55,twist*.3,tracer ? .48 : .84,1),
+     frame(.62,bend,twist*.83,tracer ? .72 : 1,tracer ? .72 : 1),
+     frame(1,0,twist,1,tracer ? 0 : .87)
     ];
-    return arenaAnimation(piece,frames,motion.flight+(tracer?index*16:0),'ease-in').then(()=>piece.remove());
-   });
-   await Promise.all([
-    arenaAnimation(actor,[{transform:`translateY(${-direction*5}px) scale(.98,1.05)`},{transform:`translateY(${direction*19}px) scale(1.07,.92)`,offset:.34},{transform:'none'}],motion.flight),
-    ...projectiles
-   ]);
+    return arenaAnimation(piece,frames,motion.flight-lag,'cubic-bezier(.37,.16,.73,.9)',launch+lag).then(()=>piece.remove());
+   }));
   }
   if(!effects.isConnected)return;
   const remaining=nextTarget.hp;
@@ -1357,12 +1364,17 @@ async function animateArenaMove(before,after){
   sound('arena-hit');
   const damage=spawn('damage',to,`−${loss}`);
   const impact=spawn(target.guard&&ability?.id!=='fracture'?'shield':'burst',to);
-  const shocks=reduced?[]:[spawn('shock-ring',to),spawn('shock-ring',to)];
-  const sparks=reduced?[]:Array.from({length:remaining?9:13},(_,index)=>spawn(index%3===0?'shard':'spark',to));
+  const shocks=reduced?[]:Array.from({length:compact?1:2},()=>spawn('shock-ring',to));
+  const sparkCount=compact?(remaining?5:7):(remaining?8:10);
+  const sparks=reduced?[]:Array.from({length:sparkCount},(_,index)=>spawn(index%3===0?'shard':'spark',to));
+  const recoil=arenaAnimation(rival,reduced?[{opacity:1},{opacity:1}]:[
+   {transform:'translateY(0) rotate(0deg)',easing:'ease-out'},
+   {transform:`translateY(${direction*9}px) rotate(${direction*5}deg)`,offset:.27,easing:'ease-in-out'},
+   {transform:`translateY(${-direction*2}px) rotate(${-direction*2}deg)`,offset:.64,easing:'ease-out'},
+   {transform:'translateY(0) rotate(0deg)'}
+  ],reduced?90:228,'linear');
   await Promise.all([
-   arenaAnimation(rival,reduced?[{filter:'brightness(1.4)'},{filter:'none'}]:[
-    {transform:`translateY(${direction*11}px) rotate(${direction*7}deg)`,filter:'brightness(1.65)'},
-    {transform:'translateY(-2px) rotate(-3deg)',offset:.48},{transform:'none',filter:remaining?'none':'grayscale(.8)'}],reduced?170:295),
+   recoil.then(()=>remaining===0&&effects.isConnected&&animateRockKnockout(rival,effects,reduced)),
    arenaAnimation(damage,reduced?[{opacity:1},{opacity:1}]:[{opacity:1,transform:'translateY(3px) scale(.85)'},{opacity:1,transform:'translateY(-22px) scale(1.13)',offset:.45},{opacity:0,transform:'translateY(-46px)'}],reduced?260:430),
    ...shocks.map((ring,index)=>arenaAnimation(ring,[
     {opacity:0,scale:.22},{opacity:.8,scale:.45,offset:.22+index*.08},{opacity:0,scale:1.8+index*.54}
@@ -1382,7 +1394,6 @@ async function animateArenaMove(before,after){
   damage.remove();
   impact.remove();
   [...sparks,...shocks].forEach(effect=>effect.remove());
-  if(remaining===0&&effects.isConnected)await animateRockKnockout(rival,reduced);
  }else if(guarded||switched){
   sound('arena-guard');
   const effect=spawn(guarded?'shield':'swap',from,guarded?'GUARD':'SWITCH');
