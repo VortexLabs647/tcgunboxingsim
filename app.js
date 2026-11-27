@@ -419,7 +419,7 @@ function profileView(){
  return `<div class="profile-dashboard">
   <header class="simple-profile-heading"><h1>Profile</h1></header>
   <section class="profile-hero" aria-label="Collector overview">
-   <div class="profile-portrait" aria-hidden="true"><img src="collector-golem.webp" alt="" width="160" height="160"></div>
+   <div class="profile-portrait" aria-hidden="true"><img src="profile-amethyst.webp" alt="" width="160" height="160"></div>
    <div class="profile-identity">
     <div class="profile-identity-name"><h2>${escape(state.name||'Rock Collector')}</h2><button class="profile-edit" type="button" data-action="edit-collector" aria-label="Edit collector name">✎</button></div>
     <p>${rank.title}</p>
@@ -1126,7 +1126,7 @@ function arenaLevelsView(locked){
  }).join('');
  return `<section class="arena-levels" aria-labelledby="arenaLevelsTitle">
   <header class="arena-campaign-title">
-   <img src="collector-golem.webp" alt="" width="132" height="132">
+   <img class="arena-pickaxe" src="levels-pickaxe.webp" alt="" width="132" height="132">
    <h2 id="arenaLevelsTitle">Levels</h2>
    <span aria-hidden="true" class="arena-title-gem"></span>
   </header>
