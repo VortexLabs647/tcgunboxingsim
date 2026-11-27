@@ -201,7 +201,7 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
 }
 
 function defaults(){
- return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,packPremium:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
+ return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,packPremium:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,bestDropScore:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
 }
 function migrate(old,catalog){
  const state={...defaults(),...old,version:4};
@@ -247,6 +247,7 @@ function validSave(state,catalog){
   new Set(state.vault.map(card=>card.uid)).size===state.vault.length&&
   (state.retiredCards===undefined||cardList(state.retiredCards))&&
   ['opened','spent','sold','best','deposited'].every(key=>Number.isSafeInteger(state[key])&&state[key]>=0)&&
+  (state.bestDropScore===undefined||[0,10,20,30].includes(state.bestDropScore))&&
   (state.rockClock===undefined||Number.isSafeInteger(state.rockClock)&&state.rockClock>=0)&&
   (state.rockRemainder===undefined||Number.isSafeInteger(state.rockRemainder)&&state.rockRemainder>=0&&state.rockRemainder<unitsPerCent)&&
   (state.welcomePack===undefined||typeof state.welcomePack==='boolean')&&

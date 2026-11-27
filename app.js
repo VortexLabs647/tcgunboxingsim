@@ -13,6 +13,7 @@ const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const SPIN_MS=2400,RESULT_MS=900;
 const rockMatchPairs=4;
+const dropLanes=5,dropRows=5;
 // Match short, frequency-weighted listening levels across the game's sound cues.
 const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
@@ -403,7 +404,7 @@ function buyBadge(id){
  sound('vault');
 }
 function profileSection(id,label,content){return `<details class="profile-fold content-card" data-profile-section="${id}" ${profileSections.has(id)?'open':''}><summary>${label}<span aria-hidden="true">+</span></summary><div class="profile-fold-body">${content}</div></details>`;}
-function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>PROFILE.</em></h1></div><div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('install','Install the app','<p>On iPhone, open this site in Safari. Tap Share, select <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong> if shown, then tap Add.</p><p>On Android, open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>')}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
+function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>PROFILE.</em></h1></div><div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length],['Best Crystal Drop score',state.bestDropScore]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('install','Install the app','<p>On iPhone, open this site in Safari. Tap Share, select <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong> if shown, then tap Add.</p><p>On Android, open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>')}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
 
 function itemView(){
  const item=byId[detailId];
@@ -591,6 +592,7 @@ function openingView(){
  if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');
  if(phase==='revealed')return resultsView();
  if(phase==='matching')return rockMatchView();
+ if(phase==='crystal-drop')return crystalDropView();
  const pack=pending.pack;
  return `<section class="opening-screen spinning" id="openingScreen" style="--foil:${pack.color};--spin-color:#c7a4fb;--spin-time:${SPIN_MS}ms">
    <div class="eyebrow">${pack.name} Rock Pack · ${pending.odds}</div>
@@ -698,7 +700,17 @@ function shuffleRockMatch(items){
  return shuffled;
 }
 function startRockMatch(){
- if(view!=='opening'||phase!=='revealed'||pending?.pull.tier!==0||pending.rockMatch)return;
+ if(view!=='opening'||phase!=='revealed'||pending?.pull.tier!==0)return;
+ if(pending.rockMatch?.complete){
+  startCrystalDrop();
+  return;
+ }
+ if(pending.rockMatch){
+  phase='matching';
+  render();
+  $('#rockMatchTitle').focus({preventScroll:true});
+  return;
+ }
  const pulled=byId[openingPull().itemId];
  const rocks=[pulled.id];
  const artKey=item=>item.image+':'+item.artIndex;
@@ -737,7 +749,10 @@ function rockMatchView(){
    </button>`;
   }).join('')}</div>
   <p class="rock-match-status" role="status">${pairs} of ${rockMatchPairs} pairs. ${escape(game.message)}</p>
-  <button class="${game.complete?'primary':'secondary'}" type="button" data-action="rock-match-back">${game.complete?'Back to card':'Exit Rock Match'}</button>
+  <div class="rock-match-actions">
+   ${game.complete?'<button class="primary" type="button" data-action="crystal-drop-start">Play Crystal Drop</button>':''}
+   <button class="secondary" type="button" data-action="rock-match-back">${game.complete?'Back to card':'Exit Rock Match'}</button>
+  </div>
  </section>`;
 }
 function flipRockMatch(index){
@@ -762,27 +777,127 @@ function flipRockMatch(index){
   }else sound('vault');
  }else{
   game.message='Try again.';
-  timers.push(setTimeout(()=>{
+  const flipTimer=setTimeout(()=>{
    if(phase!=='matching'||pending?.rockMatch!==game)return;
    game.open=[];
    render();
    $(`[data-action="rock-match-flip"][data-id="${index}"]`)?.focus({preventScroll:true});
-  },850));
+  },850);
+  game.flipTimer=flipTimer;
+  timers.push(flipTimer);
  }
  render();
  if(game.complete)$('#rockMatchTitle').focus({preventScroll:true});
  else $(`[data-action="rock-match-flip"]:not(:disabled):not([aria-disabled="true"])`)?.focus({preventScroll:true});
 }
 function exitRockMatch(){
- if(phase!=='matching')return;
+ if(phase!=='matching'&&phase!=='crystal-drop')return;
+ const game=pending.rockMatch;
+ if(game.drop?.moving)return;
+ clearTimeout(game.flipTimer);
+ game.open=[];
+ if(!game.complete)game.message='Flip two cards to find a pair.';
  phase='revealed';
  render();
  $('[data-action="keep-result"]')?.focus({preventScroll:true});
 }
 
+function makeCrystalDrop(){
+ // Swap adjacent lanes at each row so every target is reachable from one starting lane.
+ const rows=Array.from({length:dropRows},()=>{
+  const directions=Array(dropLanes).fill(0);
+  const start=Math.floor(E.random()*2);
+  for(let lane=start;lane<dropLanes-1;lane+=2){
+   if(E.random()<.25)continue;
+   directions[lane]=1;
+   directions[lane+1]=-1;
+  }
+  return directions;
+ });
+ return {rows,target:Math.floor(E.random()*dropLanes),landing:null,moving:false};
+}
+function crystalDropPath(drop,start){
+ const path=[start];
+ for(const row of drop.rows){
+  const lane=path.at(-1);
+  path.push(lane+row[lane]);
+ }
+ return path;
+}
+function startCrystalDrop(){
+ const game=pending?.rockMatch;
+ if(!['matching','revealed'].includes(phase)||!game?.complete)return;
+ game.drop??=makeCrystalDrop();
+ phase='crystal-drop';
+ render();
+ $('#crystalDropTitle').focus({preventScroll:true});
+}
+function crystalDropView(){
+ const drop=pending.rockMatch.drop;
+ const arrows=['↙','↓','↘'],directions=['left','straight','right'];
+ const finished=drop.landing!==null;
+ const lanes=Array.from({length:dropLanes},(_,lane)=>lane);
+ const style=finished?` style="left:${dropLanePosition(drop.landing)};top:91%"`:'';
+ return `<section class="rock-match crystal-drop" aria-labelledby="crystalDropTitle">
+  <header>
+   <h1 id="crystalDropTitle" tabindex="-1">Crystal Drop</h1>
+   <p>Follow the pegs and pick a lane to reach the glowing slot. Aim for slot ${drop.target+1}.</p>
+  </header>
+  <div class="crystal-board">
+   <div class="crystal-lanes">
+    ${lanes.map(lane=>{
+     const path=crystalDropPath(drop,lane);
+     const turns=drop.rows.map((row,index)=>directions[row[path[index]]+1]).join(', ');
+     return `<button class="secondary" type="button" data-action="crystal-drop-lane" data-id="${lane}" aria-label="Drop from lane ${lane+1}. Peg directions: ${turns}." ${finished?'disabled':''}>${lane+1}</button>`;
+    }).join('')}
+   </div>
+   <div class="crystal-field" aria-hidden="true">
+    ${drop.rows.map(row=>`<div class="crystal-pegs">${row.map(step=>`<span data-turn="${step!==0}">${arrows[step+1]}</span>`).join('')}</div>`).join('')}
+    <div class="crystal-ball"${style} ${finished?'':'hidden'}></div>
+    <div class="crystal-slots">${lanes.map(lane=>`<span data-target="${lane===drop.target}">${crystalMultiplier(drop,lane)}×</span>`).join('')}</div>
+   </div>
+  </div>
+  <p class="rock-match-status" role="status">${finished?`Slot ${drop.landing+1} · ${crystalMultiplier(drop,drop.landing)*10} points`:'Each slot multiplies your 10 starting points.'}</p>
+  <button class="secondary" type="button" data-action="rock-match-back">Back to card</button>
+ </section>`;
+}
+function crystalMultiplier(drop,lane){
+ return Math.max(1,3-Math.abs(drop.target-lane));
+}
+function dropLanePosition(lane){return (lane+.5)*100/dropLanes+'%';}
+function dropCrystal(lane){
+ const drop=pending?.rockMatch?.drop;
+ if(phase!=='crystal-drop'||!drop||drop.moving||drop.landing!==null||!Number.isInteger(lane)||lane<0||lane>=dropLanes)return;
+ const path=crystalDropPath(drop,lane);
+ const finish=()=>{
+  if(phase!=='crystal-drop'||pending?.rockMatch?.drop!==drop)return;
+  drop.moving=false;
+  drop.landing=path.at(-1);
+  const score=crystalMultiplier(drop,drop.landing)*10;
+  if(score>state.bestDropScore){
+   state.bestDropScore=score;
+   save();
+  }
+  render();
+  $('[data-action="rock-match-back"]').focus({preventScroll:true});
+  sound('land');
+ };
+ const ball=$('.crystal-ball');
+ if(!ball?.animate||matchMedia('(prefers-reduced-motion: reduce)').matches){finish();return;}
+ drop.moving=true;
+ for(const button of $$('.crystal-drop button'))button.disabled=true;
+ ball.hidden=false;
+ const keyframes=path.map((column,index)=>({left:dropLanePosition(column),top:16*index+'%'}));
+ keyframes.push({left:dropLanePosition(path.at(-1)),top:'91%'});
+ ball.animate(keyframes,{duration:950,fill:'forwards'});
+ timers.push(setTimeout(finish,950));
+}
+
 function resultsView(){
  const rock=openingPull(),item=byId[rock.itemId];
- const offer=rock.tier===0&&!pending.rockMatch;
+ const game=pending.rockMatch;
+ const offer=rock.tier===0&&(!game||!game.complete||game.drop?.landing==null);
+ const matchLabel=game?.complete?'Play Crystal Drop':game?'Continue Rock Match':'Play Rock Match';
  return `<section data-rock-match="${offer}" class="results-screen ${item.tier===5?'grail-result':''}" style="--rarity:${E.rarityColors[item.tier]}">
   <div class="reveal-shade" aria-hidden="true"></div>
   <div class="eyebrow"><span class="reveal-rarity">${E.rarityNames[item.tier]}</span></div>
@@ -797,7 +912,7 @@ function resultsView(){
    <button class="primary" data-action="keep-result">Keep card</button>
    <button class="secondary" data-action="vault">Inventory</button>
   </div>
-  ${offer?'<button class="secondary rock-match-offer" data-action="rock-match-start">Play Rock Match</button>':''}
+  ${offer?`<button class="secondary rock-match-offer" data-action="rock-match-start">${matchLabel}</button>`:''}
  </section>`;
 }
 function showItem(id,uid){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;detailUid=uid;go('item');}
@@ -842,6 +957,8 @@ case 'keep-result':go('packs');sound('vault');break;
 case 'rock-match-start':startRockMatch();break;
 case 'rock-match-flip':flipRockMatch(Number(id));break;
 case 'rock-match-back':exitRockMatch();break;
+case 'crystal-drop-start':startCrystalDrop();break;
+case 'crystal-drop-lane':dropCrystal(Number(id));break;
 case 'leaderboard-refresh':loadLeaderboard(true);break;
 case 'leaderboard-balance':toggleLeaderboardBalance();break;
 case 'leaderboard-toggle':if(window.TCGCloud?.user&&window.TCGCloud.ready&&window.TCGCloud.canPlay){if(!state.leaderboard&&!state.name.trim()){go('profile');notice('Save a collector name first, then join the leaderboard.');break;}state.leaderboard=!state.leaderboard;save();leaderboardLoaded=0;render();}else{go('profile');notice('Sign in and finish syncing to join the leaderboard.');}break;

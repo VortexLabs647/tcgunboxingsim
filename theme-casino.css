@@ -3569,3 +3569,71 @@ body .results-screen[data-rock-match="true"] { grid-template-rows:auto auto minm
 @media (min-width:901px) {
   .pack-room .pack-showcase .pack-carousel { padding-inline:calc((100% - 245px) / 2); }
 }
+
+.rock-match-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.rock-match.crystal-drop { gap:clamp(5px,1dvh,10px); }
+.crystal-board {
+  display:grid;
+  grid-template-rows:auto minmax(108px,1fr);
+  width:min(100%,400px);
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+  border:2px solid #b99bf0;
+  border-radius:14px;
+  background:linear-gradient(155deg,#473572,#241846 57%,#3b2863);
+  box-shadow:inset 0 0 0 2px #271740;
+}
+.crystal-lanes,.crystal-pegs,.crystal-slots { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); }
+.crystal-lanes { gap:4px; padding:4px; }
+:root body .crystal-lanes button.secondary {
+  min-width:0;
+  min-height:40px;
+  padding:2px;
+  --rock-button:linear-gradient(140deg,#fdf0a3,#eda8dd 70%,#b68dff);
+  color:#29143b;
+  text-shadow:none;
+  font:700 1.08rem/1 var(--display-font);
+}
+.crystal-field {
+  position:relative;
+  display:grid;
+  grid-template-rows:repeat(5,minmax(0,1fr)) auto;
+  align-content:center;
+}
+.crystal-pegs { place-items:center; }
+.crystal-pegs span {
+  display:grid;
+  place-items:center;
+  width:clamp(17px,5vw,26px);
+  aspect-ratio:1;
+  border:1px solid #d3c1f2;
+  border-radius:50%;
+  background:#3d2c62;
+  color:#d9caee;
+  font:700 .8rem/1 var(--interface-font);
+}
+.crystal-pegs span[data-turn="true"] { background:#6d4697; color:#fff0bf; }
+.crystal-slots span {
+  margin:1px 2px 3px;
+  padding:3px;
+  border:1px solid #a795c5;
+  border-radius:0 0 8px 8px;
+  background:#3b2d5b;
+  color:#f3e9ff;
+  font:700 .9rem/1.15 var(--display-font);
+}
+.crystal-slots span[data-target="true"] { background:#ffde85; border-color:#fff4cc; color:#31203d; box-shadow:0 0 10px #ffcd74a0; }
+.crystal-ball {
+  position:absolute;
+  z-index:1;
+  width:clamp(13px,4vw,22px);
+  aspect-ratio:1;
+  transform:translate(-50%,-50%);
+  background:linear-gradient(135deg,#e2ffe9,#74efd7 46%,#35a8cb);
+  clip-path:polygon(50% 0,98% 45%,53% 100%,0 53%);
+  pointer-events:none;
+}
+@media (max-height:485px) {
+  .rock-match.crystal-drop { grid-template-rows:auto minmax(160px,1fr) auto auto; }
+}
