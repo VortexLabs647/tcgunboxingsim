@@ -2273,47 +2273,28 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: repeating-conic-gradient(from -22.5deg, #180c23a6 0 44.5deg, #fff7d2 44.5deg 45deg);
+  background: repeating-conic-gradient(from -22.5deg, #180c2352 0 44.5deg, #fff7d2 44.5deg 45deg);
 }
 .spinning .wheel-disc { animation: card-wheel-turn var(--spin-time) cubic-bezier(.12,.62,.13,1) both; }
 @keyframes card-wheel-turn {
   from { transform: rotate(0deg); }
   to { transform: rotate(var(--wheel-stop)); }
 }
-.wheel-slot {
+ .wheel-slot {
   position: absolute;
-  left: 40%;
-  top: 36%;
-  width: 20%;
-  height: 28%;
-  transform: rotate(var(--slot-angle)) translateY(-108%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: .8cqw;
-}
-.wheel-slot .cartoon-card {
-  flex: 1;
-  width: 100%;
-  height: 0;
-  min-height: 0;
-  max-width: none;
-  padding: .5cqw;
+  inset: 37% 0;
+  display: grid;
+  place-items: center;
+  transform: rotate(var(--slot-angle)) translateY(-127%);
+ }
+ .wheel-slot span {
+  padding: .85cqw 1.6cqw;
   border-radius: 1.4cqw;
-  border: .45cqw solid var(--rarity);
-  box-shadow: 0 0 2cqw var(--rarity);
-}
-.wheel-slot .cartoon-card-head,
-.wheel-slot .cartoon-card-name,
-.wheel-slot .cartoon-card-edition { display: none; }
-.wheel-slot .cartoon-card-art { height: 100%; border-radius: .8cqw; }
-.wheel-slot > span {
-  font-family: var(--display-font);
-  font-size: 2.4cqw;
-  line-height: 1.1;
-  color: #fff;
-  text-shadow: 0 1px 2px #000;
-}
+  background: #1f1539;
+  color: #fff5e7;
+  font: 700 clamp(.56rem,4.05cqw,1.02rem)/1.1 var(--display-font);
+  white-space: nowrap;
+ }
 .wheel-pointer {
   position: absolute;
   z-index: 4;
@@ -2338,40 +2319,6 @@ body[data-view="packs"] :is(.topbar, .bottom-nav) .nav-link.active .icon { color
   border: .9cqw solid #ffe0a8;
   box-shadow: 0 0 0 1cqw #51205e, 0 1cqw 3cqw #21092ba6;
 }
-.wheel-winner {
-  position: absolute;
-  z-index: 5;
-  inset: 18% 30% 15%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  visibility: hidden;
-  transform: scale(.7);
-  transition: opacity .22s, transform .28s;
-}
-.wheel-winner .cartoon-card {
-  width: 100%;
-  height: auto;
-  max-height: 89%;
-  flex: 1;
-  min-height: 0;
-  filter: drop-shadow(0 0 3cqw var(--spin-color));
-}
-.wheel-winner strong {
-  margin-top: 2cqw;
-  font: 700 4cqw/1.15 var(--display-font);
-  padding: 1.5cqw 2cqw;
-  background: #21112eef;
-  border: .3cqw solid var(--spin-color);
-  border-radius: 2cqw;
-  color: #fff;
-  white-space: nowrap;
-}
-.landed .wheel-winner { opacity: 1; visibility: visible; transform: scale(1); }
-.landed .wheel-hub { visibility: hidden; }
-.landed .wheel-disc { filter: brightness(.55); }
 @media (prefers-reduced-motion: reduce) {
   .card-wheel { display: none; }
 }
@@ -2836,3 +2783,165 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
 }
 :is(.card-browser,.rock-lineup) .item-visual .cartoon-card :is(.cartoon-card-head,.cartoon-card-name,.cartoon-card-edition) { display: none; }
 :is(.card-browser,.rock-lineup) .item-visual .cartoon-card .cartoon-card-art { height: auto; width: 100%; aspect-ratio: 1; }
+
+/* Printed foil letters scale as artwork, independent of device font settings. */
+.foil .pack-print {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  aspect-ratio: 600 / 230;
+  background: url("pack-lettering.webp") no-repeat center 0 / 100% 1000%;
+}
+.foil .foil-logo.pack-print { top: 9%; }
+.foil .foil-title.pack-print { bottom: 3%; background-position-y: var(--print-position); }
+:root body .balance-pill .balance-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.balance-pill #balanceFraction { font: 900 .72em/1 var(--interface-font); color: #274a48; }
+
+/* A crystal vein for Odds, and layered stone for the Cards control. */
+:root body .pack-room .pack-showcase button[data-id="odds"]:enabled,
+:root body .pack-room .pack-showcase button[data-id="cards"]:enabled {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+:root body .pack-room .pack-showcase button[data-id="odds"]:enabled {
+  background:
+    linear-gradient(152deg,transparent 51%,#f7ebff85 52% 59%,#9175de6b 60% 64%,transparent 65%),
+    linear-gradient(167deg,#f2e2ff,#b6a1f8 57%,#a390ed);
+}
+:root body .pack-room .pack-showcase button[data-id="odds"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  bottom: -3px;
+  left: 6px;
+  width: 32px;
+  height: 24px;
+  opacity: .65;
+  background: conic-gradient(from 42deg,#fff3fc,#b77fea,#7059b8,#d0baff,#fff3fc);
+  clip-path: polygon(0 100%,5% 63%,26% 49%,36% 80%,43% 28%,63% 0,74% 49%,66% 87%,85% 58%,100% 74%,94% 100%);
+}
+:root body .pack-room .pack-showcase button[data-id="cards"]:enabled {
+  background:
+    linear-gradient(164deg,transparent 58%,#b7619960 59% 66%,#fff1e66b 67% 74%,#b86c9f40 75% 81%,transparent 82%),
+    linear-gradient(156deg,#ffe4e2,#faabc9 54%,#ec8db9);
+}
+:root body .pack-room .pack-showcase button[data-id="cards"]::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: 8px;
+  bottom: 4px;
+  width: 26px;
+  height: 17px;
+  opacity: .5;
+  background: conic-gradient(from 27deg,#fffaca,#f79cc4,#ad669b,#ffe0ea,#fffaca);
+  clip-path: polygon(1% 62%,24% 20%,61% 2%,86% 25%,99% 72%,77% 100%,17% 94%);
+}
+:root body .bottom-nav .nav-link[href="#leaderboard"]:not(.active) {
+  --control-light: #e7dafd;
+  --control-fill: #ab91ea;
+}
+
+/* Use the same illustrated sheets for sort, odds, card lists and the badge shop. */
+:root body .pack-dialog {
+  background: #29214d;
+  color: #fff3de;
+  border: 2px solid #8874c2;
+  box-shadow: 0 4px 0 #110c23,0 20px 45px #0c071baa;
+}
+:root body .pack-dialog > header {
+  background:
+    linear-gradient(100deg,#251a4af5,#32245ce0 52%,#24183ce6),
+    url("crystal-canyon.webp") center 81% / cover;
+  border-bottom: 2px solid #7660ad;
+}
+:root body .pack-dialog > header h2 { color: #fff1c9; }
+:root body .pack-dialog header button { --control-light:#e9d9ff; --control-fill:#b7a3ee; }
+#sortChoices { display: grid; gap: 9px; }
+:root body .sort-option {
+  min-height: 48px;
+  display: flex;
+  justify-content: space-between;
+  padding-inline: 14px;
+  --control-light: #d7c6ff;
+  --control-fill: #b39be9;
+}
+:root body .sort-option[aria-pressed="true"] { --control-light:#c8ffed; --control-fill:#85dcbf; }
+:root body .card-browser .sort-trigger {
+  flex: 0 0 min(38%,132px);
+  display: flex;
+  gap: 5px;
+  padding-inline: 5px;
+  --control-light: #e3d8ff;
+  --control-fill: #bea6ee;
+}
+.sort-trigger .icon { width: 12px; height: 12px; transform: rotate(90deg); }
+
+:where(.nav-link[href="#battle"]:not(.active),[data-action^="arena-"]) {
+  --control-light:#d3fce9;
+  --control-fill:#87d2b4;
+}
+@media (max-width:900px) {
+  body[data-view="packs"] .bottom-nav,body .bottom-nav { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  body .bottom-nav .nav-link { font-size:clamp(.58rem,2.9vw,.71rem); }
+}
+.arena {
+  max-width: 710px;
+  margin-inline: auto;
+}
+.arena h1 { margin: 0 0 10px; font-size: clamp(1.55rem,6vw,2.25rem); }
+.arena p { margin-block: 9px; }
+.arena :is(input,button,a) { min-height: 43px; }
+.arena .arena-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.arena .arena-header h1 { margin:0; }
+.arena #arenaFilter { width:100%; margin-block:7px; }
+.team-list {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+  padding:3px 3px 5px;
+  max-height:min(40dvh,330px);
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+:root body .team-option.secondary {
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  text-align:left;
+  gap:7px;
+  padding:6px;
+}
+:root body .team-option[aria-pressed="true"] { --control-light:#fff6c7; --control-fill:#ffcf70; }
+.team-option .cartoon-card { width:36px; height:49px; flex:none; padding:2px; }
+.team-option :is(.cartoon-card-head,.cartoon-card-name,.cartoon-card-edition) { display:none; }
+.team-option b,.team-option small { display:block; overflow-wrap:anywhere; }
+.team-option small { font-size:.67rem; margin-top:4px; }
+.arena-actions,.arena-reserves,.join-room {
+  display:flex;
+  align-items:stretch;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-block:12px;
+}
+.arena-actions > *, .arena-reserves > * { flex:1 1 120px; padding:7px; }
+.join-room label { flex-basis:100%; }
+.join-room input { flex:1 1 145px; min-width:0; }
+.arena-board { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.fighter { display:grid; gap:6px; justify-items:center; text-align:center; padding:8px 5px; min-width:0; }
+.arena .fighter h2 { margin:0; font-size:.96rem; }
+.fighter .cartoon-card { width:min(84%,139px); height:auto; aspect-ratio:5 / 7; }
+.fighter progress { width:90%; height:12px; accent-color:#8aedb6; }
+.fighter strong { font-size:.83rem; }
+.fighter small { color:#e4d5ff; font-size:.71rem; }
+.arena-turn strong { color:#ffcf72; }
+.arena-hint { color:#dfcff3; font-size:.79rem; }
+.room-code { width:100%; margin:0 0 9px; font-family:monospace; }
+.card-training { margin-top:12px; }
+.card-training button { min-height:44px; }

@@ -51,5 +51,5 @@ async function action(event){const b=event.target.closest('[data-cloud-action]')
  }catch(e){message=e.message;status=e.message;}finally{busy=false;display(true)}}
 document.addEventListener('submit',submit);document.addEventListener('click',action);
 window.addEventListener('online',()=>{if(dirty&&!conflict)flush();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flush();});
-root.TCGCloud={init,panel,queue,flush,reload,get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get ready(){return ready},cacheKey};
+root.TCGCloud={init,panel,queue,flush,reload,battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get ready(){return ready},cacheKey};
 })(window);

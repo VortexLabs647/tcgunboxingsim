@@ -1,25 +1,26 @@
 'use strict';
-const E=window.TCGEngine;
+const E=window.TCGEngine, A=window.TCGArena;
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=n=>`<svg class="icon" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const date=d=>new Date(d).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 const KEY='tcg-unboxing-sim-v2';
 let leaderboardLoaded=0,leaderboardLoading=false,leaderboardRows=null,leaderboardError='';
-let effectsBus=null,effectSources=new Set(),effectsUntil=0,winSources=new Set(),winStopTimer=null;
+const effectSources=new Set(),effectBuses=new Set();
+let lastCueTime=-Infinity,winSources=new Set(),winStopTimer=null;
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const TEAR_MS=360,SPIN_MS=3600,FACE_UP_AT=1;
 // Match short, frequency-weighted listening levels across the game's sound cues.
-const CUE_GAIN = {tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, vault:6.1, hit:3.3};
+const CUE_GAIN = {tick:21.5, click:14.4, 'pack-crinkle':2.8, rip:.85, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
-let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
+let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='sealed',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
 function selectedPack(){return packs[selectedIndex];}
 function notice(message){$('#status').textContent=message;}
 function save(){state.preferences={category:'rocks',packIndex:selectedIndex};const cloud=window.TCGCloud;if(cloud?.user&&!cloud.ready){updateHeader();return;}try{localStorage.setItem(cloud?.user?cloud.cacheKey(cloud.user.id):KEY,JSON.stringify(state));}catch{notice('Your device storage is full. Progress could not be saved.');}if(cloud?.user)cloud.queue(state);updateHeader();}
-function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='sealed';state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
+function replaceGameState(next){if(!E.validSave(next,catalog))return;clearAnimation();pending=null;phase='sealed';onlineRoom=null;arenaMatch=null;arenaTeam.clear();state=E.migrate(next,catalog);incomeNeedsSave=false;lastIncomeSave=0;selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));if(view==='opening')view='profile';render();}
 function guestGameState(){try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(E.validSave(saved,catalog))return E.migrate(saved,catalog);}catch{}return E.defaults();}
 
 function money(units){
@@ -31,7 +32,10 @@ function rateMoney(units){
  return '$'+amount.padEnd(8,'0')+'/sec';
 }
 function updateMoney(){
- $('#rockBalance').textContent=money(state.balance*E.unitsPerCent);
+ const whole=money(state.balance*E.unitsPerCent);
+ $('#rockBalance').textContent=whole;
+ $('#balanceFraction').textContent=String(state.rockRemainder).padStart(4,'0');
+ $('.balance-pill').setAttribute('aria-label','Virtual balance and badges: '+whole+String(state.rockRemainder).padStart(4,'0'));
  const rate=$('#incomeRate');
  if(rate){
   const income=E.activeRocks(state).reduce((sum,rock)=>sum+E.incomeRate(state,rock),0);
@@ -63,7 +67,7 @@ function sellRock(uid){
  save();
  if(view==='opening')go('packs');
  else render();
- sound('vault');
+ sound('coin');
  const message='Rock sold · +'+money(proceeds);
  notice(message);
  clearTimeout(rockNoticeTimer);
@@ -76,17 +80,17 @@ function updateHeader(){
 }
 function nav(){
  const active=['vault','collection'].includes(view)?'vault':view==='item'&&['vault','collection'].includes(previousView)?'vault':view;
- const links=[['packs','grid','Packs'],['vault','card','Cards'],['leaderboard','star','Ranks'],['profile','user','Profile']];
+ const links=[['packs','grid','Packs'],['vault','card','Cards'],['battle','arena','Battle'],['leaderboard','star','Ranks'],['profile','user','Profile']];
  const html=links.map(([key,i,name])=>`<a href="#${key}" class="nav-link ${key===active?'active':''}" ${key===active?'aria-current="page"':''}>${icon(i)}<span>${name}</span></a>`).join('');
  $('#desktopNav').innerHTML=html;
  $('#bottomNav').innerHTML=html;
 }
 function clearAnimation(){cancelAnimationFrame(wheelAudioFrame);stopEffects();timers.forEach(clearTimeout);timers=[];clearTimeout(carouselTimer);}
-function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','leaderboard','opening','item'].includes(next)?next:'packs';search='';confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
-function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();updateMoney();}
+function go(next){stopWinMusic();stopEffects();if(view==='opening'&&next!=='opening'){clearAnimation();pending=null;phase='sealed';}view=['packs','vault','collection','profile','battle','leaderboard','opening','item'].includes(next)?next:'packs';search='';confirmAction='';feedback='';notice('');if(location.hash!=='#'+view)history.replaceState(null,'','#'+view);render();window.scrollTo({top:0,behavior:'instant'});}
+function render(){document.body.dataset.view=view;nav();updateHeader();const app=$('#app');app.innerHTML=view==='packs'?packsView():view==='vault'?vaultView():view==='collection'?collectionView():view==='battle'?arenaView():view==='leaderboard'?leaderboardView():view==='profile'?profileView():view==='item'?itemView():openingView();if(view==='leaderboard')loadLeaderboard();if(view==='packs')bindCarousel();updateMoney();}
 function heading(kicker,title){return `<div class="page-heading"><div><div class="eyebrow">${kicker}</div><h1>${title}</h1></div></div>`;}
 function packArt(pack){
- return `<div class="foil rocks" data-edition="${pack.name}" style="--foil:${pack.color}"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo">TCG<span>UNBOXING SIM</span></div><div class="foil-art">${[...pack.cover.slice(1),pack.cover[0]].map((id,index)=>cardImage(byId[id],'art-'+index)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title">${pack.name.toUpperCase()}</div><div class="foil-category">ROCKS</div></div></div>`;
+ return `<div class="foil rocks" data-edition="${pack.name}" style="--foil:${pack.color};--print-position:${(pack.index+1)*100/9}%"><div class="pack-seal top" aria-hidden="true"></div><div class="foil-body"><div class="foil-shine"></div><div class="foil-logo pack-print" aria-hidden="true"></div><div class="foil-art">${[...pack.cover.slice(1),pack.cover[0]].map((id,index)=>cardImage(byId[id],'art-'+index)).join('')}</div><div class="foil-crest" aria-hidden="true"></div><div class="foil-title pack-print" aria-hidden="true"></div></div></div>`;
 }
 
 function packsView(){
@@ -271,13 +275,13 @@ function selectPack(index, scroll = true) {
 }
 function itemCard(item,own=null,itemChance=null,earning=false){
  return `<article class="item-card" style="--rarity:${E.rarityColors[item.tier]}">
-  <button class="item-button" data-action="item" data-id="${item.id}" aria-label="View ${escape(item.name)}">
+  <button class="item-button" data-action="item" data-id="${item.id}" aria-label="View ${escape(item.name)}" ${own?`data-uid="${escape(own.uid)}"`:''}>
    <div class="item-visual rocks">${cardImage(item)}${state.discovered.includes(item.id)?'<span class="item-badge" aria-label="Collected" title="Collected">✓</span>':''}</div>
    <div class="item-copy"><span class="rarity">${E.rarityNames[item.tier]}</span><h3>${escape(item.name)}</h3>
     ${itemChance===null?'':`<div class="item-value">${chance(itemChance,2)}</div>`}
    </div>
   </button>
-  ${own?`<p class="rock-rate">${own.uid===E.starterId?'<span id="starterRate"></span>':earning?rateMoney(E.incomeRate(state,own)):'Idle'}</p>
+  ${own?`<p class="rock-rate">Lv ${E.cardLevel(own)} · ${E.cardStats(own).damage} ATK</p><p class="rock-rate">${own.uid===E.starterId?'<span id="starterRate"></span>':earning?rateMoney(E.incomeRate(state,own)):'Idle'}</p>
   <div class="item-actions rock-actions">
    <button data-action="favorite" data-id="${own.uid}" aria-label="${own.locked?'Unfavorite':'Favorite'} ${escape(item.name)}" aria-pressed="${!!own.locked}">${own.locked?'★':'☆'}</button>
    ${sellButton(own)}
@@ -305,8 +309,22 @@ function vaultView(){
  return `<section class="card-browser"><h1 class="sr-only">Inventory</h1>${cardsTabs()}
   <div class="card-meta"><span>${state.vault.length} owned</span><span id="incomeRate"></span></div>
   <div class="toolbar"><div class="search">${icon('search')}<input type="search" id="vaultSearch" placeholder="Find a rock" aria-label="Search inventory" value="${escape(search)}"></div>
-   <select id="sort" aria-label="Sort inventory"><option value="recent">Newest</option><option value="rarity" ${sort==='rarity'?'selected':''}>Rarest</option></select></div>
+   <button class="secondary sort-trigger" data-action="sort-menu" aria-label="Sort inventory" aria-haspopup="dialog">${sort==='rarity'?'Rarest':'Newest'} ${icon('chevron')}</button></div>
   ${owned.length?`<div class="item-grid">${owned.map(card=>itemCard(byId[card.itemId],card,null,earning.has(card.uid))).join('')}</div>`:empty(state.vault.length?'No matches':'Inventory is empty',state.vault.length?'Try another name.':'Open a pack to start collecting.',!state.vault.length)}</section>`;
+}
+function showSortMenu(){
+ const dialog=$('#sortMenu');
+ $('#sortChoices',dialog).innerHTML=Object.entries({recent:'Newest',rarity:'Rarest'}).map(([value,label])=>
+  `<button class="secondary sort-option" data-action="sort-by" data-id="${value}" aria-pressed="${sort===value}">${label}${sort===value?'<span aria-hidden="true">✓</span>':''}</button>`
+ ).join('');
+ dialog.showModal();
+}
+function setSort(value){
+ if(!['recent','rarity'].includes(value))return;
+ sort=value;
+ $('#sortMenu').close();
+ render();
+ $('.sort-trigger')?.focus({preventScroll:true});
 }
 function collectionView(){
  const cards=catalog.filter(item=>item.name.toLowerCase().includes(search.toLowerCase()));
@@ -338,11 +356,16 @@ function profileView(){return `<div class="simple-profile-heading"><h1>YOUR <em>
 
 function itemView(){
  const item=byId[detailId];
+ const owned=state.vault.find(card=>card.uid===detailUid&&card.itemId===detailId);
  if(!item)return empty('CARD NOT FOUND.','Choose another rock.');
  return `<button class="secondary back-button" data-action="back-item">Back to ${previousView==='vault'?'Inventory':previousView==='packs'?'packs':'collection'}</button>
   <div class="detail-page"><div class="detail-image rocks">${cardImage(item)}</div><div class="detail-content">
    <div class="eyebrow">${escape(item.detail)} · ${escape(item.number)}</div><h1>${escape(item.name)}</h1><p>${escape(item.lore)}</p>
    <span class="rarity" style="--rarity:${E.rarityColors[item.tier]}">${E.rarityNames[item.tier]}</span>
+   ${owned?`<div class="card-training">
+    <p>Lv ${E.cardLevel(owned)} · ${E.cardStats(owned).damage} ATK · ${E.cardStats(owned).hp} HP</p>
+    ${E.cardLevel(owned)<E.maxLevel?`<button class="primary" data-action="upgrade-rock" data-id="${escape(owned.uid)}">Level up · ${money(E.upgradeCost(owned)*E.unitsPerCent)}</button>`:'<p>Max level</p>'}
+   </div>`:''}
   </div></div>`;
 }
 function haptic(pattern=20){if(navigator.vibrate)navigator.vibrate(pattern);}
@@ -364,12 +387,23 @@ function sound(kind){
   unlockSound();
   if(!audioCtx)return;
   const now=audioCtx.currentTime;
-  if((kind==='tick'||kind==='click')&&now<effectsUntil)return;
-  stopEffects();
-  effectsBus=audioCtx.createGain();
+  if(kind==='click'&&now-lastCueTime<.065)return;
+  lastCueTime=now;
+  const effectsBus=audioCtx.createGain();
+  const cueSources=new Set();
   effectsBus.gain.value=CUE_GAIN[kind]??1;
   effectsBus.connect(audioCtx.destination);
-  effectsUntil=now+({tick:.055,click:.08,'pack-crinkle':.155,rip:.35,wheel:.037,land:.46,vault:.25,hit:.5}[kind]||.5);
+  effectBuses.add(effectsBus);
+
+  const trackEffect=source=>{
+   cueSources.add(source);
+   effectSources.add(source);
+   source.onended=()=>{
+    cueSources.delete(source);
+    effectSources.delete(source);
+    if(!cueSources.size&&effectBuses.delete(effectsBus))effectsBus.disconnect();
+   };
+  };
 
   const tone=(frequency,delay,duration,volume,type='sine',endFrequency=frequency)=>{
    const source=audioCtx.createOscillator(),gain=audioCtx.createGain();
@@ -401,6 +435,11 @@ function sound(kind){
     tone(200,0,.075,.04,'triangle',102);
     tone(784,.044,.18,.04,'triangle');
     tone(1175,.105,.26,.033);
+    break;
+   case 'coin':
+    tone(1320,0,.14,.029,'triangle');
+    tone(1760,.07,.17,.029,'triangle');
+    tone(3290,.07,.08,.013);
     break;
    case 'vault':
     tone(530,0,.135,.032,'triangle');
@@ -447,6 +486,7 @@ function startOpening(){
  stopWinMusic();
  pending=E.openPack(state,catalog,selectedPack(),odds);
  if(!pending){updateMoney();return;}
+ sound('click');
  save();
  phase='sealed';view='opening';
  history.replaceState(null,'','#opening');
@@ -459,7 +499,7 @@ function openingView(){
  const pack=pending.pack;
  return `<section class="opening-screen ${phase}" id="openingScreen" style="--foil:${pack.color};--spin-color:${E.rarityColors[0]};--tear-time:${TEAR_MS}ms;--spin-time:${SPIN_MS}ms">
    <div class="eyebrow">${pack.name} Rock Pack · ${pending.odds}</div>
-   <h1>${phase==='sealed'?'READY TO <em>RIP.</em>':'CARD <em>WHEEL.</em>'}</h1>
+   <h1>${phase==='sealed'?'READY TO <em>RIP.</em>':'RARITY <em>WHEEL.</em>'}</h1>
    <div class="opening-stage">
      <div class="opening-aura" aria-hidden="true"></div>
      ${raritySpinner()}
@@ -481,7 +521,7 @@ function rip(){
  const screen=$('#openingScreen');
  screen.classList.replace('sealed','charging');
  $('#ripPack').disabled=true;
- $('h1',screen).innerHTML='CARD <em>WHEEL.</em>';
+ $('h1',screen).innerHTML='RARITY <em>WHEEL.</em>';
  $('.opening-message',screen).textContent='Opening your pack…';
  sound('rip');
  haptic(15);
@@ -494,21 +534,20 @@ function openingPull(){return pending.pull;}
 function raritySpinner(){
  const hero=openingPull();
  const oddsWeights=E.oddsPresets[pending.odds];
- const previews=catalog.filter(item=>item.id!==hero.itemId&&oddsWeights[item.tier]>0).map(item=>({item,tier:item.tier}));
- const slots=Array.from({length:7},(_,i)=>previews[Math.floor(i*previews.length/7)]||{item:byId[hero.itemId],tier:hero.tier});
- const landingIndex=hero.itemId.length%8;
- slots.splice(landingIndex,0,{item:byId[hero.itemId],tier:hero.tier});
- const stops=slots.map(({tier},i)=>`${E.rarityColors[tier]} ${i*45}deg ${(i+1)*45}deg`).join(',');
+ const tiers=oddsWeights.flatMap((weight,tier)=>weight>0?[tier]:[]);
+ const slots=Array.from({length:8},(_,index)=>tiers[index%tiers.length]);
+ const landings=slots.flatMap((tier,index)=>tier===hero.tier?[index]:[]);
+ const landingIndex=landings[Math.floor(E.random()*landings.length)];
+ const stops=slots.map((tier,index)=>`${E.rarityColors[tier]} ${index*45}deg ${(index+1)*45}deg`).join(',');
  const rotation=1800+(360-landingIndex*45)%360;
- return `<div class="card-wheel" aria-hidden="true" data-winner="${hero.itemId}" data-landing-index="${landingIndex}">
+ return `<div class="card-wheel" aria-hidden="true" data-landing-index="${landingIndex}">
    <div class="wheel-pointer"></div>
    <div class="wheel-disc" style="--wheel-stop:${rotation}deg;--wheel-colors:conic-gradient(from -22.5deg,${stops})">
-     ${slots.map(({item,tier},i)=>`<div class="wheel-slot" data-item-id="${item.id}" data-tier="${tier}" style="--slot-angle:${i*45}deg;--rarity:${E.rarityColors[tier]}">
-       ${cardImage(item)}<span>${E.rarityNames[tier]}</span>
+     ${slots.map((tier,i)=>`<div class="wheel-slot" data-tier="${tier}" style="--slot-angle:${i*45}deg">
+       <span>${E.rarityNames[tier]}</span>
      </div>`).join('')}
    </div>
    <div class="wheel-hub">TCG</div>
-   <div class="wheel-winner">${cardImage(byId[hero.itemId])}<strong>${escape(byId[hero.itemId].name)}</strong></div>
  </div>`;
 }
 
@@ -519,8 +558,8 @@ function playWheelTicks(disc){
   if(phase!=='spinning'||!disc.isConnected)return;
   const transform=getComputedStyle(disc).transform;
   if(transform!=='none'){
-   const matrix=new DOMMatrixReadOnly(transform);
-   const angle=Math.atan2(matrix.b,matrix.a)*180/Math.PI;
+   const [a,b]=transform.slice(transform.indexOf('(')+1).split(',',2).map(Number);
+   const angle=Math.atan2(b,a)*180/Math.PI;
    // Each boundary crosses the pointer halfway between two card centers.
    const segment=(Math.round(angle/segmentAngle)+disc.children.length)%disc.children.length;
    if(segment!==previousSegment&&now-lastSound>=40){
@@ -536,7 +575,6 @@ function playWheelTicks(disc){
 
 function spinReveal(){
  if(!pending||view!=='opening'||phase!=='charging')return;
- clearAnimation();
  phase='spinning';
  const screen=$('#openingScreen');
  const tier=openingPull().tier;
@@ -550,7 +588,6 @@ function spinReveal(){
   screen.classList.add('face-up','landed');
   screen.style.setProperty('--spin-color',E.rarityColors[tier]);
   screen.dataset.landingRarity=E.rarityNames[tier];
-  screen.dataset.landingCard=openingPull().itemId;
   const label=$('.rarity-label',screen);
   label.textContent=E.rarityNames[tier];
   label.classList.add('active');
@@ -570,11 +607,16 @@ function reveal(){
  haptic(best>=4?[40,30,70]:30);
 
 }
-function trackEffect(source){effectSources.add(source);source.onended=()=>effectSources.delete(source);}
-function stopEffects(){for(const source of effectSources){try{source.stop();source.disconnect();}catch{}}effectSources.clear();if(effectsBus){try{effectsBus.disconnect();}catch{}effectsBus=null;}effectsUntil=0;}
+function stopEffects(){
+ for(const source of effectSources){try{source.stop();source.disconnect();}catch{}}
+ effectSources.clear();
+ for(const bus of effectBuses)bus.disconnect();
+ effectBuses.clear();
+ lastCueTime=-Infinity;
+}
 function stopWinMusic(){clearTimeout(winStopTimer);for(const source of winSources){try{source.stop();source.disconnect();}catch{}}winSources.clear();if(winMusicGain){try{winMusicGain.disconnect();}catch{}winMusicGain=null;}}
 
-function playWinMusic(){stopEffects();try{audioCtx??=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume().catch(()=>{});stopWinMusic();const now=audioCtx.currentTime,beat=60/128,bus=audioCtx.createGain();winMusicGain=bus;bus.gain.setValueAtTime(WIN_MUSIC_GAIN,now);bus.gain.setTargetAtTime(0,now+4.5,.18);bus.connect(audioCtx.destination);const note=(midi,start,length,volume=.12,type='triangle')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);g.gain.setValueAtTime(.001,now+start);g.gain.exponentialRampToValueAtTime(volume,now+start+.018);g.gain.exponentialRampToValueAtTime(.001,now+start+length);o.connect(g);g.connect(bus);winSources.add(o);o.onended=()=>winSources.delete(o);o.start(now+start);o.stop(now+start+length+.03);};const chords=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]];chords.forEach((chord,b)=>{chord.forEach(m=>note(m,b*beat*2,beat*1.85,.075,'sine'));note(chord[0]-12,b*beat*2,beat*1.7,.17,'sine');});[72,76,79,84,83,79,76,79,81,84,88,86,84,79,83,84].forEach((m,i)=>note(m,i*beat/2,beat*.46,.15,'triangle'));[72,76,79,84].forEach(m=>note(m,beat*8,1.05,.09,'sine'));winStopTimer=setTimeout(()=>{bus.disconnect();if(winMusicGain===bus)winMusicGain=null;},5500);}catch{}}
+function playWinMusic(){stopEffects();try{unlockSound();if(!audioCtx)return;stopWinMusic();const now=audioCtx.currentTime,beat=60/128,bus=audioCtx.createGain();winMusicGain=bus;bus.gain.setValueAtTime(WIN_MUSIC_GAIN,now);bus.gain.setTargetAtTime(0,now+4.5,.18);bus.connect(audioCtx.destination);const note=(midi,start,length,volume=.12,type='triangle')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);g.gain.setValueAtTime(.001,now+start);g.gain.exponentialRampToValueAtTime(volume,now+start+.018);g.gain.exponentialRampToValueAtTime(.001,now+start+length);o.connect(g);g.connect(bus);winSources.add(o);o.onended=()=>winSources.delete(o);o.start(now+start);o.stop(now+start+length+.03);};const chords=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]];chords.forEach((chord,b)=>{chord.forEach(m=>note(m,b*beat*2,beat*1.85,.075,'sine'));note(chord[0]-12,b*beat*2,beat*1.7,.17,'sine');});[72,76,79,84,83,79,76,79,81,84,88,86,84,79,83,84].forEach((m,i)=>note(m,i*beat/2,beat*.46,.15,'triangle'));[72,76,79,84].forEach(m=>note(m,beat*8,1.05,.09,'sine'));winStopTimer=setTimeout(()=>{bus.disconnect();if(winMusicGain===bus)winMusicGain=null;},5500);}catch{}}
 
 function resultsView(){
  const rock=openingPull(),item=byId[rock.itemId];
@@ -595,10 +637,18 @@ function resultsView(){
   </div>
  </section>`;
 }
-function showItem(id){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;go('item');}
+function showItem(id,uid){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;detailUid=uid;go('item');}
+function upgradeRock(uid){
+ if(!E.upgradeRock(state,uid)){notice('You need more virtual balance for this upgrade.');return;}
+ save();
+ render();
+ notice('Card reached level '+E.cardLevel(state.vault.find(card=>card.uid===uid))+'.');
+ sound('land');
+}
+
 window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('dialog[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
 function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus({preventScroll:true});if(pos!=null)el?.setSelectionRange(pos,pos);}
-document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','buy-badge','favorite','save-name','delete-confirm','leaderboard-toggle','leaderboard-balance'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
+document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','upgrade-rock','buy-badge','favorite','save-name','delete-confirm','leaderboard-toggle','leaderboard-balance'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':go(a);break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
 case 'badge-shop':
@@ -607,12 +657,22 @@ case 'badge-shop':
  $('#badgeShop').showModal();
  break;
 case 'buy-badge':buyBadge(id);break;
+case 'arena-pick':pickArenaCard(id);break;
+case 'arena-ai':aiBattle();break;
+case 'arena-create':onlineAction('create');break;
+case 'arena-join':onlineAction('join',{room_code:$('#arenaCode').value.trim().toLowerCase()});break;
+case 'arena-copy':copyRoomCode();break;
+case 'arena-leave':leaveArena();break;
+case 'arena-move':battleMove(id,b.dataset.target===undefined?null:Number(b.dataset.target));break;
+case 'upgrade-rock':upgradeRock(id);break;
+case 'sort-menu':showSortMenu();break;
+case 'sort-by':setSort(id);break;
 case 'pack-details':openPackDetails(id);break;
 case 'rock-odds':if(Object.hasOwn(E.oddsPresets,id)){odds=id;$('#packOddsLabel').textContent=odds;const content=$('#packDetailsBody');content.innerHTML=oddsView();content.querySelector('.active').focus();}break;
 case 'sell-rock':sellRock(id);break;
 case 'open':startOpening();break;case 'start-seal':rip();break;
 case 'view-category':go('collection');break;
-case 'item':showItem(id);break;case 'back-item':go(previousView);break;
+case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);break;
 case 'favorite':{const v=state.vault.find(v=>v.uid===id);if(v){v.locked=!v.locked;save();render();}}break;
 case 'cancel-confirm':confirmAction='';render();break;
 case 'keep-result':go('packs');sound('vault');break;
@@ -623,11 +683,10 @@ case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Ent
 case 'delete-start':profileSections.add('delete');confirmAction='delete';render();$('.delete-details').scrollIntoView({block:'nearest'});break;
 case 'delete-confirm':{state=E.defaults();selectedIndex=0;save();go('profile');feedback='Account deleted from this device.';render();}break;
 }});
-document.addEventListener('input',e=>{if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
-document.addEventListener('change',e=>{if(e.target.id==='sort'){sort=e.target.value;render();}});
+document.addEventListener('input',e=>{if(e.target.id==='arenaFilter'){arenaFilter=e.target.value;$('#arenaTeam').innerHTML=teamOptions();return;}if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
-window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','leaderboard'].includes(target)){go(target);}});
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};E.settleIncome(state);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true);if(view==='profile'||view==='leaderboard')render();}});if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','battle','leaderboard'].includes(target)){go(target);}});
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};E.settleIncome(state);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 async function refreshWebApp(){
  try {
   const worker=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
@@ -636,6 +695,166 @@ async function refreshWebApp(){
   check();
  }catch{}
 }
+
+let arenaMatch=null,onlineRoom=null,arenaBusy=false,arenaMessage='',arenaFilter='';
+const arenaTeam=new Set();
+const battleCloud=()=>window.TCGCloud;
+
+function arenaView(){
+ if(onlineRoom?.waiting)return `<section class="arena content-card">
+  <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} cards.</p>
+  <input class="room-code" readonly aria-label="Room code" value="${escape(onlineRoom.code)}">
+  <button class="secondary" data-action="arena-copy">Copy code</button>
+  <button class="secondary" data-action="arena-leave">Close room</button>
+  <p id="arenaStatus" role="status">${escape(arenaMessage||'Waiting for Player 2…')}</p>
+ </section>`;
+ if(arenaMatch)return battleBoard();
+
+ for(const uid of arenaTeam)if(!state.vault.some(card=>card.uid===uid))arenaTeam.delete(uid);
+ const cloud=battleCloud(),locked=arenaTeam.size===0||arenaBusy;
+ return `<section class="arena">
+  <h1>Rock Arena</h1><p>Choose up to three owned cards.</p>
+  ${state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
+   <input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}">
+   <div class="team-list" id="arenaTeam">${teamOptions()}</div>
+   <p id="teamCount">${arenaTeam.size} / 3 selected</p>`:
+   '<p>Open a pack to get your first battle card.</p>'}
+  <div class="arena-actions"><button class="primary" data-action="arena-ai" ${locked?'disabled':''}>Battle AI</button>
+  ${cloud?.user?`<button class="secondary" data-action="arena-create" ${locked||!cloud.canPlay?'disabled':''}>Create private room</button>`:
+   '<a href="#profile" class="secondary">Sign in for online play</a>'}</div>
+  ${cloud?.user?`<div class="join-room">
+   <label for="arenaCode">Room code</label>
+   <input id="arenaCode" type="text" minlength="16" maxlength="16" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Enter a friend’s code">
+   <button class="secondary" data-action="arena-join" ${locked||!cloud.canPlay?'disabled':''}>Join room</button>
+  </div>`:''}
+  <p id="arenaStatus" role="status">${escape(arenaMessage)}</p>
+ </section>`;
+}
+function teamOptions(){
+ const query=arenaFilter.trim().toLowerCase();
+ const cards=state.vault.filter(card=>byId[card.itemId]?.name.toLowerCase().includes(query));
+ return cards.map(card=>{
+  const {damage,hp}=E.cardStats(card);
+  return `<button class="secondary team-option" data-action="arena-pick" data-id="${escape(card.uid)}" aria-pressed="${arenaTeam.has(card.uid)}">
+   ${cardImage(byId[card.itemId])}<span><b>${escape(byId[card.itemId].name)}</b><small>Lv ${E.cardLevel(card)} · ${damage} ATK · ${hp} HP</small></span></button>`;
+ }).join('')||'<p>No matching cards.</p>';
+}
+function pickArenaCard(uid){
+ if(arenaTeam.has(uid))arenaTeam.delete(uid);
+ else if(arenaTeam.size<3&&state.vault.some(card=>card.uid===uid))arenaTeam.add(uid);
+ else return;
+ const button=$$('.team-option').find(button=>button.dataset.id===uid);
+ button?.setAttribute('aria-pressed',String(arenaTeam.has(uid)));
+ $('#teamCount').textContent=arenaTeam.size+' / 3 selected';
+ const cloud=battleCloud();
+ for(const action of ['ai','create','join']){
+  const button=$(`[data-action="arena-${action}"]`);
+  if(button)button.disabled=!arenaTeam.size||arenaBusy||(action!=='ai'&&!cloud?.canPlay);
+ }
+}
+function aiBattle(){
+ const cards=state.vault.filter(card=>arenaTeam.has(card.uid));
+ if(!cards.length)return;
+ const first=cards.map(card=>A.combatCard(card,E));
+ const second=cards.map((card,index)=>{
+  const pool=catalog.filter(item=>item.tier===card.tier&&item.id!==card.itemId);
+  const rival=pool[Math.floor(E.random()*pool.length)]||catalog[index];
+  return A.combatCard({itemId:rival.id,tier:card.tier,level:E.cardLevel(card)},E);
+ });
+ arenaMatch=A.newMatch(first,second);
+ render();
+}
+function battleBoard(){
+ const match=arenaMatch,side=onlineRoom?.side??0,other=1-side;
+ const own=match.teams[side][match.active[side]];
+ const canMove=!arenaBusy&&match.winner===null&&match.turn===side;
+ const status=match.winner!==null?(match.winner===side?'You won!':'Opponent wins.'):match.turn===side?'Your turn':'Opponent’s turn';
+ const fighter=(team,title)=>{
+  const card=match.teams[team][match.active[team]];
+  const item=byId[card.itemId];
+  return `<article class="content-card fighter"><h2>${title}</h2>
+   ${item?cardImage(item):'<span>Rock card</span>'}<strong>${escape(item?.name||'Rock')}</strong>
+   <progress max="${card.maxHp}" value="${card.hp}" aria-label="${title} health"></progress>
+   <small>${card.hp}/${card.maxHp} HP · ${card.damage} ATK${card.guard?' · Guarded':card.focus?' · Focused':''}</small>
+  </article>`;
+ };
+ return `<section class="arena">
+  <div class="arena-header"><h1>${onlineRoom?'Private match':'AI battle'}</h1><button class="secondary" data-action="arena-leave">${match.winner===null?'Leave':'Done'}</button></div>
+  <div class="arena-board">${fighter(side,'Your rock')}${fighter(other,'Opponent')}</div>
+  <p class="arena-turn" role="status"><strong>${status}</strong> <span>${escape(arenaMessage||match.note)}</span></p>
+  ${match.winner===null?`<div class="arena-actions">
+   <button class="primary" data-action="arena-move" data-id="strike" ${canMove?'':'disabled'}>Strike · ${own.damage+(own.focus?3:0)}</button>
+   <button class="secondary" data-action="arena-move" data-id="guard" ${canMove&&!own.focus?'':'disabled'}>Guard</button>
+  </div>
+  ${match.teams[side].length>1?`<div class="arena-reserves">${match.teams[side].map((card,index)=>
+   index===match.active[side]?'':`<button class="secondary" data-action="arena-move" data-id="swap" data-target="${index}" ${canMove&&card.hp>0?'':'disabled'}>Switch · ${escape(byId[card.itemId]?.name||'Rock')} · ${card.hp} HP</button>`).join('')}</div>`:''}
+  <p class="arena-hint">Guard cuts the next hit in half and adds 3 damage to your next strike. Switching uses a turn.</p>`:''}
+ </section>`;
+}
+async function onlineAction(operation,extra={}){
+ const cloud=battleCloud();
+ if(arenaBusy||!cloud?.user)return;
+ if(operation==='join'&&!/^[0-9a-f]{16}$/.test(extra.room_code)){
+  $('#arenaStatus').textContent='Enter the 16-character room code.';
+  return;
+ }
+ const account=cloud.user.id;
+ arenaBusy=true;
+ try {
+  if(['create','join'].includes(operation)){
+   if(!cloud.canPlay||!await cloud.flush())throw Error('Sync your cards first.');
+   extra.cards=[...arenaTeam];
+  }
+  const result=await cloud.battle({operation,room_code:onlineRoom?.code,...extra});
+  if(cloud.user?.id!==account)return;
+  const changed=onlineRoom?.waiting!==result?.waiting||arenaMatch?.revision!==result?.match?.revision||arenaMatch?.winner!==result?.match?.winner;
+  onlineRoom=result;
+  arenaMatch=result&&!result.waiting?result.match:null;
+  const hadMessage=!!arenaMessage;
+  arenaMessage='';
+  if(view==='battle'&&(operation!=='state'||changed||hadMessage)){
+   arenaBusy=false;
+   render();
+  }
+ }catch(error){
+  arenaMessage=error.message;
+  if(operation==='state'&&/closed or expired/i.test(error.message)){
+   onlineRoom=null;arenaMatch=null;
+   if(view==='battle')render();
+  }
+  const status=$('#arenaStatus,.arena-turn span');
+  if(status)status.textContent=arenaMessage;
+ }finally{arenaBusy=false;}
+}
+function battleMove(action,target){
+ if(onlineRoom){
+  onlineAction('move',{action,target,expected:arenaMatch?.revision});
+ }else if(arenaMatch&&A.move(arenaMatch,0,action,target)){
+  if(arenaMatch.winner===null)A.aiMove(arenaMatch);
+  sound(arenaMatch.winner===0?'land':'tick');
+  render();
+ }
+}
+function leaveArena(){
+ if(onlineRoom)onlineAction('leave');
+ else {arenaMatch=null;arenaMessage='';render();}
+}
+async function copyRoomCode(){
+ const input=$('.room-code');
+ if(!input)return;
+ try{
+  await navigator.clipboard.writeText(input.value);
+  $('#arenaStatus').textContent='Code copied.';
+ }catch{
+  input.select();
+  $('#arenaStatus').textContent='Press and hold to copy the code.';
+ }
+}
+setInterval(()=>{
+ if(view==='battle'&&!document.hidden&&onlineRoom&&(onlineRoom.waiting||arenaMatch?.winner===null))onlineAction('state');
+},2000);
+
+
 init();
 setInterval(incomeTick,1000);
 window.addEventListener('pageshow',()=>incomeTick(true));
@@ -648,7 +867,7 @@ function insideLineup(pack){
  return `<div class="item-grid rock-lineup">${catalog.filter(item=>E.oddsPresets[odds][item.tier]>0).sort((a,b)=>b.tier-a.tier).map(item=>itemCard(item,null,E.itemOdds(item,pack,pools[item.tier],odds))).join('')}</div>`;
 }
 
-document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','start-seal','open','keep-result','sell-rock'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('button,a,summary');if(b&&!b.disabled){const action=b.dataset.action,dedicated=['choose-pack','previous-pack','next-pack','start-seal','open','keep-result','sell-rock','buy-badge'];if(!dedicated.includes(action)&&!b.closest('#packCarousel'))sound('click');haptic(6);}},true);
 
 function cardImage(item,extra=''){
  const column = item.artIndex % 4;

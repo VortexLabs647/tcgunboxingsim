@@ -1,5 +1,5 @@
-const VERSION='tcg-unboxing-sim-rocks-v83';
-const SHELL=['./art-rocks.webp','./art-rocks-2.webp','./art-rocks-3.webp','./crystal-canyon.webp','./pack-pearl-wrapper.webp','./nunito-latin.woff2','./font-1.ttf','./font-7.ttf','./fredoka-bold-latin.woff2?v=68','./theme-casino.css?v=83','./','./index.html','./styles.css?v=47','./engine.js?v=83','./app.js?v=83','./catalog.json?v=80','./cloud-config.js?v=47','./supabase.min.js?v=47','./cloud.js?v=52','./manifest.webmanifest?v=80','./icon.svg','./icon-192.png','./icon-512.png'];
+const VERSION='tcg-unboxing-sim-rocks-v84';
+const SHELL=['./pack-lettering.webp','./art-rocks.webp','./art-rocks-2.webp','./art-rocks-3.webp','./crystal-canyon.webp','./pack-pearl-wrapper.webp','./nunito-latin.woff2','./font-1.ttf','./font-7.ttf','./fredoka-bold-latin.woff2?v=68','./theme-casino.css?v=84','./','./index.html','./styles.css?v=47','./engine.js?v=84','./app.js?v=84','./arena.js?v=84','./catalog.json?v=80','./cloud-config.js?v=47','./supabase.min.js?v=47','./cloud.js?v=84','./manifest.webmanifest?v=80','./icon.svg','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install', event => {
   const requests = SHELL.map(path => new Request(new URL(path, self.location.href), {cache:'reload'}));

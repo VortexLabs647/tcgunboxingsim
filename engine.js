@@ -43,8 +43,35 @@ function buyBadge(state,id,now=Date.now()){
  ensureStarterRock(state,now);
  return true;
 }
+const maxLevel=5;
+function packRank(rock){
+ const match=/^rocks-([0-8])$/.exec(rock.packId);
+ return Number(match?.[1]??0);
+}
+function cardLevel(rock){return rock.level??1;}
+function cardStats(rock){
+ const bonus=cardLevel(rock)-1;
+ return {damage:3+rock.tier+bonus*2,hp:12+rock.tier*2+bonus*3};
+}
+function upgradeCost(rock){return 1+rock.tier+cardLevel(rock);}
+function upgradeRock(state,uid,now=Date.now()){
+ const rock=state.vault.find(card=>card.uid===uid);
+ if(!rock||cardLevel(rock)>=maxLevel)return false;
+ settleIncome(state,now);
+ const cost=upgradeCost(rock);
+ if(state.balance<cost)return false;
+ state.balance-=cost;
+ rock.level=cardLevel(rock)+1;
+ state.rockClock=Math.max(state.rockClock,now);
+ ensureStarterRock(state,now);
+ return true;
+}
+function rockIncome(rock){
+ return passiveUnits[rock.tier]+packRank(rock)+cardLevel(rock)-1;
+}
 function saleValue(price,tier){
- return Math.max(1,Math.floor(price*salePercent[tier]/100));
+ const rank=Math.max(0,packPrices.indexOf(price));
+ return Math.max(rank+1,Math.floor(price*salePercent[tier]*(100+rank*2)/10000));
 }
 function saleProceeds(rock){
  return rock.uid===starterId?0:rock.value*unitsPerCent+(rock.resaleUnits||0);
@@ -58,18 +85,18 @@ function ensureStarterRock(state,now){
 }
 function activeRocks(state){
  const seen=new Set();
- return state.vault.filter(rock=>{
+ return [...state.vault].sort((a,b)=>rockIncome(b)-rockIncome(a)).filter(rock=>{
   if(rock.uid===starterId||seen.has(rock.itemId))return false;
   seen.add(rock.itemId);
   return true;
- }).sort((a,b)=>b.tier-a.tier).slice(0,productiveLimit);
+ }).slice(0,productiveLimit);
 }
 function starterShortfall(state){
  return Math.max(0,(packPrices[0]-state.balance)*unitsPerCent-state.rockRemainder);
 }
 function incomeRate(state,rock){
  if(rock.uid===starterId)return starterShortfall(state)>0?starterUnits:0;
- return passiveUnits[rock.tier]*(100+badgeBoost(state))/100;
+ return rockIncome(rock)*(100+badgeBoost(state))/100;
 }
 function credit(state,units){
  const total=state.rockRemainder+units;
@@ -82,7 +109,7 @@ function settleIncome(state,now=Date.now()){
  // Drop time above the offline limit, while keeping fractional seconds.
  state.rockClock=now-(now-state.rockClock)%1000;
  let earned=0;
- for(const rock of activeRocks(state))earned+=passiveUnits[rock.tier]*seconds;
+ for(const rock of activeRocks(state))earned+=rockIncome(rock)*seconds;
  const boosted=earned*(100+badgeBoost(state))+state.badgeCarry;
  earned=Math.floor(boosted/100);
  state.badgeCarry=boosted%100;
@@ -153,7 +180,7 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
 }
 
 function defaults(){
- return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
+ return {version:4,balance:startingBalance,rockClock:Date.now(),rockRemainder:0,badges:[],badgeCarry:0,pricedPacks:true,packPremium:true,vault:[],discovered:[],opened:0,spent:0,sold:0,best:0,deposited:0,referralClaimed:false,name:'',history:[],settings:{sound:true,haptics:true},preferences:{category:'rocks',packIndex:0}};
 }
 function migrate(old,catalog){
  const state={...defaults(),...old,version:4};
@@ -172,6 +199,13 @@ function migrate(old,catalog){
   }
   if(state.balance===0&&!state.vault.length)state.balance=startingBalance;
  }
+ if(old.packPremium!==true){
+  for(const rock of state.vault){
+   const rank=packRank(rock);
+   if(rank>0)rock.value=Math.max(rock.value,saleValue(packPrices[rank],rock.tier));
+  }
+ }
+ state.packPremium=true;
  state.pricedPacks=true;
  ensureStarterRock(state,Date.now());
  const index=old.preferences?.packIndex;
@@ -183,7 +217,8 @@ function validSave(state,catalog){
  const activeIds=new Set(catalog.map(card=>card.id));
  const retiredPattern=/^(?:(?:pokemon|creatures|football|basketball|sneakers)(?:-expansion)?|wilds|cosmic|mechs|relics)-\d+$/;
  const knownId=id=>typeof id==='string'&&(activeIds.has(id)||retiredPattern.test(id));
- const validCard=card=>card&&typeof card.uid==='string'&&knownId(card.itemId)&&Number.isSafeInteger(card.value)&&
+ const validCard=card=>card&&typeof card.uid==='string'&&knownId(card.itemId)&&
+  (card.level===undefined||Number.isInteger(card.level)&&card.level>=1&&card.level<=maxLevel)&&Number.isSafeInteger(card.value)&&
   (card.resaleUnits===undefined||Number.isSafeInteger(card.resaleUnits)&&card.resaleUnits>=0&&card.resaleUnits<=5000)&&card.value>=0&&card.value<=1e12&&Number.isInteger(card.tier)&&card.tier>=0&&card.tier<rarityNames.length;
  const cardList=list=>Array.isArray(list)&&list.length<50000&&list.every(validCard);
  const discoveries=list=>Array.isArray(list)&&list.every(knownId);
@@ -201,7 +236,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);
