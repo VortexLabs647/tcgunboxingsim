@@ -12,7 +12,7 @@ const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const SPIN_MS=2400,RESULT_MS=900;
-const rockMatchPairs=4,rockMatchReward=2;
+const rockMatchPairs=4,rockMatchMinReward=1,rockMatchMaxReward=50;
 // Match short, frequency-weighted listening levels across the game's sound cues.
 const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
@@ -719,10 +719,14 @@ function startRockMatch(){
 function rockMatchView(){
  const game=pending.rockMatch;
  const pairs=game.matched.size/2;
+ const prize=cents=>money(cents*E.unitsPerCent);
+ const rewardText=game.complete
+  ? 'You earned '+prize(game.reward)+' in virtual coins.'
+  : 'Find all '+rockMatchPairs+' pairs to earn '+prize(rockMatchMinReward)+'–'+prize(rockMatchMaxReward)+' in virtual coins.';
  return `<section class="rock-match" aria-labelledby="rockMatchTitle">
   <header>
    <h1 id="rockMatchTitle" tabindex="-1">${game.complete?'All pairs matched!':'Rock Match'}</h1>
-   <p>${game.complete?'You earned '+money(rockMatchReward*E.unitsPerCent)+' in virtual coins.':'Find all '+rockMatchPairs+' pairs to earn '+money(rockMatchReward*E.unitsPerCent)+' in virtual coins.'}</p>
+   <p>${rewardText}</p>
   </header>
   <div class="rock-match-grid">${game.tiles.map((id,index)=>{
    const matched=game.matched.has(index),visible=matched||game.open.includes(index);
@@ -750,7 +754,8 @@ function flipRockMatch(index){
   game.complete=game.matched.size===game.tiles.length;
   game.message=game.complete?'':'Pair found!';
   if(game.complete){
-   E.creditReward(state,rockMatchReward);
+   game.reward=rockMatchMinReward+Math.floor(E.random()*(rockMatchMaxReward-rockMatchMinReward+1));
+   E.creditReward(state,game.reward);
    save();
    sound('coin');
   }else sound('vault');

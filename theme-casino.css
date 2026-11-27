@@ -3415,8 +3415,11 @@ body .results-screen[data-rock-match="true"] { grid-template-rows:auto auto minm
   width:min(100%,620px);
   justify-self:center;
   min-height:39px;
-  --control-light:#d5ffda;
-  --control-fill:#80e2b3;
+  --rock-button:linear-gradient(140deg,#fff5c8 4%,#ffca92 28%,#f8acd8 56%,#d1bcff 78%,#a0edd9 100%);
+  --rock-button-text:#271641;
+  border-color:#291740;
+  box-shadow:inset 0 2px #fffa,0 3px #170e2a;
+  text-shadow:0 1px #fff7;
 }
 .rock-match {
   width:min(100%,520px);
