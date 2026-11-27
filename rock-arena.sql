@@ -52,6 +52,12 @@ declare
  active integer;
  rival_active integer;
  damage integer;
+ ability integer;
+ ability_id text;
+ ability_name text;
+ bonus integer;
+ healed integer;
+ detail text;
  reserve integer;
 begin
  if actor is null then raise exception 'Sign in to play online' using errcode='42501'; end if;
@@ -73,7 +79,7 @@ begin
    insert into rock_arena.rooms(code,host,match)
    values(left(replace(gen_random_uuid()::text,'-',''),16),actor,
     jsonb_build_object('teams',jsonb_build_array(team,'[]'::jsonb),'active',jsonb_build_array(0,0),
-     'turn',0,'revision',0,'winner',null,'note','Waiting for Player 2.'))
+     'turn',0,'revision',0,'rules',2,'winner',null,'note','Waiting for Player 2.'))
    returning * into room;
   else
    raise exception 'You already have three open rooms.';
@@ -114,13 +120,34 @@ begin
    rival_path:=array['teams',other::text,rival_active::text];
    own:=game#>own_path;
    rival:=game#>rival_path;
-   if action='strike' then
-    damage:=(own->>'damage')::int+case when (own->>'focus')::boolean then 3 else 0 end;
-    if (rival->>'guard')::boolean then damage:=(damage+1)/2; end if;
-    own:=own||jsonb_build_object('focus',false);
-    rival:=rival||jsonb_build_object('guard',false,'hp',greatest(0,(rival->>'hp')::int-damage));
+   if action='ability' and game->>'rules'='2' and not coalesce((own->>'abilityUsed')::boolean,false) then
+    select sum(ascii(substr(own->>'itemId',n,1))) % 5 into ability
+    from generate_series(1,length(own->>'itemId')) as letters(n);
+    ability_id:=(array['fracture','meteor','renew','bulwark','prism'])[ability+1];
+    ability_name:=(array['Fracture','Meteor Crash','Crystal Renewal','Crystal Shell','Prism Siphon'])[ability+1];
+    bonus:=(array[2,4,0,0,1])[ability+1];
+    healed:=least((own->>'maxHp')::int-(own->>'hp')::int,(array[0,0,5,2,3])[ability+1]);
+    if bonus=0 and healed=0 and (ability<>3 or ((own->>'guard')::boolean and (own->>'focus')::boolean)) then
+     raise exception 'That ability is unavailable.';
+    end if;
+    own:=own||jsonb_build_object('abilityUsed',true,'hp',(own->>'hp')::int+healed);
+    if ability=3 then own:=own||jsonb_build_object('guard',true,'focus',true); end if;
+   elsif action='ability' then
+    raise exception 'That ability is unavailable.';
+   end if;
+   if action in ('strike','ability') then
+    damage:=0;
+    if action='strike' or bonus>0 then
+     damage:=(own->>'damage')::int+case when (own->>'focus')::boolean then 3 else 0 end+coalesce(bonus,0);
+     if (rival->>'guard')::boolean and ability is distinct from 0 then damage:=(damage+1)/2; end if;
+     own:=own||jsonb_build_object('focus',false);
+     rival:=rival||jsonb_build_object('guard',false,'hp',greatest(0,(rival->>'hp')::int-damage));
+    end if;
     game:=jsonb_set(jsonb_set(game,own_path,own),rival_path,rival);
-    game:=game||jsonb_build_object('note',format('Team %s dealt %s damage.',side+1,damage));
+    detail:=concat_ws(' · ',case when damage>0 then damage||' damage' end,
+     case when healed>0 then healed||' HP restored' end,case when ability=3 then 'shield raised' end);
+    if action='ability' then game:=game||jsonb_build_object('note',format('Team %s used %s. %s',side+1,ability_name,detail));
+    else game:=game||jsonb_build_object('note',format('Team %s struck. %s',side+1,detail)); end if;
     if (rival->>'hp')::int=0 then
      select min(ordinality::int)-1 into reserve
      from jsonb_array_elements(game#>array['teams',other::text]) with ordinality as slot(card,ordinality)
@@ -138,7 +165,8 @@ begin
    else
     raise exception 'That action is unavailable.';
    end if;
-   room.match:=game||jsonb_build_object('turn',other,'revision',expected+1);
+   room.match:=game||jsonb_build_object('turn',other,'revision',expected+1,
+    'lastMove',jsonb_build_object('action',action,'ability',ability_id));
    update rock_arena.rooms set match=room.match,expires_at=now()+interval '2 hours' where code=room.code;
   elsif operation is null or operation not in ('state','join') then
    raise exception 'Unknown match action.';

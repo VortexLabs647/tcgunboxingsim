@@ -21,7 +21,16 @@ async function adopt(next,event){
   const rows=await request('game_saves?user_id=eq.'+encodeURIComponent(id)+'&select=state,revision,updated_at','GET',undefined,active);if(generation!==ownGeneration)return;
   const row=rows?.[0],pending=localGet(pendingKey(id));revision=row?.revision||0;let loaded;
   if(row){if(!hooks.validate(row.state))throw Error('Your cloud save could not be read. It has not been overwritten.');loaded=row.state;}
-  else{const signupEmail=localGet('tcg-new-account-email');loaded=signupEmail===user.email?.toLowerCase()?hooks.guest():hooks.fresh();if(!hooks.validate(loaded))loaded=hooks.fresh();revision=await request('rpc/save_game','POST',{p_state:loaded,p_expected_revision:0},active);if(generation!==ownGeneration)return;try{localStorage.removeItem('tcg-new-account-email')}catch{}}
+  else{
+   const signupEmail=localGet('tcg-new-account-email');
+   loaded=signupEmail===user.email?.toLowerCase()?hooks.guest():hooks.fresh();
+   if(!hooks.validate(loaded))loaded=hooks.fresh();
+   loaded.welcomePack=true;
+   loaded.preferences={...loaded.preferences,packIndex:0};
+   revision=await request('rpc/save_game','POST',{p_state:loaded,p_expected_revision:0},active);
+   if(generation!==ownGeneration)return;
+   try{localStorage.removeItem('tcg-new-account-email')}catch{}
+  }
   if(pending&&hooks.validate(pending.state)){
    if(pending.revision===revision){loaded=pending.state;dirty=clone(loaded);}
    else{loaded=pending.state;conflict=true;problem=true;status='Another device has a newer save. Your unsynced game is kept on this device.';}
@@ -50,6 +59,9 @@ async function action(event){const b=event.target.closest('[data-cloud-action]')
  else if(act==='delete'){if(!document.querySelector('#confirmCloudDelete')?.checked)throw Error('Check the deletion confirmation first.');busy=true;await request('rpc/delete_my_game_account','POST',{});const id=user.id;try{localStorage.removeItem(cacheKey(id));localStorage.removeItem(pendingKey(id))}catch{}dirty=null;await client.auth.signOut({scope:'local'});await adopt(null,'SIGNED_OUT');message='Cloud account deleted.';}
  }catch(e){message=e.message;status=e.message;}finally{busy=false;display(true)}}
 document.addEventListener('submit',submit);document.addEventListener('click',action);
-window.addEventListener('online',()=>{if(dirty&&!conflict)flush();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flush();});
-root.TCGCloud={init,panel,queue,flush,reload,battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get ready(){return ready},cacheKey};
+window.addEventListener('online',()=>{
+ if(dirty&&!conflict)flush();
+ else if(user&&!ready&&!busy&&session)adopt(session,'RECONNECT');
+});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flush();});
+root.TCGCloud={init,panel,queue,flush,reload,battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get canAccrue(){return !user||(ready&&!busy&&!conflict)},get ready(){return ready},cacheKey};
 })(window);

@@ -76,12 +76,12 @@ function saleValue(price,tier){
 function saleProceeds(rock){
  return rock.uid===starterId?0:rock.value*unitsPerCent+(rock.resaleUnits||0);
 }
-function canAfford(state,pack){return state.balance>=pack.price;}
+function hasWelcomePack(state,pack){return state.welcomePack===true&&pack.id==='rocks-0';}
+function canAfford(state,pack){return hasWelcomePack(state,pack)||state.balance>=pack.price;}
 function ensureStarterRock(state,now){
  if(canAfford(state,{price:packPrices[0]})||state.vault.some(rock=>rock.uid===starterId))return;
  state.vault.push({uid:starterId,itemId:'rock-granite',value:0,tier:0,date:new Date(now).toISOString(),locked:false});
  if(!state.discovered.includes('rock-granite'))state.discovered.push('rock-granite');
- state.rockClock=Math.max(state.rockClock,now);
 }
 function activeRocks(state){
  const seen=new Set();
@@ -113,9 +113,14 @@ function settleIncome(state,now=Date.now()){
  const boosted=earned*(100+badgeBoost(state))+state.badgeCarry;
  earned=Math.floor(boosted/100);
  state.badgeCarry=boosted%100;
- if(state.vault.some(rock=>rock.uid===starterId))earned+=Math.min(starterShortfall(state),starterUnits*seconds);
  credit(state,earned);
- return earned;
+ const starter=state.vault.find(rock=>rock.uid===starterId);
+ if(!starter)return earned;
+ const addedAt=Date.parse(starter.date);
+ const starterSeconds=Number.isFinite(addedAt)?Math.max(0,Math.min(seconds,Math.floor((now-addedAt)/1000))):seconds;
+ const stipend=Math.min(starterShortfall(state),starterUnits*starterSeconds);
+ credit(state,stipend);
+ return earned+stipend;
 }
 function sellRock(state,uid,now=Date.now()){
  const index=state.vault.findIndex(rock=>rock.uid===uid&&!rock.locked);
@@ -168,15 +173,16 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
  const duplicate=state.vault.some(rock=>rock.itemId===item.id);
  const value=saleValue(pack.price,tier);
  const pull={uid:uuid(),itemId:item.id,value,tier,packId:pack.id,date:new Date(now).toISOString(),locked:false};
- state.balance-=pack.price;
- state.spent+=pack.price;
+ const free=hasWelcomePack(state,pack);
+ if(free)state.welcomePack=false;
+ else{state.balance-=pack.price;state.spent+=pack.price;}
  state.vault.unshift(pull);
  state.rockClock=Math.max(state.rockClock,now);
  state.best=Math.max(state.best,value);
  ensureStarterRock(state,now);
  state.opened++;
  if(!state.discovered.includes(item.id))state.discovered.push(item.id);
- return {pull,pack,odds,duplicate};
+ return {pull,pack,odds,duplicate,free};
 }
 
 function defaults(){
@@ -229,6 +235,7 @@ function validSave(state,catalog){
   ['opened','spent','sold','best','deposited'].every(key=>Number.isSafeInteger(state[key])&&state[key]>=0)&&
   (state.rockClock===undefined||Number.isSafeInteger(state.rockClock)&&state.rockClock>=0)&&
   (state.rockRemainder===undefined||Number.isSafeInteger(state.rockRemainder)&&state.rockRemainder>=0&&state.rockRemainder<unitsPerCent)&&
+  (state.welcomePack===undefined||typeof state.welcomePack==='boolean')&&
   (state.badges===undefined||Array.isArray(state.badges)&&state.badges.length<=Object.keys(badges).length&&state.badges.every(id=>typeof id==='string'&&Object.hasOwn(badges,id)))&&
   (state.badgeCarry===undefined||Number.isSafeInteger(state.badgeCarry)&&state.badgeCarry>=0&&state.badgeCarry<100)&&
   discoveries(state.discovered)&&(state.retiredDiscoveries===undefined||discoveries(state.retiredDiscoveries))&&
@@ -236,7 +243,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);

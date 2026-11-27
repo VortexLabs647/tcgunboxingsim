@@ -3107,3 +3107,299 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
   .arena-fighter { width:clamp(62px,min(28vw,11.8dvh),100px); }
   .arena-match .arena-turn { margin-top:8px; }
 }
+
+
+/* Set the labels inside the disc's usable radius, including on short phones. */
+.opening-stage .card-wheel {
+  width:min(94cqw,92cqh,430px);
+  filter:drop-shadow(0 1.2cqw 0 #110c26) drop-shadow(0 0 22px #a272ff63);
+}
+.wheel-rim {
+  position:absolute;
+  inset:0;
+  border-radius:50%;
+  background:
+    radial-gradient(circle,transparent 64%,#fff0ca 65% 66%,transparent 67%),
+    repeating-conic-gradient(from var(--half-slice),#ae72d3 0deg 3deg,#33224d 3deg 8deg);
+  border:2px solid #201235;
+  box-shadow:inset 0 0 0 2px #f9dba5;
+}
+.wheel-disc {
+  inset:4%;
+  border:.8cqw solid #301e4b;
+  background:
+    radial-gradient(circle,#241438d9 15%,transparent 49%,#1f0d3359 72%,#1a103999 100%),
+    var(--wheel-colors);
+  box-shadow:0 0 0 .55cqw #fff0c3, inset 0 0 0 .85cqw #ffffff70;
+}
+.wheel-disc::before {
+  background:
+    radial-gradient(circle,transparent 55%,#ffffff72 55.4% 56.1%,transparent 56.5% 67%,#fff7e67a 67.2% 67.8%,transparent 68%),
+    repeating-conic-gradient(from var(--half-slice),#fff1bd 0deg .8deg,transparent .8deg var(--slice));
+}
+.wheel-slot {
+  inset:50% 0 auto;
+  height:0;
+  transform:rotate(var(--slot-angle));
+}
+.wheel-slot span {
+  position:absolute;
+  top:-31.5cqw;
+  transform:translateY(-50%);
+  min-width:17cqw;
+  padding:1.1cqw 2cqw;
+  border:.55cqw solid #ffffff70;
+  border-radius:1.8cqw;
+  background:#231634;
+  box-shadow:0 .8cqw 0 #2614397a;
+  font-size:clamp(.49rem,3.75cqw,1.02rem);
+  text-align:center;
+  line-height:1.12;
+  letter-spacing:normal;
+}
+.wheel-pointer {
+  inset:0 auto auto 44%;
+  height:12%;
+  background:linear-gradient(145deg,#fff8d5 0 41%,#f4b46c 42% 63%,#cb6aa5 65%);
+  clip-path:polygon(50% 0,100% 28%,67% 78%,50% 100%,33% 78%,0 28%);
+}
+.wheel-hub {
+  inset:38.5%;
+  background:radial-gradient(circle at 32% 25%,#8552bf,#3b1f66 72%);
+  border:.85cqw solid #fff0cc;
+  box-shadow:0 0 0 1cqw #321940,0 0 0 1.55cqw #ffffff78;
+}
+.wheel-hub span {
+  display:block;
+  width:52%;
+  aspect-ratio:.9;
+  clip-path:polygon(50% 0,91% 26%,91% 68%,50% 100%,8% 68%,8% 26%);
+  background:conic-gradient(from 32deg,#fffbd6,#d28bfc,#6142ab,#9d6ce7,#97ffed,#fffbd6);
+}
+.landed .wheel-pointer { background:linear-gradient(150deg,#fffade 15%,var(--spin-color) 62%,#693e8a); }
+.landed .wheel-rim { box-shadow:inset 0 0 0 2px #f9dba5,0 0 18px var(--spin-color); }
+.opening-screen h1 { font-size:clamp(1.36rem,8vw,3.2rem); text-wrap:balance; }
+.opening-screen .eyebrow { max-width:100%; text-align:center; overflow-wrap:anywhere; font-size:clamp(.66rem,2.9vw,.83rem); }
+.opening-screen .spin-readout { max-width:100%; white-space:normal; }
+
+.arena-match .arena-actions[data-abilities="true"] { grid-template-columns:minmax(0,1fr) minmax(0,.7fr) minmax(0,1.35fr); gap:6px; }
+:root body .arena-match .arena-actions button {
+  min-width:0;
+  padding:6px 3px;
+  font-size:clamp(.75rem,3.7vw,.94rem);
+  line-height:1.1;
+  overflow-wrap:anywhere;
+}
+:root body .arena-match [data-id="ability"] { --control-light:#f4cffd; --control-fill:#d4a0f4; }
+.arena-effect[data-ability="fracture"] { --effect-color:#a2eaff; }
+.arena-effect[data-ability="meteor"] { --effect-color:#ffaa68; }
+.arena-effect[data-ability="renew"] { --effect-color:#b7ff9e; }
+.arena-effect[data-ability="bulwark"] { --effect-color:#7ce5ff; }
+.arena-effect[data-ability="prism"] { --effect-color:#ff9fe8; }
+.arena-effect--shot[data-ability="meteor"]::before { background:linear-gradient(#fff3be,var(--effect-color) 31%,#ff873c9e 70%,transparent); }
+.arena-effect--shot[data-ability="fracture"]::before { clip-path:polygon(35% 0,69% 0,85% 18%,66% 45%,78% 61%,47% 100%,58% 58%,34% 53%,21% 21%); }
+.arena-effect--shot[data-ability="prism"]::before { background:linear-gradient(#fff,#ffa9e9 24%,#bcabff 54%,#80ffdd 73%,transparent); }
+.arena-effect--spark {
+  width:8px;
+  aspect-ratio:1;
+  background:linear-gradient(130deg,#fffdf2 12%,var(--effect-color));
+  box-shadow:0 0 7px var(--effect-color);
+  rotate:45deg;
+}
+.arena-effect--charge {
+  z-index:1;
+  padding:6px 10px;
+  border:2px solid var(--effect-color);
+  border-radius:10px;
+  background:#231634;
+  color:var(--effect-color);
+  box-shadow:0 0 20px var(--effect-color);
+  text-align:center;
+  font:900 clamp(.83rem,4vw,1.15rem)/1.1 var(--display-font);
+}
+.arena-result {
+  --finish:#acecfd;
+  display:grid;
+  justify-items:center;
+  text-align:center;
+  overflow:hidden;
+  padding:clamp(15px,5vw,38px);
+  border:2px solid #8d72b5;
+  border-radius:24px;
+  background:radial-gradient(ellipse at 50% 18%,#503676d4,#221b43ed 70%),url('crystal-canyon.webp') center bottom / cover;
+  box-shadow:0 6px #110f23;
+}
+.arena-result[data-won="true"] { --finish:#ffe6a2; }
+.arena-result-art {
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:min(100%,250px);
+  aspect-ratio:1.15;
+  isolation:isolate;
+}
+.arena-result-art::before {
+  content:'';
+  z-index:-1;
+  position:absolute;
+  inset:0;
+  border-radius:50%;
+  background:repeating-conic-gradient(from 4deg,var(--finish) 0deg 7deg,transparent 7deg 31deg);
+  opacity:.36;
+  mask-image:radial-gradient(closest-side,#000,transparent);
+}
+.arena-result-art .cartoon-card { width:43%; height:auto; filter:drop-shadow(0 0 16px var(--finish)); }
+.arena-result h1 { color:var(--finish); text-shadow:0 4px #241539; font-size:clamp(2.2rem,10vw,3.4rem); }
+.arena-result .arena-actions { width:min(100%,365px); margin-bottom:0; }
+.arena-result #arenaStatus:empty { display:none; }
+@media (prefers-reduced-motion:no-preference) {
+  .arena-result-art .cartoon-card { animation:arena-result-rise .4s cubic-bezier(.2,.7,.3,1.3) both; }
+  @keyframes arena-result-rise { from { opacity:.3; transform:translateY(14px) scale(.88); } }
+}
+
+/* Search and room fields share the controls' inked outline and faceted finish. */
+:root body :is(.toolbar,.arena) .search,
+:root body .arena :is(#arenaCode,.room-code) {
+  min-height:44px;
+  border:2px solid #1a142f;
+  border-radius:14px;
+  background:linear-gradient(133deg,#fbebff 0 10%,transparent 10% 82%,#8f72d24a 82%),linear-gradient(160deg,#eadcff,#c6b2f3);
+  color:#23173c;
+  box-shadow:inset 0 0 0 1px #fffbed,inset 0 -3px #7257b03b,0 3px #100d23;
+  font:900 1rem/1.25 var(--interface-font);
+}
+:root body :is(.toolbar,.arena) .search input {
+  width:100%;
+  min-width:0;
+  min-height:40px;
+  padding:0 12px 0 38px;
+  border:0;
+  outline:none;
+  background:transparent;
+  color:inherit;
+  box-shadow:none;
+  font:inherit;
+}
+:root body .arena .search { margin-block:8px; }
+:root body .arena .search #arenaFilter { margin:0; }
+:root body :is(.toolbar,.arena) .search .icon { top:50%; transform:translateY(-50%); color:#554082; pointer-events:none; }
+:root body :is(.toolbar .search,.arena .search,.arena .join-room) input::placeholder { color:#594679; opacity:1; }
+:root body :is(.toolbar,.arena) .search:focus-within { outline:2px solid #99f4d8; outline-offset:2px; }
+:root body .arena .room-code { letter-spacing:.06em; font-family:monospace; }
+:root body .team-option.secondary { align-items:flex-start; }
+:root body .team-option[aria-pressed="true"] {
+  --control-light:#e4ffed;
+  --control-fill:#92ebc5;
+  outline:2px solid #a7ffda;
+  outline-offset:-2px;
+}
+.team-option .team-equipped {
+  display:inline-block;
+  padding:2px 5px;
+  border:1px solid #361e58;
+  border-radius:6px;
+  background:#513c75;
+  color:#fff7ff;
+  font-weight:900;
+}
+.team-option[aria-pressed="true"] .team-equipped { background:#245348; color:#dcffed; border-color:#163f35; }
+
+.arena-result[data-won="true"] {
+  align-content:center;
+  gap:clamp(5px,1.4dvh,12px);
+  min-height:min(690px,calc(100dvh - 145px));
+  border-color:#f8d38a;
+  background:radial-gradient(ellipse at 50% 35%,#8654aa83,#221b43ef 72%),url('crystal-canyon.webp') center bottom / cover;
+}
+.arena-result[data-won="true"] .arena-result-art { width:min(89%,43dvh,350px); }
+.arena-result[data-won="true"] .arena-result-art .cartoon-card { width:56%; }
+.arena-result[data-won="true"] h1 { margin:0; font-size:clamp(3rem,12vw,6rem); line-height:1; }
+.arena-result[data-won="true"] p { margin-block:2px; }
+.victory-timer {
+  width:min(100%,232px);
+  height:5px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#211737;
+}
+.victory-timer span { display:block; height:100%; background:#ffdfa0; transform-origin:left; animation:victory-countdown 4.2s linear both; }
+@keyframes victory-countdown { to { transform:scaleX(0); } }
+@media (prefers-reduced-motion:reduce) { .victory-timer { visibility:hidden; } }
+
+.charging:not(.spinning) .card-wheel { visibility:hidden; animation:none; }
+.spinning .card-wheel { visibility:visible; animation:wheel-entrance .22s ease-out both; }
+.spinning .rip-pack[hidden] { display:none; }
+.opening-screen.spinning {
+  background:
+    radial-gradient(ellipse at 50% 44%,#6142a5a6,transparent 64%),
+    linear-gradient(#161439 12%,#221b54e0 62%,#20183ea8),
+    url('crystal-canyon.webp') center bottom / cover #21193e;
+}
+.opening-screen .rip-instruction { height:clamp(30px,7dvh,54px); }
+.opening-screen .spin-readout .rarity-label.active {
+  padding:5px 16px;
+  border:2px solid var(--spin-color);
+  border-radius:11px;
+  background:#24193e;
+  color:#fff8eb;
+  font-size:clamp(.88rem,4.6vw,1.16rem);
+  font-weight:900;
+  text-shadow:none;
+  box-shadow:0 0 12px color-mix(in srgb,var(--spin-color),transparent 48%);
+}
+.wheel-disc { --wheel-motion:cubic-bezier(.12,.62,.13,1); }
+.spinning .wheel-disc { animation-timing-function:var(--wheel-motion); }
+.wheel-slot span {
+  transform:translateY(-50%) rotate(calc(0deg - var(--slot-angle)));
+  font-size:clamp(.52rem,3.85cqw,1.07rem);
+}
+.spinning .wheel-slot span { animation:wheel-label-hold var(--spin-time) var(--wheel-motion) both; }
+@keyframes wheel-label-hold {
+  from { transform:translateY(-50%) rotate(calc(0deg - var(--slot-angle))); }
+  to { transform:translateY(-50%) rotate(calc(0deg - var(--slot-angle) - var(--wheel-stop))); }
+}
+.results-screen {
+  --reveal-accent:color-mix(in srgb,var(--rarity),#fff 34%);
+  background:radial-gradient(ellipse at center,color-mix(in srgb,var(--rarity),transparent 63%),transparent 62%),#231b44;
+  padding-inline:clamp(10px,3.5vw,25px);
+}
+.reveal-rarity {
+  padding:3px 10px;
+  border:1px solid var(--reveal-accent);
+  border-radius:999px;
+  color:var(--reveal-accent);
+  background:#221638;
+  letter-spacing:.055em;
+}
+.results-screen h1 { max-width:100%; font-size:clamp(1.18rem,6.8vw,2.65rem); text-wrap:balance; overflow-wrap:anywhere; }
+.results-screen .result-grid { min-height:0; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); place-items:center; overflow:hidden; }
+body .results-screen .result.rocks {
+  display:block;
+  min-height:0;
+  width:min(100%,410px);
+  max-width:none;
+  height:100%;
+  padding:0;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+}
+.results-screen .result.rocks .result-image { height:100%; min-height:0; padding:0; container-type:size; }
+.results-screen .result.rocks .cartoon-card { width:min(78cqw, calc((100cqh - 16px) * 5 / 7),292px); height:auto; flex:none; }
+.results-screen .result-actions { gap:7px; }
+.results-screen .result-actions button { min-width:0; padding-inline:8px; text-wrap:balance; }
+
+.detail-kicker { display:flex; gap:9px; align-items:center; flex-wrap:wrap; color:#c8bce8; font-size:.79rem; }
+.detail-lore { margin-top:12px; }
+@media (max-width:900px) {
+  body[data-view="item"] #app { padding-top:10px; }
+  body[data-view="item"] .back-button { margin:0 0 10px; min-height:40px; padding:6px 11px; }
+  .detail-page { gap:10px; }
+  .detail-image { height:clamp(138px,34dvh,280px); padding:9px; }
+  .detail-content { min-width:0; }
+  .detail-content h1 { font-size:clamp(1.35rem,6.6vw,2.2rem); line-height:1.1; margin:6px 0; }
+  .detail-content p { font-size:.89rem; line-height:1.4; }
+  .card-training { display:flex; flex-wrap:wrap; align-items:center; gap:7px 12px; margin-top:8px; }
+  .card-training button { flex:1 1 135px; padding-inline:8px; }
+  .detail-lore { margin-top:9px; }
+}
