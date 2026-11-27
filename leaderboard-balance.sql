@@ -2,7 +2,7 @@ alter table public.leaderboard_entries
  add column if not exists balance_cents bigint
  check (balance_cents between 0 and 100000000000000);
 
--- Existing members opt in to sharing balance separately from pack counts.
+-- Membership is opt-in. Every member publishes their virtual balance with their pack count.
 grant select(balance_cents) on public.leaderboard_entries to anon,authenticated;
 
 create or replace function tcg_private.sync_leaderboard() returns trigger
@@ -18,7 +18,7 @@ begin
  opened:=(new.state->>'opened')::bigint;
  spent:=(new.state->>'spent')::bigint;
  if opened>100000000000000 or spent>100000000000000 then return new; end if;
- if new.state->'shareBalance' = 'true'::jsonb and jsonb_typeof(new.state->'balance')='number'
+ if jsonb_typeof(new.state->'balance')='number'
     and (new.state->>'balance') ~ '^\d{1,15}$' then
   balance:=(new.state->>'balance')::bigint;
   if balance>100000000000000 then balance:=null; end if;
@@ -31,3 +31,19 @@ begin
  return new;
 end $$;
 revoke all on function tcg_private.sync_leaderboard() from public,anon,authenticated;
+
+-- Fill balances for existing leaderboard members only.
+with balances as (
+ select user_id,case
+  when jsonb_typeof(state->'balance')='number' and (state->>'balance') ~ '^\d{1,15}$'
+  then (state->>'balance')::bigint
+ end as cents
+ from public.game_saves
+ where state->'leaderboard'='true'::jsonb
+)
+update public.leaderboard_entries as entry
+set balance_cents=balances.cents
+from balances
+where entry.user_id=balances.user_id
+ and balances.cents between 0 and 100000000000000
+ and entry.balance_cents is distinct from balances.cents;

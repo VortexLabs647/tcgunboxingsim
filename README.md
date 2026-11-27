@@ -1,6 +1,6 @@
 # TCG Unboxing Sim
 
-A free rock and mineral card collection game. Open 16 editions of illustrated rock packs, discover 240 cards based on 48 rocks and minerals, and organize your finds in the vault. Each pack edition features a signature rock. Buy one pack at a time using virtual money and one of two odds presets. Owned rocks earn small amounts while away, and every newly pulled card can be sold immediately. A Common pull unlocks Rock Match. Complete it to play Crystal Drop, a peg puzzle that tracks your best score. Rock Arena has 12 campaign levels with completion and first-clear rewards, plus quick AI battles and private rooms.
+A free rock and mineral card collection game. Open 16 editions of illustrated rock packs, discover 240 cards based on 48 rocks and minerals, and organize your finds in the vault. Each pack edition features a signature rock. Buy one pack at a time using virtual money and one of two odds presets. Owned rocks earn small amounts while away, and every newly pulled card can be sold immediately. A Common pull offers a free Second Chance wheel with its own displayed odds. A successful roll awards another card from the same pack. Rock Arena has 12 campaign levels with completion and first-clear rewards, plus quick AI battles and private rooms.
 
 ## Play or install
 

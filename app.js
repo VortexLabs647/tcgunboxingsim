@@ -7,15 +7,13 @@ const date=d=>new Date(d).toLocaleDateString(undefined,{month:'short',day:'numer
 const KEY='tcg-unboxing-sim-v2';
 let leaderboardLoaded=0,leaderboardLoading=false,leaderboardRows=null,leaderboardError='';
 const effectBuses=new Map();
-let lastClickTime=-Infinity,packCrinkleUntil=0,packCrinkleBuffer=null,audioMix=null,audioResuming=null,winSources=new Set(),winStopTimer=null;
+let lastClickTime=-Infinity,packSoundUntil=0,audioMix=null,audioResuming=null,winSources=new Set(),winStopTimer=null;
 const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const SPIN_MS=2400,RESULT_MS=900;
-const rockMatchPairs=4;
-const dropLanes=5,dropRows=5;
 // Match short, frequency-weighted listening levels across the game's sound cues.
-const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
+const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-select':4.5,'pack-open':5.5, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
 const chance=(n,digits=3)=>n>0&&n<.001?'<0.0010%':Number(n.toFixed(digits))+'%';
 let state=E.defaults(),catalog=[],byId={},packs=[],view='packs',selectedIndex=0,odds='Balanced',search='',sort='recent',detailId=null,detailUid=null,previousView='collection',pending=null,phase='idle',timers=[],audioCtx=null,confirmAction='',carouselTimer=null,feedback='';
@@ -23,7 +21,7 @@ function selectedPack(){return packs[selectedIndex];}
 function notice(message){
  if(view==='battle'){
   const status=$('.arena-turn span,#arenaStatus:not(.arena-turn)');
-  if(status&&message)status.textContent=message;
+  if(status)status.textContent=message;
   return;
  }
  $('#status').textContent=message;
@@ -309,7 +307,7 @@ function bindCarousel() {
 function selectPack(index, scroll = true) {
   const before = selectedIndex;
   selectedIndex = Math.max(0, Math.min(packs.length-1, Number(index)));
-  if (before !== selectedIndex) sound('pack-crinkle');
+  if (before !== selectedIndex) sound('pack-select');
   save();
 
   const pack = selectedPack();
@@ -434,15 +432,22 @@ function profileView(){
    </section>
    <section class="profile-data-panel">
     <h2>${icon('card')} Current team</h2>
-    ${team.length?`<div class="profile-team">${team.map(card=>`<div>${cardImage(byId[card.itemId])}<strong>Lv. ${E.cardLevel(card)}</strong></div>`).join('')}</div>`:'<a class="profile-team-link" href="#battle">Equip cards in Battle</a>'}
+    ${team.length?`<div class="profile-team">${team.map(card=>{
+     const item=byId[card.itemId];
+     return `<div>${cardImage(item,'profile-mini-card')}<strong>Lv. ${E.cardLevel(card)}</strong><span class="profile-team-name" title="${escape(item.name)}">${escape(item.name)}</span></div>`;
+    }).join('')}</div>`:'<a class="profile-team-link" href="#battle">Equip cards in Battle</a>'}
    </section>
    <section class="profile-data-panel">
     <h2>${icon('arena')} Achievements</h2>
     <ul class="profile-milestones">${milestones.map(([name,value,max])=>`<li><div><span>${name}</span><strong>${value} / ${max}</strong></div><progress aria-label="${name}" value="${value}" max="${max}"></progress></li>`).join('')}</ul>
    </section>
   </div>
+  <section class="profile-data-panel profile-summary-stats">
+   <h2>${icon('grid')} My stats</h2>
+   ${stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length],['Cards owned',state.vault.length]])}
+  </section>
  </div>
- <div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${profileSection('stats','My stats',stats([['Packs opened',state.opened],['Unique rocks',state.discovered.length],['Best Crystal Drop score',state.bestDropScore]]))}${profileSection('rankings','Leaderboard',leaderboardMembership()+'<a class="secondary full" href="#leaderboard">View leaderboard</a>')}${profileSection('install','Install the app','<p>On iPhone, open this site in Safari. Tap Share, select <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong> if shown, then tap Add.</p><p>On Android, open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>')}${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
+ <div class="profile-simple profile-basic"><div>${window.TCGCloud?.panel()||''}</div><section class="content-card collector-card"><h2>COLLECTOR NAME</h2><label class="field-label" for="username">Your collector name</label><div class="profile-name-row"><input id="username" maxlength="24" autocomplete="nickname" value="${escape(state.name)}" placeholder="Choose a name"><button class="primary" data-action="save-name">Save</button></div>${feedback?`<p class="settings-feedback" role="status">${escape(feedback)}</p>`:''}</section><div class="profile-folds">${!window.TCGCloud?.user?profileSection('delete','Delete guest progress',`<div class="delete-details"><p>Permanently delete guest progress from this device. </p>${confirmAction==='delete'?'<button class="secondary danger" data-action="delete-confirm">Delete progress permanently</button><button class="secondary" data-action="cancel-confirm">Keep progress</button>':'<button class="secondary danger" data-action="delete-start">Delete guest progress</button>'}</div>`):''}</div></div>`;}
 
 function itemView(){
  const item=byId[detailId];
@@ -494,7 +499,7 @@ function sound(kind){
   unlockSound();
   if(!audioMix)return;
   const now=audioCtx.currentTime;
-  if(kind==='pack-crinkle'&&now<packCrinkleUntil)return;
+  if(kind==='pack-select'&&now<packSoundUntil)return;
   if(kind==='click'){
    if(now-lastClickTime<.07)return;
    lastClickTime=now;
@@ -570,37 +575,17 @@ function sound(kind){
     tone(530,0,.135,.032,'triangle');
     tone(795,.06,.19,.027);
     break;
-   case 'pack-crinkle': {
-    const duration=.15;
-    if(!packCrinkleBuffer){
-     packCrinkleBuffer=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*duration),audioCtx.sampleRate);
-     const data=packCrinkleBuffer.getChannelData(0);
-     const folds=[.012,.029,.047,.081,.108,.131];
-     const widths=[.010,.009,.015,.012,.017,.011];
-     const strengths=[.62,.45,.95,.56,.76,.34];
-     for(let i=0;i<data.length;i++){
-      const time=i/audioCtx.sampleRate;
-      const envelope=folds.reduce((level,center,index)=>level+strengths[index]*Math.max(0,1-Math.abs(time-center)/widths[index])**2,0);
-      data[i]=(Math.random()*2-1)*envelope;
-     }
-    }
-    const source=audioCtx.createBufferSource(),filter=audioCtx.createBiquadFilter(),gain=audioCtx.createGain();
-    source.buffer=packCrinkleBuffer;
-    filter.type='bandpass';
-    filter.frequency.value=2850;
-    filter.Q.value=.7;
-    gain.gain.setValueAtTime(0,now);
-    gain.gain.linearRampToValueAtTime(.2,now+.009);
-    gain.gain.setValueAtTime(.2,now+duration-.018);
-    gain.gain.linearRampToValueAtTime(0,now+duration);
-    packCrinkleUntil=now+duration+.018;
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(effectsBus);
-    trackEffect(source);
-    source.start();
+   case 'pack-select':
+    packSoundUntil=now+.085;
+    tone(380,0,.052,.028,'triangle',530);
+    tone(720,.019,.07,.019);
     break;
-   }
+   case 'pack-open':
+    tone(170,0,.082,.045,'triangle',87);
+    tone(510,.025,.11,.027,'triangle',920);
+    tone(1320,.065,.16,.023);
+    tone(1760,.101,.18,.014);
+    break;
    case 'hit':
     [523,659,784].forEach((frequency,index)=>tone(frequency,index*.095,.28,.045,'sine'));
     break;
@@ -613,28 +598,31 @@ function startOpening(){
  pending=E.openPack(state,catalog,selectedPack(),odds);
  if(!pending){updateMoney();return;}
  stopWinMusic();
- sound('click');
  save();
  view='opening';
  history.replaceState(null,'','#opening');
+ spinPackWheel();
+ sound('pack-open');
+ window.scrollTo({top:0,behavior:'instant'});
+}
+function spinPackWheel(){
  if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+  phase='idle';
   reveal();
  }else{
   phase='spinning';
   render();
   spinReveal();
  }
- window.scrollTo({top:0,behavior:'instant'});
 }
 function openingView(){
  if(!pending)return empty('READY FOR A NEW PULL?','Choose your next pack.');
  if(phase==='revealed')return resultsView();
- if(phase==='matching')return rockMatchView();
- if(phase==='crystal-drop')return crystalDropView();
+ if(phase==='second-chance')return secondChanceView();
  const pack=pending.pack;
  return `<section class="opening-screen spinning" id="openingScreen" style="--foil:${pack.color};--spin-color:#c7a4fb;--spin-time:${SPIN_MS}ms">
    <div class="eyebrow">${pack.name} Rock Pack · ${pending.odds}</div>
-   <h1>Rarity wheel</h1>
+   <h1>${pending.extraSpin?'Second Chance · Rarity wheel':'Rarity wheel'}</h1>
    <div class="opening-stage">${raritySpinner()}</div>
    <p class="opening-result" role="status"><strong class="opening-rarity"></strong></p>
  </section>`;
@@ -645,20 +633,28 @@ function openingPull(){return pending.pull;}
 const wheelColors=['#a7afd9','#49dd29','#0795ff','#b939f6','#ffb813','#f23441'];
 const wheelSymbols=['★','◆','⬢','♛','✪','🏆'];
 function raritySpinner(){
- const hero=openingPull();
  const slots=E.oddsPresets[pending.odds].flatMap((weight,tier)=>weight>0?[tier]:[]);
- const angle=360/slots.length;
- const landings=slots.flatMap((tier,index)=>tier===hero.tier?[index]:[]);
- const landingIndex=landings[Math.floor(E.random()*landings.length)];
- const stops=slots.map((tier,index)=>`${wheelColors[tier]} ${index*angle}deg ${(index+1)*angle}deg`).join(',');
- const rotation=1800+(360-landingIndex*angle)%360;
- return `<div class="card-wheel" aria-hidden="true" data-landing-index="${landingIndex}" style="--slice:${angle}deg;--half-slice:${-angle/2}deg">
+ const size=360/slots.length;
+ const wedges=slots.map(tier=>({label:E.rarityNames[tier],symbol:wheelSymbols[tier],color:wheelColors[tier],size,tier}));
+ return wheelMarkup(wedges,slots.indexOf(openingPull().tier));
+}
+function wheelMarkup(wedges,winner){
+ const origin=-wedges[0].size/2;
+ let cursor=0;
+ const slices=wedges.map(wedge=>{
+  const start=cursor;
+  cursor+=wedge.size;
+  return {...wedge,start,end:cursor,middle:origin+(start+cursor)/2};
+ });
+ const stops=slices.map(({color,start,end})=>`${color} ${start}deg ${end}deg`).join(',');
+ const rotation=1800+(360-slices[winner].middle)%360;
+ return `<div class="card-wheel" aria-hidden="true" data-landing-index="${winner}" style="--slice:${360/slices.length}deg;--half-slice:${origin}deg">
    <div class="wheel-rim"></div>
-   ${slots.map((_,index)=>`<i class="wheel-rim-star" style="--star-angle:${(index+.5)*angle}deg">★</i>`).join('')}
+   ${slices.map(({end})=>`<i class="wheel-rim-star" style="--star-angle:${origin+end}deg">★</i>`).join('')}
    <div class="wheel-pointer"></div>
-   <div class="wheel-disc" style="--wheel-stop:${rotation}deg;--wheel-colors:conic-gradient(from ${-angle/2}deg,${stops})">
-     ${slots.map((tier,i)=>`<div class="wheel-slot" data-tier="${tier}" style="--slot-angle:${i*angle}deg">
-       <span class="wheel-label"><b>${E.rarityNames[tier]}</b><i>${wheelSymbols[tier]}</i></span>
+   <div class="wheel-disc" style="--wheel-stop:${rotation}deg;--wheel-colors:conic-gradient(from ${origin}deg,${stops})">
+     ${slices.map(({label,symbol,middle,tier})=>`<div class="wheel-slot" ${tier===undefined?'':`data-tier="${tier}"`} style="--slot-angle:${middle}deg">
+       <span class="wheel-label"><b>${label}</b><i>${symbol}</i></span>
      </div>`).join('')}
    </div>
    <div class="wheel-hub"><span>★</span></div>
@@ -669,7 +665,7 @@ function playWheelTicks(disc){
  const segmentAngle=360/disc.children.length;
  let previousSegment=0,lastSound=-Infinity;
  const tick=(now)=>{
-  if(phase!=='spinning'||!disc.isConnected)return;
+  if(!disc.isConnected||disc.closest('.landed'))return;
   const transform=getComputedStyle(disc).transform;
   if(transform!=='none'){
    const [a,b]=transform.slice(transform.indexOf('(')+1).split(',',2).map(Number);
@@ -726,220 +722,73 @@ function stopEffects({keepClick=false}={}){
   bus.disconnect();
  }
  if(!keepClick)lastClickTime=-Infinity;
- packCrinkleUntil=0;
+ packSoundUntil=0;
 }
 function stopWinMusic(){clearTimeout(winStopTimer);for(const source of winSources){try{source.stop();source.disconnect();}catch{}}winSources.clear();if(winMusicGain){try{winMusicGain.disconnect();}catch{}winMusicGain=null;}}
 
 function playWinMusic(){stopEffects();try{unlockSound();if(!audioMix)return;stopWinMusic();const now=audioCtx.currentTime,beat=60/128,bus=audioCtx.createGain();winMusicGain=bus;bus.gain.setValueAtTime(WIN_MUSIC_GAIN,now);bus.gain.setTargetAtTime(0,now+4.5,.18);bus.connect(audioMix);const note=(midi,start,length,volume=.12,type='triangle')=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);g.gain.setValueAtTime(.001,now+start);g.gain.exponentialRampToValueAtTime(volume,now+start+.018);g.gain.exponentialRampToValueAtTime(.001,now+start+length);o.connect(g);g.connect(bus);winSources.add(o);o.onended=()=>winSources.delete(o);o.start(now+start);o.stop(now+start+length+.03);};const chords=[[60,64,67,71],[57,60,64,67],[53,57,60,64],[55,59,62,67]];chords.forEach((chord,b)=>{chord.forEach(m=>note(m,b*beat*2,beat*1.85,.075,'sine'));note(chord[0]-12,b*beat*2,beat*1.7,.17,'sine');});[72,76,79,84,83,79,76,79,81,84,88,86,84,79,83,84].forEach((m,i)=>note(m,i*beat/2,beat*.46,.15,'triangle'));[72,76,79,84].forEach(m=>note(m,beat*8,1.05,.09,'sine'));winStopTimer=setTimeout(()=>{bus.disconnect();if(winMusicGain===bus)winMusicGain=null;},5500);}catch{}}
 
-function shuffleRockMatch(items){
- const shuffled=[...items];
- for(let i=shuffled.length-1;i>0;i--){
-  const another=Math.floor(E.random()*(i+1));
-  [shuffled[i],shuffled[another]]=[shuffled[another],shuffled[i]];
- }
- return shuffled;
-}
-function startRockMatch(){
- if(view!=='opening'||phase!=='revealed'||pending?.pull.tier!==0)return;
- if(pending.rockMatch?.complete){
-  startCrystalDrop();
-  return;
- }
- if(pending.rockMatch){
-  phase='matching';
-  render();
-  $('#rockMatchTitle').focus({preventScroll:true});
-  return;
- }
- const pulled=byId[openingPull().itemId];
- const rocks=[pulled.id];
- const artKey=item=>item.image+':'+item.artIndex;
- const usedArt=new Set([artKey(pulled)]);
- for(const item of shuffleRockMatch(catalog.filter(item=>item.tier===0))){
-  const key=artKey(item);
-  if(usedArt.has(key))continue;
-  usedArt.add(key);
-  rocks.push(item.id);
-  if(rocks.length===rockMatchPairs)break;
- }
- pending.rockMatch={tiles:shuffleRockMatch([...rocks,...rocks]),open:[],matched:new Set(),message:'Flip two cards to find a pair.',complete:false};
- phase='matching';
- render();
- $('#rockMatchTitle').focus({preventScroll:true});
-}
 function winRewardRange(){
  return money(E.winRewardMin*E.unitsPerCent)+'–'+money(E.winRewardMax*E.unitsPerCent);
 }
-function rockMatchView(){
- const game=pending.rockMatch;
- const pairs=game.matched.size/2;
- const rewardText=game.complete
-  ? 'You earned '+money(game.reward*E.unitsPerCent)+' in virtual coins.'
-  : 'Find all '+rockMatchPairs+' pairs to earn '+winRewardRange()+' in virtual coins.';
- return `<section class="rock-match" aria-labelledby="rockMatchTitle">
-  <header>
-   <h1 id="rockMatchTitle" tabindex="-1">${game.complete?'All pairs matched!':'Rock Match'}</h1>
-   <p>${rewardText}</p>
-  </header>
-  <div class="rock-match-grid">${game.tiles.map((id,index)=>{
-   const matched=game.matched.has(index),visible=matched||game.open.includes(index);
-   const label=visible?byId[id].name+(matched?', matched':''):'Face-down card '+(index+1);
-   return `<button type="button" class="rock-match-tile" data-action="rock-match-flip" data-id="${index}" data-face="${visible}" data-matched="${matched}" aria-label="${escape(label)}" ${matched||game.complete?'disabled':visible||game.open.length===2?'aria-disabled="true"':''}>
-    ${visible?cardImage(byId[id]):'<span aria-hidden="true" class="rock-match-back">?</span>'}
-   </button>`;
-  }).join('')}</div>
-  <p class="rock-match-status" role="status">${pairs} of ${rockMatchPairs} pairs. ${escape(game.message)}</p>
-  <div class="rock-match-actions">
-   ${game.complete?'<button class="primary" type="button" data-action="crystal-drop-start">Play Crystal Drop</button>':''}
-   <button class="secondary" type="button" data-action="rock-match-back">${game.complete?'Back to card':'Exit Rock Match'}</button>
-  </div>
- </section>`;
-}
-function flipRockMatch(index){
- if(phase!=='matching')return;
- const game=pending.rockMatch;
- if(game.complete||game.open.length===2||game.open.includes(index)||game.matched.has(index)||!game.tiles[index])return;
- game.open.push(index);
- const [first,second]=game.open;
- if(second===undefined){
-  game.message='Choose another card.';
- }else if(game.tiles[first]===game.tiles[second]){
-  game.matched.add(first);
-  game.matched.add(second);
-  game.open=[];
-  game.complete=game.matched.size===game.tiles.length;
-  game.message=game.complete?'':'Pair found!';
-  if(game.complete){
-   game.reward=E.rollWinReward();
-   E.creditReward(state,game.reward);
-   save();
-   sound('coin');
-  }else sound('vault');
- }else{
-  game.message='Try again.';
-  const flipTimer=setTimeout(()=>{
-   if(phase!=='matching'||pending?.rockMatch!==game)return;
-   game.open=[];
-   render();
-   $(`[data-action="rock-match-flip"][data-id="${index}"]`)?.focus({preventScroll:true});
-  },850);
-  game.flipTimer=flipTimer;
-  timers.push(flipTimer);
- }
+function startSecondChance(){
+ if(view!=='opening'||phase!=='revealed'||openingPull().tier!==0||pending.secondChance||pending.extraSpin)return;
+ const odds=15+Math.floor(E.random()*31);
+ const bonus={odds,won:E.random()*100<odds};
+ pending.secondChance=bonus;
+ phase='second-chance';
  render();
- if(game.complete)$('#rockMatchTitle').focus({preventScroll:true});
- else $(`[data-action="rock-match-flip"]:not(:disabled):not([aria-disabled="true"])`)?.focus({preventScroll:true});
-}
-function exitRockMatch(){
- if(phase!=='matching'&&phase!=='crystal-drop')return;
- const game=pending.rockMatch;
- if(game.drop?.moving)return;
- clearTimeout(game.flipTimer);
- game.open=[];
- if(!game.complete)game.message='Flip two cards to find a pair.';
- phase='revealed';
- render();
- $('[data-action="keep-result"]')?.focus({preventScroll:true});
-}
-
-function makeCrystalDrop(){
- // Swap adjacent lanes at each row so every target is reachable from one starting lane.
- const rows=Array.from({length:dropRows},()=>{
-  const directions=Array(dropLanes).fill(0);
-  const start=Math.floor(E.random()*2);
-  for(let lane=start;lane<dropLanes-1;lane+=2){
-   if(E.random()<.25)continue;
-   directions[lane]=1;
-   directions[lane+1]=-1;
-  }
-  return directions;
- });
- return {rows,target:Math.floor(E.random()*dropLanes),landing:null,moving:false};
-}
-function crystalDropPath(drop,start){
- const path=[start];
- for(const row of drop.rows){
-  const lane=path.at(-1);
-  path.push(lane+row[lane]);
- }
- return path;
-}
-function startCrystalDrop(){
- const game=pending?.rockMatch;
- if(!['matching','revealed'].includes(phase)||!game?.complete)return;
- game.drop??=makeCrystalDrop();
- phase='crystal-drop';
- render();
- $('#crystalDropTitle').focus({preventScroll:true});
-}
-function crystalDropView(){
- const drop=pending.rockMatch.drop;
- const arrows=['↙','↓','↘'],directions=['left','straight','right'];
- const finished=drop.landing!==null;
- const lanes=Array.from({length:dropLanes},(_,lane)=>lane);
- const style=finished?` style="left:${dropLanePosition(drop.landing)};top:91%"`:'';
- return `<section class="rock-match crystal-drop" aria-labelledby="crystalDropTitle">
-  <header>
-   <h1 id="crystalDropTitle" tabindex="-1">Crystal Drop</h1>
-   <p>Follow the pegs and pick a lane to reach the glowing slot. Aim for slot ${drop.target+1}.</p>
-  </header>
-  <div class="crystal-board">
-   <div class="crystal-lanes">
-    ${lanes.map(lane=>{
-     const path=crystalDropPath(drop,lane);
-     const turns=drop.rows.map((row,index)=>directions[row[path[index]]+1]).join(', ');
-     return `<button class="secondary" type="button" data-action="crystal-drop-lane" data-id="${lane}" aria-label="Drop from lane ${lane+1}. Peg directions: ${turns}." ${finished?'disabled':''}>${lane+1}</button>`;
-    }).join('')}
-   </div>
-   <div class="crystal-field" aria-hidden="true">
-    ${drop.rows.map(row=>`<div class="crystal-pegs">${row.map(step=>`<span data-turn="${step!==0}">${arrows[step+1]}</span>`).join('')}</div>`).join('')}
-    <div class="crystal-ball"${style} ${finished?'':'hidden'}></div>
-    <div class="crystal-slots">${lanes.map(lane=>`<span data-target="${lane===drop.target}">${crystalMultiplier(drop,lane)}×</span>`).join('')}</div>
-   </div>
-  </div>
-  <p class="rock-match-status" role="status">${finished?`Slot ${drop.landing+1} · ${crystalMultiplier(drop,drop.landing)*10} points`:'Each slot multiplies your 10 starting points.'}</p>
-  <button class="secondary" type="button" data-action="rock-match-back">Back to card</button>
- </section>`;
-}
-function crystalMultiplier(drop,lane){
- return Math.max(1,3-Math.abs(drop.target-lane));
-}
-function dropLanePosition(lane){return (lane+.5)*100/dropLanes+'%';}
-function dropCrystal(lane){
- const drop=pending?.rockMatch?.drop;
- if(phase!=='crystal-drop'||!drop||drop.moving||drop.landing!==null||!Number.isInteger(lane)||lane<0||lane>=dropLanes)return;
- const path=crystalDropPath(drop,lane);
- const finish=()=>{
-  if(phase!=='crystal-drop'||pending?.rockMatch?.drop!==drop)return;
-  drop.moving=false;
-  drop.landing=path.at(-1);
-  const score=crystalMultiplier(drop,drop.landing)*10;
-  if(score>state.bestDropScore){
-   state.bestDropScore=score;
-   save();
-  }
-  render();
-  $('[data-action="rock-match-back"]').focus({preventScroll:true});
-  sound('land');
+ $('#secondChanceTitle')?.focus({preventScroll:true});
+ const screen=$('#openingScreen');
+ const disc=$('.wheel-disc',screen);
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const land=()=>{
+  if(!screen.isConnected||phase!=='second-chance'||screen.classList.contains('landed'))return;
+  cancelAnimationFrame(wheelAudioFrame);
+  screen.classList.add('landed');
+  $('.opening-rarity',screen).textContent=bonus.won?'Second Chance!':'Fail · original card kept';
+  sound(bonus.won?'vault':'hit');
+  timers.push(setTimeout(()=>{
+   if(view!=='opening'||phase!=='second-chance'||pending?.secondChance!==bonus)return;
+   clearAnimation();
+   if(bonus.won){
+    const {pack,odds:packOdds}=pending;
+    pending={...E.awardSecondChance(state,catalog,pack,packOdds),extraSpin:true};
+    save();
+    spinPackWheel();
+   }else{
+    phase='revealed';
+    render();
+   }
+  },RESULT_MS));
  };
- const ball=$('.crystal-ball');
- if(!ball?.animate||matchMedia('(prefers-reduced-motion: reduce)').matches){finish();return;}
- drop.moving=true;
- for(const button of $$('.crystal-drop button'))button.disabled=true;
- ball.hidden=false;
- const keyframes=path.map((column,index)=>({left:dropLanePosition(column),top:16*index+'%'}));
- keyframes.push({left:dropLanePosition(path.at(-1)),top:'91%'});
- ball.animate(keyframes,{duration:950,fill:'forwards'});
- timers.push(setTimeout(finish,950));
+ if(reduced){land();return;}
+ playWheelTicks(disc);
+ disc.addEventListener('animationend',event=>{if(event.target===disc)land();});
+ timers.push(setTimeout(land,SPIN_MS+150));
+}
+function secondChanceView(){
+ const {odds,won}=pending.secondChance;
+ const wedges=[
+  {label:'Second Chance',symbol:'★',color:'#18aa8a',size:odds*3.6},
+  {label:'Fail',symbol:'×',color:'#8269aa',size:(100-odds)*3.6}
+ ];
+ return `<section class="opening-screen spinning second-chance-screen" id="openingScreen" aria-labelledby="secondChanceTitle" style="--spin-time:${SPIN_MS}ms;--spin-color:#a7f4d4">
+  <div class="eyebrow">Free extra spin · ${escape(pending.pack.name)} Pack</div>
+  <h1 id="secondChanceTitle" tabindex="-1">Second Chance</h1>
+  <div class="opening-stage">${wheelMarkup(wedges,won?0:1)}</div>
+  <div class="second-chance-outcome">
+   <p>Second Chance ${odds}% · Fail ${100-odds}%</p>
+   <p class="opening-result" role="status"><strong class="opening-rarity"></strong></p>
+  </div>
+ </section>`;
 }
 
 function resultsView(){
  const rock=openingPull(),item=byId[rock.itemId];
- const game=pending.rockMatch;
- const offer=rock.tier===0&&(!game||!game.complete||game.drop?.landing==null);
- const matchLabel=game?.complete?'Play Crystal Drop':game?'Continue Rock Match':'Play Rock Match';
- return `<section data-rock-match="${offer}" class="results-screen ${item.tier===5?'grail-result':''}" style="--rarity:${E.rarityColors[item.tier]}">
+ const offer=rock.tier===0&&!pending.secondChance&&!pending.extraSpin;
+ const bonusStatus=pending.extraSpin?'Extra card from Second Chance':pending.secondChance?'Second Chance missed. Original card kept.':'';
+ return `<section data-bonus-row="${!!(offer||bonusStatus)}" class="results-screen ${item.tier===5?'grail-result':''}" style="--rarity:${E.rarityColors[item.tier]}">
   <div class="reveal-shade" aria-hidden="true"></div>
   <div class="eyebrow"><span class="reveal-rarity">${E.rarityNames[item.tier]}</span></div>
   <h1>${escape(item.name)}</h1>
@@ -953,7 +802,7 @@ function resultsView(){
    <button class="primary" data-action="keep-result">Keep card</button>
    <button class="secondary" data-action="vault">Inventory</button>
   </div>
-  ${offer?`<button class="secondary rock-match-offer" data-action="rock-match-start">${matchLabel}</button>`:''}
+  ${offer?'<button class="secondary second-chance-offer" data-action="second-chance-start">Second Chance</button>':bonusStatus?`<p class="second-chance-caption" role="status">${bonusStatus}</p>`:''}
  </section>`;
 }
 function showItem(id,uid){if(!byId[id])return;previousView=view==='opening'?'packs':view;detailId=id;detailUid=uid;go('item');}
@@ -967,7 +816,7 @@ function upgradeRock(uid){
 
 window.tcgNativeMessage=notice;window.tcgGoBack=()=>{const dialog=$('dialog[open]');if(dialog){dialog.close();return true;}if(view==='packs')return false;go('packs');return true;};
 function searchRender(id){const pos=$('#'+id)?.selectionStart;render();const el=$('#'+id);el?.focus({preventScroll:true});if(pos!=null)el?.setSelectionRange(pos,pos);}
-document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','upgrade-rock','buy-badge','favorite','save-name','delete-confirm','leaderboard-toggle','leaderboard-balance'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
+document.addEventListener('click',e=>{const external=e.target.closest('a[target="_blank"]');if(external&&window.TCGAndroid){e.preventDefault();window.TCGAndroid.openExternal(external.href);return;}const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;if(window.TCGCloud?.user&&!window.TCGCloud.canPlay&&['open','sell-rock','upgrade-rock','buy-badge','favorite','save-name','delete-confirm','leaderboard-toggle','second-chance-start'].includes(a)){notice('Please finish syncing your account before changing your game.');return;}switch(a){
 case 'packs':case 'vault':case 'collection':case 'profile':case 'leaderboard':go(a);break;
 case 'choose-pack':selectPack(id);break;case 'previous-pack':selectPack(selectedIndex-1);break;case 'next-pack':selectPack(selectedIndex+1);break;
 case 'badge-shop':
@@ -980,6 +829,7 @@ case 'arena-pick':pickArenaCard(id);break;
 case 'arena-mode':setArenaMode(id);break;
 case 'arena-level':selectArenaLevel(Number(id));break;
 case 'arena-start-level':startArenaLevel();break;
+case 'arena-roster':openArenaRoster();break;
 case 'arena-next-level':if(arenaMatch?.winner===0)startArenaLevel(arenaMatch.levelIndex+1);break;
 case 'arena-ai':aiBattle();break;
 case 'arena-create':onlineAction('create');break;
@@ -999,13 +849,8 @@ case 'item':showItem(id,b.dataset.uid);break;case 'back-item':go(previousView);b
 case 'favorite':{const v=state.vault.find(v=>v.uid===id);if(v){v.locked=!v.locked;save();render();}}break;
 case 'cancel-confirm':confirmAction='';render();break;
 case 'keep-result':go('packs');sound('vault');break;
-case 'rock-match-start':startRockMatch();break;
-case 'rock-match-flip':flipRockMatch(Number(id));break;
-case 'rock-match-back':exitRockMatch();break;
-case 'crystal-drop-start':startCrystalDrop();break;
-case 'crystal-drop-lane':dropCrystal(Number(id));break;
+case 'second-chance-start':startSecondChance();break;
 case 'leaderboard-refresh':loadLeaderboard(true);break;
-case 'leaderboard-balance':toggleLeaderboardBalance();break;
 case 'leaderboard-toggle':if(window.TCGCloud?.user&&window.TCGCloud.ready&&window.TCGCloud.canPlay){if(!state.leaderboard&&!state.name.trim()){go('profile');notice('Save a collector name first, then join the leaderboard.');break;}state.leaderboard=!state.leaderboard;save();leaderboardLoaded=0;render();}else{go('profile');notice('Sign in and finish syncing to join the leaderboard.');}break;
 case 'edit-collector':$('#username').focus();break;
 case 'save-name':{const name=$('#username').value.trim();if(!name){feedback='Enter a username first.';render();break;}state.name=name.slice(0,24);save();feedback='Username saved.';render();}break;
@@ -1018,7 +863,7 @@ window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if
 async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}restoreArenaTeam();state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(packs.length-1,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
  if(snapshot)return E.creditReward(snapshot,cents);
  E.creditReward(state,cents);updateHeader();return state;
- },validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+ },validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom&&!$('#arenaRoster')?.open)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 async function refreshWebApp(){
  try {
   const worker=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
@@ -1064,11 +909,13 @@ function arenaView(){
    <button class="secondary" data-action="arena-mode" data-id="levels" aria-pressed="${arenaMode==='levels'}">Levels</button>
    <button class="secondary" data-action="arena-mode" data-id="quick" aria-pressed="${arenaMode==='quick'}">Quick Battle</button>
   </div>
-  ${arenaMode==='levels'?arenaLevelsView(locked||cloud?.user&&!cloud.canPlay):`<p>Play AI or challenge a friend. Wins earn ${winRewardRange()} in virtual coins.</p>`}
-  ${arenaMode==='levels'?`<details class="campaign-team-setup" ${locked?'open':''}>
-   <summary>Battle team <span id="teamCount" role="status">${arenaTeam.size} / 3 equipped</span></summary>
-   ${arenaTeamOptions()}
-  </details>`:arenaTeamOptions()+'<p id="teamCount" role="status">'+arenaTeam.size+' / 3 equipped</p>'}
+  ${arenaMode==='levels'?arenaLevelsView(arenaBusy):`<p>Play AI or challenge a friend. Wins earn ${winRewardRange()} in virtual coins.</p>`}
+  <button class="secondary campaign-team-setup" type="button" data-action="arena-roster" aria-haspopup="dialog">Battle team <span id="teamCount" role="status">${arenaTeam.size} / 3 equipped</span></button>
+  <dialog class="pack-dialog campaign-team-dialog" id="arenaRoster" aria-labelledby="arenaRosterTitle">
+   <header><h2 id="arenaRosterTitle">Battle team</h2><form method="dialog"><button class="secondary" aria-label="Close team picker">${icon('close')}</button></form></header>
+   <div class="campaign-team-content">${arenaTeamOptions()}</div>
+   <form method="dialog"><button class="primary">Done</button></form>
+  </dialog>
   ${arenaMode==='levels'?'':`
    <div class="arena-actions"><button class="primary" data-action="arena-ai" ${locked?'disabled':''}>Battle AI</button>
    ${cloud?.user?`<button class="secondary" data-action="arena-create" ${locked||!cloud.canPlay?'disabled':''}>Create private room</button>`:
@@ -1149,11 +996,20 @@ function arenaLevelsView(locked){
   </div>
  </section>`;
 }
+function openArenaRoster(){
+ $('#arenaRoster')?.showModal();
+}
 function startArenaLevel(index=selectedArenaLevel()){
  const level=E.arenaLevels[index],cloud=battleCloud();
- if(!level||index>state.arenaCleared||arenaBusy||cloud?.user&&!cloud.canPlay)return;
+ if(!level||index>state.arenaCleared||arenaBusy)return;
+ if(cloud?.user&&!cloud.canCampaign){
+  arenaMessage='Finish loading your save in Profile, then try again.';
+  notice(arenaMessage);
+  return;
+ }
  const cards=state.vault.filter(card=>arenaTeam.has(card.uid));
- if(!cards.length)return;
+ if(!cards.length){openArenaRoster();return;}
+ arenaMessage='';
  const enemy=A.campaignTeam(level,byId,E);
  clearArenaResult();
  arenaLevelIndex=index;
@@ -1176,7 +1032,7 @@ function pickArenaCard(uid){
  if(arenaTeam.has(uid))arenaTeam.delete(uid);
  else if(arenaTeam.size<3&&state.vault.some(card=>card.uid===uid))arenaTeam.add(uid);
  else{
-  $('#teamCount').textContent='Team full. Unequip a card to make room.';
+  $('#teamCount').textContent='Team full';
   return;
  }
  save();
@@ -1188,10 +1044,10 @@ function pickArenaCard(uid){
  }
  $('#teamCount').textContent=arenaTeam.size+' / 3 equipped';
  const cloud=battleCloud();
- for(const action of ['ai','create','join','start-level']){
+ for(const action of ['ai','create','join']){
   const button=$(`[data-action="arena-${action}"]`);
   if(!button)continue;
-  const needsSync=action==='start-level'?cloud?.user:action!=='ai';
+  const needsSync=action!=='ai';
   button.disabled=!arenaTeam.size||arenaBusy||(needsSync&&!cloud?.canPlay);
  }
 }
@@ -1302,6 +1158,19 @@ const arenaAttackArt={
  boulder:0,ribbon:1,fracture:2,bulwark:3,prism:4,ring:5,shard:6,comet:7,volley:8,renew:9,meteor:0
 };
 const arenaElementArt={fire:0,ice:1,lightning:2,mist:3,earth:4,void:5,light:6,water:7,wind:8,arcane:9};
+const arenaMotion={
+ fire:{bend:40,turn:32,flight:335,impact:470},
+ ice:{bend:16,turn:8,flight:290,impact:510},
+ lightning:{bend:22,turn:0,flight:230,impact:390},
+ mist:{bend:52,turn:24,flight:400,impact:555},
+ earth:{bend:32,turn:58,flight:340,impact:510},
+ void:{bend:48,turn:105,flight:390,impact:540},
+ light:{bend:12,turn:12,flight:285,impact:470},
+ water:{bend:43,turn:19,flight:365,impact:530},
+ wind:{bend:53,turn:82,flight:365,impact:505},
+ arcane:{bend:36,turn:68,flight:345,impact:515}
+};
+const rockMotion={bend:26,turn:40,flight:295,impact:460};
 async function animateArenaMove(before,after){
  if(view!=='battle'||document.hidden||after?.revision!==before?.revision+1||before.winner!==null)return;
  const effects=$('.arena-effects');
@@ -1316,6 +1185,7 @@ async function animateArenaMove(before,after){
  const loss=target.hp-nextTarget.hp,healed=nextOwn.hp-own.hp;
  const ability=after.lastMove?.ability?A.abilityFor(own,before.rules):null;
  const visual=A.moveVisual(own,!!ability);
+ const motion=arenaMotion[visual.element]??rockMotion;
  const switched=before.active[side]!==after.active[side];
  const guarded=nextOwn.guard&&(!own.focus||!own.guard);
  if(!(ability||loss>0||switched||guarded))return;
@@ -1353,7 +1223,7 @@ async function animateArenaMove(before,after){
    {opacity:.94,scale:1.08,offset:.68},
    {opacity:0,scale:1.18,transform:swirling?'rotate(10deg)':'none'}
   ];
-  return arenaAnimation(sprite,frames,reduced?230:480).then(()=>sprite.remove());
+  return arenaAnimation(sprite,frames,reduced?230:motion.impact).then(()=>sprite.remove());
  };
  const from=center(actor),to=center(rival);
  const updateFighter=(fighter,card)=>{
@@ -1385,18 +1255,36 @@ async function animateArenaMove(before,after){
     shard:[0],fracture:[-1,0,1],comet:[.5],meteor:[-1],ring:[0],boulder:[-.6],
     ribbon:[-1,1],volley:[-1,0,1],prism:[-1,1],renew:[0],bulwark:[0]
    };
-   const projectiles=paths[visual.motif].map(lane=>{
-    const projectile=spawn('shot',from);
-    projectile.dataset.direction=direction>0?'down':'up';
-    const bend=lane*visual.bend;
-    return arenaAnimation(projectile,[
-     {opacity:0,transform:'scale(.35)'},
-     {opacity:1,offset:.48,transform:`translate(${dx*.5+bend}px,${dy*.48}px) scale(.9)`},
-     {opacity:1,transform:`translate(${dx}px,${dy}px) scale(1.08)`}
-    ],280,'ease-in').then(()=>projectile.remove());
+   const windup=spawn('windup',from);
+   await Promise.all([
+    arenaAnimation(actor,[{transform:'scale(1)'},{transform:`translateY(${-direction*9}px) scale(.91,1.08)`,offset:.68},{transform:`translateY(${-direction*5}px) scale(.98,1.05)`}],137),
+    arenaAnimation(windup,[{opacity:0,scale:.35},{opacity:.95,scale:.76,offset:.68},{opacity:0,scale:1.08}],137)
+   ]);
+   windup.remove();
+   if(!effects.isConnected)return;
+   const shots=paths[visual.motif];
+   const trails=Array.from({length:shots.length>1?3:4},(_,i)=>i);
+   const projectiles=[...shots,...trails].map((lane,index)=>{
+    const tracer=index>=shots.length;
+    const piece=spawn(tracer?'tracer':'shot',from);
+    piece.dataset.direction=direction>0?'down':'up';
+    const sideOffset=tracer?(lane-1.5)/3:lane;
+    const bend=sideOffset*motion.bend;
+    const twist=motion.turn*(sideOffset<0?-1:1);
+    const frame=(at,xOffset,rotation,scale,opacity)=>({
+     offset:at,opacity,
+     transform:`translate(${dx*at+xOffset}px,${dy*at}px) rotate(${rotation}deg) scale(${scale})`
+    });
+    const frames=[
+     frame(0,0,-twist,.31,0),
+     frame(.29,bend*.65,twist*.65,tracer ? .43 : .92,1),
+     frame(.64,visual.element==='lightning'?-bend:bend,twist,tracer ? .72 : 1.1,tracer ? .74 : 1),
+     frame(1,0,twist*1.2,1.15,tracer ? .08 : 1)
+    ];
+    return arenaAnimation(piece,frames,motion.flight+(tracer?index*16:0),'ease-in').then(()=>piece.remove());
    });
    await Promise.all([
-    arenaAnimation(actor,[{transform:'translateY(0)'},{transform:`translateY(${-direction*9}px)`,offset:.26},{transform:`translateY(${direction*13}px)`,offset:.56},{transform:'translateY(0)'}],310),
+    arenaAnimation(actor,[{transform:`translateY(${-direction*5}px) scale(.98,1.05)`},{transform:`translateY(${direction*19}px) scale(1.07,.92)`,offset:.34},{transform:'none'}],motion.flight),
     ...projectiles
    ]);
   }
@@ -1407,22 +1295,31 @@ async function animateArenaMove(before,after){
   sound('arena-hit');
   const damage=spawn('damage',to,`−${loss}`);
   const impact=spawn(target.guard&&ability?.id!=='fracture'?'shield':'burst',to);
-  const sparks=reduced?[]:Array.from({length:remaining?6:10},()=>spawn('spark',to));
+  const shocks=reduced?[]:[spawn('shock-ring',to),spawn('shock-ring',to)];
+  const sparks=reduced?[]:Array.from({length:remaining?9:13},(_,index)=>spawn(index%3===0?'shard':'spark',to));
   await Promise.all([
    arenaAnimation(rival,reduced?[{filter:'brightness(1.4)'},{filter:'none'}]:[
     {transform:`translateY(${direction*11}px) rotate(${direction*7}deg)`,filter:'brightness(1.65)'},
     {transform:'translateY(-2px) rotate(-3deg)',offset:.48},{transform:'none',filter:remaining?'none':'grayscale(.8)'}],reduced?170:295),
    arenaAnimation(damage,reduced?[{opacity:1},{opacity:1}]:[{opacity:1,transform:'translateY(3px) scale(.85)'},{opacity:1,transform:'translateY(-22px) scale(1.13)',offset:.45},{opacity:0,transform:'translateY(-46px)'}],reduced?260:430),
+   ...shocks.map((ring,index)=>arenaAnimation(ring,[
+    {opacity:0,scale:.22},{opacity:.8,scale:.45,offset:.22+index*.08},{opacity:0,scale:1.8+index*.54}
+   ],330+index*105)),
    ...sparks.map((spark,index)=>{
-    const angle=index/sparks.length*2*Math.PI+visual.hue*Math.PI/180,radius=visual.spread+(remaining?0:20);
-    return arenaAnimation(spark,[{opacity:1,transform:'none'},{opacity:0,transform:`translate(${Math.cos(angle)*radius}px,${Math.sin(angle)*radius}px) rotate(110deg)`}],remaining?320:430);
+    const angle=index/sparks.length*2*Math.PI+visual.hue*Math.PI/180;
+    const radius=visual.spread+(remaining?8:22)+index%3*7;
+    const dx=Math.cos(angle)*radius,dy=Math.sin(angle)*radius;
+    return arenaAnimation(spark,[{opacity:1,transform:'none'},
+     {opacity:1,transform:`translate(${dx*.55}px,${dy*.76-12}px) rotate(55deg)`,offset:.42},
+     {opacity:0,transform:`translate(${dx}px,${dy+15}px) rotate(${100+index*14}deg)`}
+    ],motion.impact-58+index%3*18);
    }),
    illustratedImpact(to),
    arenaAnimation(impact,reduced?[{opacity:.8},{opacity:0}]:[{opacity:1,scale:.38},{opacity:0,scale:1.5,rotate:'28deg'}],reduced?180:340)
   ]);
   damage.remove();
   impact.remove();
-  sparks.forEach(spark=>spark.remove());
+  [...sparks,...shocks].forEach(effect=>effect.remove());
  }else if(guarded||switched){
   sound('arena-guard');
   const effect=spawn(guarded?'shield':'swap',from,guarded?'GUARD':'SWITCH');
@@ -1508,7 +1405,7 @@ async function battleMove(action,target){
   }
  }finally{
   arenaBusy=false;
-  if(view==='battle'&&arenaMatch)render();
+  if(view==='battle'&&!$('#arenaRoster')?.open)render();
  }
 }
 function leaveArena(){
@@ -1576,35 +1473,32 @@ function leaderboardMembership(){
  const cloud=window.TCGCloud;
  const joined=!!state.leaderboard;
  return `<div class="rank-membership">
+  <p>Ranked collectors show their pack count and virtual balance.</p>
   <button class="secondary" data-action="${cloud?.user?'leaderboard-toggle':'profile'}" ${cloud?.user&&!cloud.canPlay?'disabled':''}>
    ${cloud?.user?(joined?'Leave leaderboard':'Join leaderboard'):'Sign in to join'}
   </button>
-  ${cloud?.user&&joined?`<button class="secondary" data-action="leaderboard-balance" aria-pressed="${state.shareBalance===true}" ${cloud.canPlay?'':'disabled'}>${state.shareBalance?'Hide virtual balance':'Share virtual balance'}</button>`:''}
  </div>`;
 }
-async function toggleLeaderboardBalance(){
- const cloud=window.TCGCloud;
- if(!cloud?.user||!cloud.canPlay||!state.leaderboard)return;
- state.shareBalance=!state.shareBalance;
- save();
- render();
- if(await cloud.flush())loadLeaderboard(true);
-}
 function leaderboardView(){
- return `${ '<h1 class="compact-title">Ranks</h1>' }${leaderboardMembership()}
- <div class="rank-toolbar"><button class="secondary" data-action="leaderboard-refresh">Refresh</button></div>
- <div id="leaderboardTables" aria-live="polite">${leaderboardContent()}</div>`;
+ return `<section class="profile-dashboard ranks-dashboard" aria-labelledby="rankTitle">
+  <header class="simple-profile-heading"><h1 id="rankTitle">Ranks</h1></header>
+  <div class="profile-data-panel ranks-table-panel">
+   <h2>${icon('star')} Collector leaderboard</h2>
+   <div class="ranks-controls">${leaderboardMembership()}<button class="secondary" data-action="leaderboard-refresh" aria-label="Refresh standings">Refresh</button></div>
+   <div id="leaderboardTables" aria-live="polite">${leaderboardContent()}</div>
+  </div>
+ </section>`;
 }
 function leaderboardContent(){
  if(leaderboardError)return `<div class="content-card"><p>${escape(leaderboardError)}</p><button class="secondary" data-action="leaderboard-refresh">Try again</button></div>`;
  if(!leaderboardRows)return '<p class="rank-loading">Loading rankings…</p>';
  const rows=leaderboardRows.opened;
  return `<section class="content-card rank-board">${rows.length?`<table class="rank-table">
-   <thead><tr><th>Rank</th><th>Collector</th><th>Packs</th><th>Balance</th></tr></thead>
+   <thead><tr><th>Rank</th><th>Collector</th><th>Packs</th><th>Virtual balance</th></tr></thead>
    <tbody>${rows.map((row,index)=>`<tr>
     <td><span class="rank-place rank-${index+1}">${index+1}</span></td><td>${escape(row.display_name)}</td>
     <td>${Number(row.packs_opened).toLocaleString('en-US')}</td>
-    <td>${typeof row.balance_cents==='number'?money(row.balance_cents*E.unitsPerCent):'—'}</td>
+    <td>${row.balance_cents!=null&&Number.isSafeInteger(Number(row.balance_cents))?money(Number(row.balance_cents)*E.unitsPerCent):'—'}</td>
    </tr>`).join('')}</tbody>
   </table>`:'<p class="rank-empty">No ranked collectors yet. Join to start the board.</p>'}</section>`;
 }

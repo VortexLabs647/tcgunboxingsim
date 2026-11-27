@@ -102,5 +102,5 @@ window.addEventListener('online',()=>{
  if(user&&ready&&!conflict)flush(true);
  else if(user&&!ready&&!busy&&session)adopt(session,'RECONNECT');
 });document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flush();else if(document.visibilityState==='visible'&&user&&ready)flush(true);});
-root.TCGCloud={init,panel,queue,flush,reload,claimBattleRewards:()=>flush(true),battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get canAccrue(){return !user||(ready&&!busy&&!conflict)},get ready(){return ready},cacheKey};
+root.TCGCloud={init,panel,queue,flush,reload,claimBattleRewards:()=>flush(true),battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get canCampaign(){return !user||(ready&&!busy&&!conflict)},get canAccrue(){return !user||(ready&&!busy&&!conflict)},get ready(){return ready},cacheKey};
 })(window);

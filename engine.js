@@ -199,11 +199,8 @@ function itemOdds(item,pack,group,odds){
  const weight=item.id===pack.signature?2:1;
  return oddsPresets[odds][item.tier]*weight/(group.length+Number(signatureInGroup));
 }
-function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
+function awardPackCard(state,catalog,pack,odds,rng,now){
  const weights=oddsPresets[odds];
- if(!Object.hasOwn(oddsPresets,odds))throw Error('Unknown odds');
- settleIncome(state,now);
- if(!canAfford(state,pack))return null;
  const groups=pools(catalog);
  let roll=rng()*100;
  const tier=weights.findIndex(weight=>(roll-=weight)<0);
@@ -213,16 +210,28 @@ function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
  const duplicate=state.vault.some(rock=>rock.itemId===item.id);
  const value=saleValue(pack.price,tier);
  const pull={uid:uuid(),itemId:item.id,value,tier,packId:pack.id,date:new Date(now).toISOString(),locked:false};
- const free=hasWelcomePack(state,pack);
- if(free)state.welcomePack=false;
- else{state.balance-=pack.price;state.spent+=pack.price;}
  state.vault.unshift(pull);
  state.rockClock=Math.max(state.rockClock,now);
  state.best=Math.max(state.best,value);
+ if(!state.discovered.includes(item.id))state.discovered.push(item.id);
+ return {pull,pack,odds,duplicate};
+}
+function openPack(state,catalog,pack,odds,rng=random,now=Date.now()){
+ if(!Object.hasOwn(oddsPresets,odds))throw Error('Unknown odds');
+ settleIncome(state,now);
+ if(!canAfford(state,pack))return null;
+ const result=awardPackCard(state,catalog,pack,odds,rng,now);
+ const free=hasWelcomePack(state,pack);
+ if(free)state.welcomePack=false;
+ else{state.balance-=pack.price;state.spent+=pack.price;}
  ensureStarterRock(state,now);
  state.opened++;
- if(!state.discovered.includes(item.id))state.discovered.push(item.id);
- return {pull,pack,odds,duplicate,free};
+ return {...result,free};
+}
+function awardSecondChance(state,catalog,pack,odds,rng=random,now=Date.now()){
+ if(!Object.hasOwn(oddsPresets,odds))throw Error('Unknown odds');
+ settleIncome(state,now);
+ return awardPackCard(state,catalog,pack,odds,rng,now);
 }
 
 function defaults(){
@@ -293,7 +302,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={arenaLevels,arenaPlayReward,finishArenaLevel,packRank,winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={arenaLevels,arenaPlayReward,finishArenaLevel,packRank,winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,awardSecondChance,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);
