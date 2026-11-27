@@ -755,7 +755,10 @@ case 'delete-confirm':{state=E.defaults();selectedIndex=0;save();go('profile');f
 document.addEventListener('input',e=>{if(e.target.id==='arenaCode'){e.target.value=e.target.value.replace(/[^0-9]/g,'').slice(0,4);return;}if(e.target.id==='arenaFilter'){arenaFilter=e.target.value;$('#arenaTeam').innerHTML=teamOptions();return;}if(e.target.id==='vaultSearch'||e.target.id==='collectionSearch'){search=e.target.value;searchRender(e.target.id);}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='arenaCode')$('[data-action="arena-join"]').click();if(e.key==='Enter'&&e.target.id==='username')$('[data-action="save-name"]').click();});
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(target!==view&&['packs','vault','collection','profile','battle','leaderboard'].includes(target)){go(target);}});
-async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
+async function init(){try{if(window.TCG_INLINE_CATALOG)catalog=window.TCG_INLINE_CATALOG;else{const response=await fetch('catalog.json?v=80');if(!response.ok)throw Error();catalog=await response.json();}byId=Object.fromEntries(catalog.map(i=>[i.id,i]));packs=E.packs();try{const saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('cool-collectables-simulator-v1')||'null');if(E.validSave(saved,catalog))state=E.migrate(saved,catalog);}catch{}state.settings={sound:true,haptics:true};const now=Date.now(),elapsed=now-state.rockClock,earned=settleRockIncome(now);selectedIndex=Math.max(0,Math.min(8,state.preferences.packIndex||0));const route=location.hash.slice(1);view=['packs','vault','collection','profile','battle','leaderboard'].includes(route)?route:'packs';save();render();await window.TCGCloud?.init({creditBattleReward:(cents,snapshot)=>{
+ if(snapshot)return E.creditBattleReward(snapshot,cents);
+ E.creditBattleReward(state,cents);updateHeader();return state;
+ },validate:next=>E.validSave(next,catalog),guest:guestGameState,fresh:E.defaults,replace:replaceGameState,restoreGuest:()=>replaceGameState(guestGameState()),changed:()=>{incomeTick(true,true);if(view==='profile'||view==='leaderboard'||view==='battle'&&!arenaMatch&&!onlineRoom)render();}});if(!window.TCGCloud?.user&&earned>0&&elapsed>=10000&&!$('#status').textContent)showAwayIncome(earned);if('serviceWorker'in navigator&&window.isSecureContext&&!window.TCGAndroid&&!window.TCG_INLINE_CATALOG)refreshWebApp();}catch(e){$('#app').innerHTML=empty('THE COLLECTION COULD NOT LOAD.','Please reload the game to try again.',false);}}
 async function refreshWebApp(){
  try {
   const worker=await navigator.serviceWorker.register('sw.js',{updateViaCache:'none'});
@@ -782,7 +785,7 @@ function arenaView(){
  for(const uid of arenaTeam)if(!state.vault.some(card=>card.uid===uid))arenaTeam.delete(uid);
  const cloud=battleCloud(),locked=arenaTeam.size===0||arenaBusy;
  return `<section class="arena">
-  <h1>Rock Arena</h1><p>Choose up to three owned cards.</p>
+  <h1>Rock Arena</h1><p>Choose up to three owned cards. Win to earn ${money(E.battleWinReward*E.unitsPerCent)} in virtual coins.</p>
   ${state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
    <div class="search">${icon('search')}<input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}"></div>
    <div class="team-list" id="arenaTeam">${teamOptions()}</div>
@@ -890,10 +893,12 @@ function battleResult(){
  const card=match.teams[match.winner][match.active[match.winner]];
  const art=byId[card.itemId];
  const reason=match.note==='Opponent left the match.'?'Your opponent left the match.':won?'Your team won the battle.':'The opposing team won the battle.';
+ const reward=won?match.reward:0;
  return `<section class="arena arena-result" data-won="${won}" aria-labelledby="battleOutcome">
   <div class="arena-result-art">${art?cardImage(art):''}</div>
   <h1 id="battleOutcome" tabindex="-1">${won?'You won!':'You lost.'}</h1>
   <p>${reason}</p>
+  ${reward?`<p class="arena-hint">Win reward · ${money(reward*E.unitsPerCent)} in virtual coins</p>`:''}
   <div class="arena-actions">
    ${won?'<button class="primary" data-action="packs">Back to Packs</button>':`${onlineRoom?'':'<button class="primary" data-action="arena-ai">Play again</button>'}<button class="secondary" data-action="arena-leave">Back to Battle</button>`}
   </div>
@@ -1044,6 +1049,7 @@ async function onlineAction(operation,extra={}){
   }
   onlineRoom=result;
   arenaMatch=result&&!result.waiting?result.match:null;
+  if(arenaMatch?.reward&&arenaMatch.winner===result.side)cloud.claimBattleRewards();
   const hadMessage=!!arenaMessage;
   arenaMessage='';
   if(view==='battle'&&(operation!=='state'||changed||hadMessage)){
@@ -1075,6 +1081,11 @@ async function battleMove(action,target){
   await animateArenaMove(before,playerMatch);
   if(arenaMatch!==before)return;
   arenaMatch=playerMatch;
+  if(playerMatch.winner===0){
+   playerMatch.reward=E.battleWinReward;
+   E.creditBattleReward(state,playerMatch.reward);
+   save();
+  }
   if(playerMatch.winner===null){
    if(view==='battle')render();
    const enemyMatch=structuredClone(playerMatch);

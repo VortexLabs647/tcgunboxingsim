@@ -27,6 +27,56 @@ create table if not exists rock_arena.join_attempts (
 alter table rock_arena.join_attempts enable row level security;
 revoke all on rock_arena.join_attempts from public, anon, authenticated;
 
+-- Each finished private room grants one fixed reward to its winner.
+create table if not exists rock_arena.win_rewards (
+ room_code text primary key,
+ winner uuid not null references auth.users(id) on delete cascade
+);
+alter table rock_arena.win_rewards enable row level security;
+revoke all on rock_arena.win_rewards from public,anon,authenticated;
+create index if not exists rock_win_rewards_winner on rock_arena.win_rewards(winner);
+
+create or replace function rock_arena.save_with_rewards(p_state jsonb,p_expected_revision bigint)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $$
+declare
+ actor uuid:=auth.uid();
+ saved public.game_saves%rowtype;
+ next_state jsonb;
+ current_balance bigint;
+ reward bigint;
+begin
+ if actor is null then raise exception 'Sign in required' using errcode='42501'; end if;
+ select * into saved from public.game_saves where user_id=actor for update;
+ if not found or saved.revision is distinct from p_expected_revision then
+  raise exception 'Save changed on another device. Load the latest cloud save.' using errcode='40001';
+ end if;
+
+ with wins as (delete from rock_arena.win_rewards where winner=actor returning room_code)
+ select count(*)*10 into reward from wins;
+ if p_state is null and reward=0 then
+  return jsonb_build_object('revision',saved.revision,'reward',0);
+ end if;
+ next_state:=coalesce(p_state,saved.state);
+ if reward>0 then
+  current_balance:=(next_state->>'balance')::bigint;
+  if current_balance is null or current_balance not between 0 and 100000000000000 then
+   raise exception 'Invalid balance in saved game.';
+  end if;
+  reward:=least(reward,100000000000000-current_balance);
+  next_state:=jsonb_set(next_state,'{balance}',to_jsonb(current_balance+reward));
+ end if;
+ return jsonb_build_object('revision',public.save_game(next_state,p_expected_revision),'reward',reward);
+end
+$$;
+revoke all on function rock_arena.save_with_rewards(jsonb,bigint) from public,anon,authenticated;
+grant execute on function rock_arena.save_with_rewards(jsonb,bigint) to authenticated;
+
+create or replace function public.save_rock_game(p_state jsonb,p_expected_revision bigint)
+returns jsonb language sql security invoker set search_path=pg_catalog
+as $$ select rock_arena.save_with_rewards(p_state,p_expected_revision) $$;
+revoke all on function public.save_rock_game(jsonb,bigint) from public,anon,authenticated;
+grant execute on function public.save_rock_game(jsonb,bigint) to authenticated;
+
 -- Stats come from the signed-in player's synced inventory, never from the request.
 create or replace function rock_arena.deck(player uuid, cards text[]) returns jsonb
 language sql stable set search_path=pg_catalog
@@ -222,7 +272,10 @@ begin
    if room.guest is null then
     delete from rock_arena.rooms where code=room.code;
    elsif room.match->'winner'='null'::jsonb then
-    update rock_arena.rooms set match=match||jsonb_build_object('winner',1-side,'note','Opponent left the match.') where code=room.code;
+    insert into rock_arena.win_rewards(room_code,winner)
+     values(room.code,case when side=0 then room.guest else room.host end) on conflict do nothing;
+    update rock_arena.rooms set match=match||jsonb_build_object('winner',1-side,'reward',10,'note','Opponent left the match.')
+     where code=room.code;
    end if;
    return null;
   elsif operation='move' then
@@ -295,8 +348,12 @@ begin
      select min(ordinality::int)-1 into reserve
      from jsonb_array_elements(game#>array['teams',other::text]) with ordinality as slot(card,ordinality)
      where (card->>'hp')::int>0;
-     if reserve is null then game:=game||jsonb_build_object('winner',side);
-     else game:=jsonb_set(game,array['active',other::text],to_jsonb(reserve)); end if;
+     if reserve is null then
+      insert into rock_arena.win_rewards(room_code,winner) values(room.code,actor) on conflict do nothing;
+      game:=game||jsonb_build_object('winner',side,'reward',10);
+     else
+      game:=jsonb_set(game,array['active',other::text],to_jsonb(reserve));
+     end if;
     end if;
    elsif action='guard' and not (own->>'focus')::boolean then
     game:=jsonb_set(game,own_path,own||jsonb_build_object('guard',true,'focus',true));

@@ -4,7 +4,7 @@
 const names=['Opal','Sapphire','Amethyst','Emerald','Ruby','Gold','Obsidian','Diamond','Sovereign'];
 const packPrices=[2,4,6,10,15,25,40,65,100];
 const salePercent=[20,35,60,100,150,300];
-const startingBalance=10;
+const startingBalance=10,battleWinReward=10;
 const starterId='starter-granite';
 const foilColors=['#fa3d7d','#3e8bff','#b052ff','#24dfad','#ff4c3d','#ffbf20','#5f63ff','#37d9ff','#ffb54a'];
 const rarityNames=['Common','Uncommon','Rare','Epic','Legendary','Grail'];
@@ -23,7 +23,7 @@ const oddsPresets={
 const productiveLimit=12,offlineSeconds=8*60*60;
 // One unit is $0.000001 in virtual currency.
 const unitsPerCent=10000;
-const passiveUnits=[1,2,3,4,5,6],passiveIncomeMultiplier=40,starterUnits=4000;
+const passiveUnits=[1,2,3,4,5,6],passiveIncomeMultiplier=20,starterUnits=2000;
 const badges={
  quartz:{name:'Quartz',price:5,boost:25},
  amethyst:{name:'Amethyst',price:15,boost:50},
@@ -106,6 +106,10 @@ function credit(state,units){
  const total=state.rockRemainder+units;
  state.balance=Math.min(1e14,state.balance+Math.floor(total/unitsPerCent));
  state.rockRemainder=total%unitsPerCent;
+}
+function creditBattleReward(state,cents){
+ credit(state,cents*unitsPerCent);
+ return state;
 }
 function settleIncome(state,now=Date.now()){
  const seconds=Math.min(offlineSeconds,Math.floor((now-state.rockClock)/1000));
@@ -247,7 +251,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={battleWinReward,creditBattleReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);

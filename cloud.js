@@ -4,7 +4,7 @@ const PASSWORD_MIN_LENGTH = 6;
 const cfg=root.TCG_CLOUD_CONFIG||{},esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function secretKey(key){if(String(key).startsWith('sb_secret_'))return true;try{return JSON.parse(atob(String(key).split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'}catch{return false}}
 const configured=/^https:\/\/[^/]+\/?$/.test(cfg.url||'')&&!!cfg.publishableKey&&!secretKey(cfg.publishableKey);
-let client=null,session=null,user=null,ready=false,busy=false,dirty=null,revision=0,generation=0,flushing=null,timer=null,hooks=null,conflict=false,problem=false,recovery=false,tab='login',message='',status='Guest · saved on this device';
+let client=null,session=null,user=null,ready=false,busy=false,dirty=null,revision=0,generation=0,flushing=null,collectRewards=false,timer=null,hooks=null,conflict=false,problem=false,recovery=false,tab='login',message='',status='Guest · saved on this device';
 const pendingKey=id=>'tcg-cloud-pending-'+id,cacheKey=id=>'tcg-account-'+id;
 const clone=x=>JSON.parse(JSON.stringify(x));
 function localGet(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null}}
@@ -14,7 +14,7 @@ function setStatus(text){status=text;display();}
 async function request(path,method='GET',body,active=session){if(!active?.access_token)throw Error('Please sign in again.');const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);try{const r=await fetch(cfg.url.replace(/\/$/,'')+'/rest/v1/'+path,{method,headers:{apikey:cfg.publishableKey,Authorization:'Bearer '+active.access_token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});const text=await r.text();let data;try{data=text?JSON.parse(text):null}catch{data=null}if(!r.ok){const e=Error(data?.code==='40001'?'This save changed on another device. Load its latest save before continuing.':r.status===401?'Your session expired. Sign in again to sync.':data?.message||'Cloud save is unavailable. Your game is still saved on this device.');e.code=data?.code;throw e;}return data;}finally{clearTimeout(timeout)}}
 async function adopt(next,event){
  if(next?.user?.id===user?.id&&(ready||busy)){session=next;if(event==='PASSWORD_RECOVERY'){recovery=true;display(true);}return;}
- const ownGeneration=++generation;clearTimeout(timer);dirty=null;conflict=false;problem=false;ready=false;session=next;user=next?.user||null;
+ const ownGeneration=++generation;clearTimeout(timer);dirty=null;collectRewards=false;conflict=false;problem=false;ready=false;session=next;user=next?.user||null;
  if(!user){busy=false;status='Guest · saved on this device';hooks?.restoreGuest();display(true);return;}
  busy=true;setStatus('Loading your cloud save…');display(true);const active=next,id=user.id;
  try{
@@ -36,12 +36,51 @@ async function adopt(next,event){
    else{loaded=pending.state;conflict=true;problem=true;status='Another device has a newer save. Your unsynced game is kept on this device.';}
   }
   hooks.replace(clone(loaded));localSet(cacheKey(id),loaded);ready=true;busy=false;if(event==='PASSWORD_RECOVERY')recovery=true;
-  if(!conflict){status=dirty?'Saving pending changes…':'Cloud save up to date';display(true);if(dirty)await flush();}else display(true);
+  if(!conflict){status=dirty?'Saving pending changes…':'Cloud save up to date';display(true);void flush(true);}else display(true);
  }catch(e){if(generation!==ownGeneration)return;busy=false;problem=true;status=e.message;const cached=localGet(cacheKey(id));if(cached&&hooks.validate(cached))hooks.replace(cached);display(true);}
 }
 function queue(state){if(!user||!ready||conflict)return;dirty=clone(state);localSet(cacheKey(user.id),dirty);localSet(pendingKey(user.id),{state:dirty,revision});setStatus(problem?'Saved on this device · sync needs attention':'Saving…');clearTimeout(timer);timer=setTimeout(()=>flush(),500);}
-async function flush(){if(flushing)return flushing;if(!dirty||!user||!ready||conflict)return !problem;const gen=generation,id=user.id,active=session;
- flushing=(async()=>{while(dirty&&generation===gen&&!conflict){const snapshot=dirty;dirty=null;try{const nextRevision=await request('rpc/save_game','POST',{p_state:snapshot,p_expected_revision:revision},active);if(generation!==gen)return false;revision=nextRevision;problem=false;if(dirty)localSet(pendingKey(id),{state:dirty,revision});else{try{localStorage.removeItem(pendingKey(id))}catch{}}setStatus(dirty?'Saving…':'Cloud save up to date');}catch(e){if(generation!==gen)return false;dirty=dirty||snapshot;problem=true;conflict=e.code==='40001';localSet(pendingKey(id),{state:dirty,revision});status=e.message;display(true);return false;}}return generation===gen&&!problem;})().finally(()=>{flushing=null});return flushing;}
+async function flush(includeRewards=false){
+ if(!user||!ready||conflict)return !problem;
+ if(includeRewards)collectRewards=true;
+ if(flushing)return flushing;
+ if(!dirty&&!collectRewards)return !problem;
+ const gen=generation,id=user.id,active=session;
+ flushing=(async()=>{
+  while((dirty||collectRewards)&&generation===gen&&!conflict){
+   const snapshot=dirty;
+   const checkRewards=collectRewards;
+   dirty=null;
+   collectRewards=false;
+   try{
+    const result=await request('rpc/save_rock_game','POST',{p_state:snapshot,p_expected_revision:revision},active);
+    if(generation!==gen)return false;
+    revision=result.revision;
+    problem=false;
+    if(result.reward>0){
+     const updated=hooks.creditBattleReward(result.reward);
+     if(dirty)hooks.creditBattleReward(result.reward,dirty);
+     localSet(cacheKey(id),updated);
+    }
+    if(dirty)localSet(pendingKey(id),{state:dirty,revision});
+    else try{localStorage.removeItem(pendingKey(id));}catch{}
+    setStatus(dirty?'Saving…':'Cloud save up to date');
+   }catch(error){
+    if(generation!==gen)return false;
+    dirty=dirty||snapshot;
+    collectRewards=collectRewards||checkRewards;
+    problem=true;
+    conflict=error.code==='40001';
+    if(dirty)localSet(pendingKey(id),{state:dirty,revision});
+    status=error.message;
+    display(true);
+    return false;
+   }
+  }
+  return generation===gen&&!problem;
+ })().finally(()=>{flushing=null;});
+ return flushing;
+}
 async function reload(){if(!user||busy)return;busy=true;display(true);const id=user.id,gen=generation;try{const rows=await request('game_saves?user_id=eq.'+encodeURIComponent(id)+'&select=state,revision');if(gen!==generation)return;const row=rows?.[0];if(!row||!hooks.validate(row.state))throw Error('No valid cloud save was found.');dirty=null;revision=row.revision;conflict=false;problem=false;ready=true;try{localStorage.removeItem(pendingKey(id))}catch{}hooks.replace(clone(row.state));localSet(cacheKey(id),row.state);status='Loaded latest cloud save';}catch(e){status=e.message;}finally{busy=false;display(true)}}
 function panel(){
  if(!configured)return '<section class="content-card account-card"><h2>YOUR ACCOUNT</h2><p>Email accounts are not available yet. You can keep playing on this device.</p><p class="account-status" data-cloud-status>Guest · saved on this device</p></section>';
@@ -60,8 +99,8 @@ async function action(event){const b=event.target.closest('[data-cloud-action]')
  }catch(e){message=e.message;status=e.message;}finally{busy=false;display(true)}}
 document.addEventListener('submit',submit);document.addEventListener('click',action);
 window.addEventListener('online',()=>{
- if(dirty&&!conflict)flush();
+ if(user&&ready&&!conflict)flush(true);
  else if(user&&!ready&&!busy&&session)adopt(session,'RECONNECT');
-});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flush();});
-root.TCGCloud={init,panel,queue,flush,reload,battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get canAccrue(){return !user||(ready&&!busy&&!conflict)},get ready(){return ready},cacheKey};
+});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flush();else if(document.visibilityState==='visible'&&user&&ready)flush(true);});
+root.TCGCloud={init,panel,queue,flush,reload,claimBattleRewards:()=>flush(true),battle:args=>request('rpc/rock_battle','POST',args),get user(){return user},get configured(){return configured},get canPlay(){return !user||(ready&&!busy&&!problem&&!conflict)},get canAccrue(){return !user||(ready&&!busy&&!conflict)},get ready(){return ready},cacheKey};
 })(window);
