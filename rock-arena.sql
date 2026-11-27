@@ -27,7 +27,7 @@ create table if not exists rock_arena.join_attempts (
 alter table rock_arena.join_attempts enable row level security;
 revoke all on rock_arena.join_attempts from public, anon, authenticated;
 
--- Each finished private room grants one fixed reward to its winner.
+-- Store each private win reward at match completion so claiming it cannot reroll it.
 create table if not exists rock_arena.win_rewards (
  room_code text primary key,
  winner uuid not null references auth.users(id) on delete cascade
@@ -35,6 +35,20 @@ create table if not exists rock_arena.win_rewards (
 alter table rock_arena.win_rewards enable row level security;
 revoke all on rock_arena.win_rewards from public,anon,authenticated;
 create index if not exists rock_win_rewards_winner on rock_arena.win_rewards(winner);
+
+-- Preserve the ten-cent reward for wins already recorded before this range was added.
+alter table rock_arena.win_rewards add column if not exists cents smallint not null default 10
+ check (cents between 1 and 50);
+
+create or replace function rock_arena.award_win(room_id text,player_id uuid)
+returns integer language sql volatile set search_path=pg_catalog
+as $$
+ insert into rock_arena.win_rewards as existing(room_code,winner,cents)
+ values(room_id,player_id,1+floor(random()*50)::int)
+ on conflict (room_code) do update set cents=existing.cents
+ returning cents::int
+$$;
+revoke all on function rock_arena.award_win(text,uuid) from public,anon,authenticated;
 
 create or replace function rock_arena.save_with_rewards(p_state jsonb,p_expected_revision bigint)
 returns jsonb language plpgsql security definer set search_path=pg_catalog as $$
@@ -51,8 +65,8 @@ begin
   raise exception 'Save changed on another device. Load the latest cloud save.' using errcode='40001';
  end if;
 
- with wins as (delete from rock_arena.win_rewards where winner=actor returning room_code)
- select count(*)*10 into reward from wins;
+ with wins as (delete from rock_arena.win_rewards where winner=actor returning cents)
+ select coalesce(sum(cents),0) into reward from wins;
  if p_state is null and reward=0 then
   return jsonb_build_object('revision',saved.revision,'reward',0);
  end if;
@@ -198,6 +212,7 @@ declare
  reserve integer;
  short_code boolean;
  attempts integer;
+ win_reward integer;
 begin
  if actor is null then raise exception 'Sign in to play online' using errcode='42501'; end if;
  if operation in ('create','join') then
@@ -272,9 +287,8 @@ begin
    if room.guest is null then
     delete from rock_arena.rooms where code=room.code;
    elsif room.match->'winner'='null'::jsonb then
-    insert into rock_arena.win_rewards(room_code,winner)
-     values(room.code,case when side=0 then room.guest else room.host end) on conflict do nothing;
-    update rock_arena.rooms set match=match||jsonb_build_object('winner',1-side,'reward',10,'note','Opponent left the match.')
+    win_reward:=rock_arena.award_win(room.code,case when side=0 then room.guest else room.host end);
+    update rock_arena.rooms set match=match||jsonb_build_object('winner',1-side,'reward',win_reward,'note','Opponent left the match.')
      where code=room.code;
    end if;
    return null;
@@ -349,8 +363,8 @@ begin
      from jsonb_array_elements(game#>array['teams',other::text]) with ordinality as slot(card,ordinality)
      where (card->>'hp')::int>0;
      if reserve is null then
-      insert into rock_arena.win_rewards(room_code,winner) values(room.code,actor) on conflict do nothing;
-      game:=game||jsonb_build_object('winner',side,'reward',10);
+      win_reward:=rock_arena.award_win(room.code,actor);
+      game:=game||jsonb_build_object('winner',side,'reward',win_reward);
      else
       game:=jsonb_set(game,array['active',other::text],to_jsonb(reserve));
      end if;

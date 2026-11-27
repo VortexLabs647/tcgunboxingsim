@@ -12,7 +12,7 @@ const profileSections=new Set();
 const programmaticPackScroll = new WeakSet();
 let lastTickAt=0,cardSequence=0,wheelAudioFrame=0,winMusicGain=null;
 const SPIN_MS=2400,RESULT_MS=900;
-const rockMatchPairs=4,rockMatchMinReward=1,rockMatchMaxReward=50;
+const rockMatchPairs=4;
 // Match short, frequency-weighted listening levels across the game's sound cues.
 const CUE_GAIN = {'arena-win':3.8,'arena-loss':4.4,'arena-special':3.5,'arena-hit':3.8, 'arena-guard':4.8, tick:21.5, click:14.4, 'pack-crinkle':2.8, wheel:14, land:4.1, vault:6.1, hit:3.3, coin:5};
 const WIN_MUSIC_GAIN = .56;
@@ -716,13 +716,15 @@ function startRockMatch(){
  render();
  $('#rockMatchTitle').focus({preventScroll:true});
 }
+function winRewardRange(){
+ return money(E.winRewardMin*E.unitsPerCent)+'–'+money(E.winRewardMax*E.unitsPerCent);
+}
 function rockMatchView(){
  const game=pending.rockMatch;
  const pairs=game.matched.size/2;
- const prize=cents=>money(cents*E.unitsPerCent);
  const rewardText=game.complete
-  ? 'You earned '+prize(game.reward)+' in virtual coins.'
-  : 'Find all '+rockMatchPairs+' pairs to earn '+prize(rockMatchMinReward)+'–'+prize(rockMatchMaxReward)+' in virtual coins.';
+  ? 'You earned '+money(game.reward*E.unitsPerCent)+' in virtual coins.'
+  : 'Find all '+rockMatchPairs+' pairs to earn '+winRewardRange()+' in virtual coins.';
  return `<section class="rock-match" aria-labelledby="rockMatchTitle">
   <header>
    <h1 id="rockMatchTitle" tabindex="-1">${game.complete?'All pairs matched!':'Rock Match'}</h1>
@@ -754,7 +756,7 @@ function flipRockMatch(index){
   game.complete=game.matched.size===game.tiles.length;
   game.message=game.complete?'':'Pair found!';
   if(game.complete){
-   game.reward=rockMatchMinReward+Math.floor(E.random()*(rockMatchMaxReward-rockMatchMinReward+1));
+   game.reward=E.rollWinReward();
    E.creditReward(state,game.reward);
    save();
    sound('coin');
@@ -881,7 +883,7 @@ function arenaView(){
  for(const uid of arenaTeam)if(!state.vault.some(card=>card.uid===uid))arenaTeam.delete(uid);
  const cloud=battleCloud(),locked=arenaTeam.size===0||arenaBusy;
  return `<section class="arena">
-  <h1>Rock Arena</h1><p>Choose up to three owned cards. Win to earn ${money(E.battleWinReward*E.unitsPerCent)} in virtual coins.</p>
+  <h1>Rock Arena</h1><p>Choose up to three owned cards. Win to earn ${winRewardRange()} in virtual coins.</p>
   ${state.vault.length?`<label class="sr-only" for="arenaFilter">Find a team card</label>
    <div class="search">${icon('search')}<input type="search" id="arenaFilter" placeholder="Find a team card" value="${escape(arenaFilter)}"></div>
    <div class="team-list" id="arenaTeam">${teamOptions()}</div>
@@ -1178,7 +1180,7 @@ async function battleMove(action,target){
   if(arenaMatch!==before)return;
   arenaMatch=playerMatch;
   if(playerMatch.winner===0){
-   playerMatch.reward=E.battleWinReward;
+   playerMatch.reward=E.rollWinReward();
    E.creditReward(state,playerMatch.reward);
    save();
   }

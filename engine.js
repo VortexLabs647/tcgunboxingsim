@@ -4,7 +4,8 @@
 const names=['Opal','Sapphire','Amethyst','Emerald','Ruby','Gold','Obsidian','Diamond','Sovereign'];
 const packPrices=[2,4,6,10,15,25,40,65,100];
 const salePercent=[20,35,60,100,150,300];
-const startingBalance=10,battleWinReward=10;
+const startingBalance=10;
+const winRewardMin=1,winRewardMax=50;
 const starterId='starter-granite';
 const foilColors=['#fa3d7d','#3e8bff','#b052ff','#24dfad','#ff4c3d','#ffbf20','#5f63ff','#37d9ff','#ffb54a'];
 const rarityNames=['Common','Uncommon','Rare','Epic','Legendary','Grail'];
@@ -106,6 +107,9 @@ function credit(state,units){
  const total=state.rockRemainder+units;
  state.balance=Math.min(1e14,state.balance+Math.floor(total/unitsPerCent));
  state.rockRemainder=total%unitsPerCent;
+}
+function rollWinReward(rng=random){
+ return winRewardMin+Math.floor(rng()*(winRewardMax-winRewardMin+1));
 }
 function creditReward(state,cents){
  credit(state,cents*unitsPerCent);
@@ -251,7 +255,7 @@ function validSave(state,catalog){
   state.history.every(entry=>entry&&typeof entry.label==='string'&&Number.isSafeInteger(entry.amount)&&!isNaN(Date.parse(entry.date)));
 }
 
-const engine={battleWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
+const engine={winRewardMin,winRewardMax,rollWinReward,creditReward,maxLevel,cardLevel,cardStats,upgradeCost,upgradeRock,badges,badgeBoost,buyBadge,rarityNames,rarityColors,oddsPresets,incomeRate,starterId,productiveLimit,offlineSeconds,unitsPerCent,activeRocks,settleIncome,sellRock,saleProceeds,saleValue,hasWelcomePack,canAfford,packs,pools,itemOdds,openPack,defaults,migrate,validSave,random};
 if(typeof module!=='undefined'&&module.exports)module.exports=engine;
 else root.TCGEngine=engine;
 })(typeof window==='undefined'?globalThis:window);
