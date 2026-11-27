@@ -23,7 +23,7 @@ const oddsPresets={
 const productiveLimit=12,offlineSeconds=8*60*60;
 // One unit is $0.000001 in virtual currency.
 const unitsPerCent=10000;
-const passiveUnits=[1,2,3,4,5,6],starterUnits=250;
+const passiveUnits=[1,2,3,4,5,6],passiveIncomeMultiplier=10,starterUnits=1000;
 const badges={
  quartz:{name:'Quartz',price:5,boost:25},
  amethyst:{name:'Amethyst',price:15,boost:50},
@@ -71,7 +71,7 @@ function upgradeRock(state,uid,now=Date.now()){
  return true;
 }
 function rockIncome(rock){
- return passiveUnits[rock.tier]+packRank(rock)+cardLevel(rock)-1;
+ return (passiveUnits[rock.tier]+packRank(rock)+cardLevel(rock)-1)*passiveIncomeMultiplier;
 }
 function saleValue(price,tier){
  const rank=Math.max(0,packPrices.indexOf(price));
