@@ -61,6 +61,13 @@ const minerals={
 const finishStyles={
  sunlit:['Solar','sunlit'],frost:['Icy','frost'],ember:['Blazing','ember'],moonlit:['Lunar','moonlit']
 };
+const finishElements={sunlit:'light',frost:'ice',ember:'fire',moonlit:'void'};
+const mineralElements={
+ basalt:'fire',cinnabar:'fire',sapphire:'ice',celestite:'ice',copper:'lightning',galena:'lightning',
+ malachite:'mist',peridot:'mist',jasper:'earth',marble:'earth',obsidian:'void',onyx:'void',
+ pyrite:'light',citrine:'light',aquamarine:'water',turquoise:'water',pumice:'wind','desert-rose':'wind',
+ amethyst:'arcane',labradorite:'arcane',spinel:'arcane'
+};
 function movesFor(card){
  const mineral=card.itemId.slice(5);
  const suffix=Object.keys(finishStyles).find(finish=>mineral.endsWith('-'+finish));
@@ -68,14 +75,19 @@ function movesFor(card){
  const moves=minerals[base];
  if(!moves)return {attack:'Rock Strike',special:'Crystal Shell',effect:'bulwark',style:'stone'};
  const [prefix,style]=finishStyles[suffix]||['','stone'];
- return {attack:prefix?prefix+' '+moves[0]:moves[0],special:prefix?prefix+' '+moves[1]:moves[1],effect:moves[2],style};
+ return {
+  attack:prefix?prefix+' '+moves[0]:moves[0],
+  special:prefix?prefix+' '+moves[1]:moves[1],
+  effect:moves[2],style,element:finishElements[style]||mineralElements[base]
+ };
 }
 function moveVisual(card,special=false){
  const moves=movesFor(card);
  const name=special?moves.special:moves.attack;
  const key=Array.from(name).reduce((hash,char)=>Math.imul(hash,31)+char.codePointAt(0)>>>0,0);
  const motif=special?moves.effect:['shard','comet','ring','boulder','ribbon','volley'][key%6];
- return {motif,hue:key/0x100000000*360,spread:25+(key%31),bend:14+(key%32)};
+ const element=moves.element;
+ return {motif,element,hue:key/0x100000000*360,spread:25+(key%31),bend:14+(key%32)};
 }
 function abilityFor(card,rules=3){
  if(rules>=3){

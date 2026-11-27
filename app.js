@@ -1018,7 +1018,7 @@ function arenaView(){
    <div class="team-list" id="arenaTeam">${teamOptions()}</div>
    <p id="teamCount" role="status">${arenaTeam.size} / 3 equipped</p>`:
    '<p>Open a pack to get your first battle card.</p>'}
-  ${arenaMode==='levels'?`<div class="arena-actions"><button class="primary" data-action="arena-start-level" ${locked||cloud?.user&&!cloud.canPlay?'disabled':''}>Battle Level ${selectedArenaLevel()+1}</button></div>`:`
+  ${arenaMode==='levels'?`<div class="arena-actions arena-level-actions"><button class="primary" data-action="arena-start-level" ${locked||cloud?.user&&!cloud.canPlay?'disabled':''}>Battle Level ${selectedArenaLevel()+1}</button></div>`:`
    <div class="arena-actions"><button class="primary" data-action="arena-ai" ${locked?'disabled':''}>Battle AI</button>
    ${cloud?.user?`<button class="secondary" data-action="arena-create" ${locked||!cloud.canPlay?'disabled':''}>Create private room</button>`:
     '<a href="#profile" class="secondary">Sign in for online play</a>'}</div>
@@ -1047,18 +1047,40 @@ function selectArenaLevel(index){
 }
 function arenaLevelsView(){
  const index=selectedArenaLevel(),level=E.arenaLevels[index];
- const firstBattle=index===state.arenaPlayed,uncleared=index===state.arenaCleared;
- return `<section class="arena-levels" aria-label="Campaign levels">
-  <div class="arena-level-heading"><strong>Battle Levels</strong><span>${state.arenaCleared} / ${E.arenaLevels.length} cleared</span></div>
-  <div class="arena-level-grid">${E.arenaLevels.map((stage,id)=>{
-   const cleared=id<state.arenaCleared,locked=id>state.arenaCleared;
-   const status=cleared?'cleared':locked?'locked':'unlocked';
-   return `<button type="button" class="secondary" data-action="arena-level" data-id="${id}" data-cleared="${cleared}" data-boss="${!!stage.boss}" aria-pressed="${id===index}" aria-label="Level ${id+1}, ${stage.name}, ${status}" ${locked?'disabled':''}><b>${id+1}</b><span aria-hidden="true">${cleared?'✓':stage.boss?'★':''}</span></button>`;
-  }).join('')}</div>
+ const {arenaCleared:cleared,arenaPlayed:played}=state;
+ const total=E.arenaLevels.length;
+ const columns=3;
+ const rows=Array.from({length:Math.ceil(total/columns)},(_,row)=>{
+  const start=row*columns;
+  const stages=E.arenaLevels.slice(start,start+columns);
+  return `<div class="arena-map-row" data-turn="${row%2===0?'right':'left'}" data-connected="${cleared>=start+columns}">
+   <div class="arena-map-route" aria-hidden="true">${stages.slice(1).map((_,offset)=>`<i data-open="${cleared>start+offset}"></i>`).join('')}</div>
+   ${stages.map((stage,offset)=>{
+    const id=start+offset,complete=id<cleared,locked=id>cleared;
+    const status=complete?'cleared':locked?'locked':'unlocked';
+    return `<button type="button" class="arena-map-node" data-action="arena-level" data-id="${id}" data-cleared="${complete}" data-boss="${!!stage.boss}" aria-pressed="${id===index}" aria-label="Level ${id+1}, ${stage.name}, ${status}" ${locked?'disabled':''}>
+     <span class="arena-map-stone" aria-hidden="true"><b>${id+1}</b><span class="arena-map-mark">${complete?'✓':locked?'<i class="arena-map-lock"></i>':'◆'}</span></span>
+     ${stage.boss?'<span class="arena-map-boss" aria-hidden="true">Boss</span>':''}
+    </button>`;
+   }).join('')}
+  </div>`;
+ }).join('');
+ return `<section class="arena-levels" aria-labelledby="arenaLevelsTitle">
+  <header class="arena-level-heading">
+   <h2 id="arenaLevelsTitle">Battle Levels</h2>
+   <div class="arena-level-progress"><span>${cleared} / ${total} cleared</span><progress aria-label="Levels cleared" value="${cleared}" max="${total}"></progress></div>
+  </header>
+  <div class="arena-level-grid">${rows}</div>
   <div class="arena-level-info">
-   <h2>${level.name}${level.boss?' <span>Boss</span>':''}</h2>
-   <p>${level.enemies.length} opponent ${level.enemies.length===1?'card':'cards'} · ${level.enemies.map(([name])=>escape(byId['rock-'+name].name)).join(', ')}</p>
-   <p>${uncleared?`First clear ${money(level.reward*E.unitsPerCent)}${firstBattle?' · First finished battle '+money(E.arenaPlayReward*E.unitsPerCent):''}`:'First-clear reward collected'}</p>
+   <div class="arena-level-summary">
+    <h3>${level.name}${level.boss?' <span>Boss</span>':''}</h3>
+    <p>${level.enemies.map(([name])=>escape(byId['rock-'+name].name)).join(' · ')}</p>
+   </div>
+   <div class="arena-level-reward">
+    <strong>${index<cleared?'Cleared':money(level.reward*E.unitsPerCent)}</strong>
+    <span>${index<cleared?'Reward collected':'First-clear reward'}</span>
+    ${index===played?`<small>+${money(E.arenaPlayReward*E.unitsPerCent)} first finished battle</small>`:''}
+   </div>
   </div>
  </section>`;
 }
@@ -1213,6 +1235,7 @@ function arenaAnimation(element,keyframes,duration,easing='ease-out'){
 const arenaAttackArt={
  boulder:0,ribbon:1,fracture:2,bulwark:3,prism:4,ring:5,shard:6,comet:7,volley:8,renew:9,meteor:0
 };
+const arenaElementArt={fire:0,ice:1,lightning:2,mist:3,earth:4,void:5,light:6,water:7,wind:8,arcane:9};
 async function animateArenaMove(before,after){
  if(view!=='battle'||document.hidden||after?.revision!==before?.revision+1||before.winner!==null)return;
  const effects=$('.arena-effects');
@@ -1243,6 +1266,7 @@ async function animateArenaMove(before,after){
   effect.dataset.color=color;
   if(ability)effect.dataset.ability=ability.id;
   effect.dataset.motif=visual.motif;
+  if(visual.element)effect.dataset.element=visual.element;
   effect.style.setProperty('--move-hue',String(visual.hue));
   effect.style.left=position.x+'px';
   effect.style.top=position.y+'px';
@@ -1250,16 +1274,18 @@ async function animateArenaMove(before,after){
   effects.append(effect);
   return effect;
  };
- const illustratedImpact=(position,motif)=>{
+ const illustratedImpact=position=>{
   const sprite=spawn('illustrated',position);
-  const tile=arenaAttackArt[motif];
+  const tile=visual.element?arenaElementArt[visual.element]:arenaAttackArt[visual.motif];
   sprite.style.setProperty('--sprite-x',tile%5*25+'%');
   sprite.style.setProperty('--sprite-y',tile<5?'12%':'88%');
+  const swirling=['fire','mist','void','water','wind','arcane'].includes(visual.element);
+  const entry=visual.element==='lightning'?'translateY(-22px)':swirling?'rotate(-12deg)':'none';
   const frames=reduced?[{opacity:.9},{opacity:.9},{opacity:0}]:[
-   {opacity:0,scale:.58},
-   {opacity:1,scale:1.05,offset:.23},
+   {opacity:0,scale:.58,transform:entry},
+   {opacity:1,scale:1.05,transform:'none',offset:.23},
    {opacity:.94,scale:1.08,offset:.68},
-   {opacity:0,scale:1.18}
+   {opacity:0,scale:1.18,transform:swirling?'rotate(10deg)':'none'}
   ];
   return arenaAnimation(sprite,frames,reduced?230:480).then(()=>sprite.remove());
  };
@@ -1279,7 +1305,7 @@ async function animateArenaMove(before,after){
   await Promise.all([
    arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.7},{opacity:1,scale:1.04,offset:.28},{opacity:0,scale:1.15}],reduced?230:400),
    aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.75,offset:.35},{opacity:0,scale:1+visual.spread/45,rotate:visual.bend+'deg'}],400),
-   loss===0&&illustratedImpact(from,visual.motif)
+   loss===0&&illustratedImpact(from)
   ]);
   charge.remove();
   aura?.remove();
@@ -1325,7 +1351,7 @@ async function animateArenaMove(before,after){
     const angle=index/sparks.length*2*Math.PI+visual.hue*Math.PI/180,radius=visual.spread+(remaining?0:20);
     return arenaAnimation(spark,[{opacity:1,transform:'none'},{opacity:0,transform:`translate(${Math.cos(angle)*radius}px,${Math.sin(angle)*radius}px) rotate(110deg)`}],remaining?320:430);
    }),
-   illustratedImpact(to,visual.motif),
+   illustratedImpact(to),
    arenaAnimation(impact,reduced?[{opacity:.8},{opacity:0}]:[{opacity:1,scale:.38},{opacity:0,scale:1.5,rotate:'28deg'}],reduced?180:340)
   ]);
   damage.remove();
