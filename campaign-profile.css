@@ -868,6 +868,13 @@ body #app .arena-lobby .campaign-team-setup { margin:0; padding:4px 8px; }
     margin-block:0;
     overflow:hidden;
   }
+  body[data-view="battle"]:has(.arena-match) {
+    height:100svh;
+    overscroll-behavior:none;
+  }
+  body[data-view="battle"] #app:has(.arena-match) {
+    height:calc(100svh - var(--mobile-header-size) - var(--mobile-nav-size));
+  }
   .arena-lobby[data-mode="levels"] {
     display:grid;
     grid-template-rows:auto minmax(0,1fr) auto auto;
@@ -899,13 +906,14 @@ body #app .arena-lobby .campaign-team-setup { margin:0; padding:4px 8px; }
   body #app .arena-lobby .campaign-team-setup { min-height:36px; }
   .arena-lobby #arenaStatus { margin:0; font-size:.74rem; }
   .arena-lobby #arenaStatus:empty { display:none; }
-  .arena-match { height:100%; display:grid; grid-template-rows:auto minmax(0,1fr) auto auto auto; gap:5px; }
-  .arena-match .arena-header { margin:0; min-height:36px; }
-  .arena-match .arena-header h1 { font-size:clamp(.94rem,4vw,1.43rem); }
+  .arena-match { height:100%; display:grid; grid-template-rows:40px minmax(0,1fr) 3.55rem 46px 1.75rem; gap:5px; }
+  .arena-match .arena-header { margin:0; min-height:0; }
+  .arena-match .arena-header h1 { font-size:clamp(.94rem,4vw,1.43rem); line-height:1.13; }
   .arena-match .arena-header button { min-height:36px; }
-  .arena-match .arena-board { padding-block:6px; grid-template-rows:minmax(0,1fr) clamp(12px,3dvh,24px) minmax(0,1fr); border-radius:17px; }
-  .arena-match .arena-fighter { width:clamp(50px,min(20vw,11.7dvh),100px); }
-  .arena-match .arena-turn { min-height:17px; margin:0; font-size:.74rem; line-height:1.2; }
+  .arena-match .arena-board { padding-block:6px; grid-template-rows:minmax(0,1fr) clamp(12px,3svh,24px) minmax(0,1fr); border-radius:17px; }
+  .arena-match .arena-fighter { width:clamp(50px,min(20vw,11.7svh),100px); }
+  .arena-match .arena-turn { display:block; min-height:0; margin:0; font-size:.74rem; line-height:1.2; }
+  .arena-match .arena-turn strong { display:block; }
   .arena-match .arena-actions { margin:0; }
   .arena-match .arena-hint { margin:0; font-size:.7rem; line-height:1.15; }
   .arena-result .arena-result-art { width:min(69%,30dvh,250px); }

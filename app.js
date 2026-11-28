@@ -1227,6 +1227,46 @@ const arenaAttackArt={
  boulder:0,ribbon:1,fracture:2,bulwark:3,prism:4,ring:5,shard:6,comet:7,volley:8,renew:9,meteor:0
 };
 const arenaElementArt={fire:0,ice:1,lightning:2,mist:3,earth:4,void:5,light:6,water:7,wind:8,arcane:9};
+const arenaSprites=new Map();
+function arenaImpactSprite(element,tile){
+ const key=Number(element)*10+tile;
+ if(arenaSprites.has(key))return arenaSprites.get(key);
+ const image=arenaArtPreload?.[Number(element)];
+ if(!image?.naturalWidth)return null;
+ const cellWidth=image.naturalWidth/5,cellHeight=image.naturalHeight/2;
+ const inset=element?0:7;
+ const canvas=document.createElement('canvas');
+ canvas.width=192;
+ canvas.height=Math.round(canvas.width*(cellHeight-2*inset)/(cellWidth-2*inset));
+ const {width,height}=canvas;
+ const context=canvas.getContext('2d');
+ context.drawImage(image,tile%5*cellWidth+inset,Math.floor(tile/5)*cellHeight+inset,
+  cellWidth-2*inset,cellHeight-2*inset,0,0,width,height);
+ const pixels=context.getImageData(0,0,width,height);
+ let left=width,top=height,right=0,bottom=0;
+ // Lift out the charcoal backing and feather only the seams between atlas cells.
+ const floor=element?7:32;
+ const feather=element?15:5;
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const offset=4*(y*width+x);
+  const brightness=Math.max(pixels.data[offset],pixels.data[offset+1],pixels.data[offset+2]);
+  const edge=Math.min(x,y,width-1-x,height-1-y);
+  const fade=Math.min(1,edge/feather);
+  const alpha=fade*fade*(3-2*fade)*Math.max(0,Math.min(1,(brightness-floor)/26));
+  pixels.data[offset+3]=255*alpha;
+  if(alpha>0){
+   left=Math.min(left,x); right=Math.max(right,x);
+   top=Math.min(top,y); bottom=Math.max(bottom,y);
+  }
+ }
+ context.putImageData(pixels,0,0);
+ const sprite=document.createElement('canvas');
+ sprite.width=right-left+1;
+ sprite.height=bottom-top+1;
+ sprite.getContext('2d').drawImage(canvas,-left,-top);
+ arenaSprites.set(key,sprite);
+ return sprite;
+}
 const arenaMotion={
  fire:{bend:40,turn:32,flight:335,impact:470},
  ice:{bend:16,turn:8,flight:290,impact:510},
@@ -1280,20 +1320,64 @@ async function animateArenaMove(before,after){
   effects.append(effect);
   return effect;
  };
- const illustratedImpact=position=>{
-  const sprite=spawn('illustrated',position);
-  const tile=visual.element?arenaElementArt[visual.element]:arenaAttackArt[visual.motif];
-  sprite.style.setProperty('--sprite-x',tile%5*25+'%');
-  sprite.style.setProperty('--sprite-y',tile<5?'12%':'88%');
-  const swirling=['fire','mist','void','water','wind','arcane'].includes(visual.element);
-  const entry=visual.element==='lightning'?'translateY(-22px)':swirling?'rotate(-12deg)':'none';
-  const frames=reduced?[{opacity:.9},{opacity:.9},{opacity:0}]:[
-   {opacity:0,scale:.58,transform:entry},
-   {opacity:1,scale:1.05,transform:'none',offset:.23},
-   {opacity:.94,scale:1.08,offset:.68},
-   {opacity:0,scale:1.18,transform:swirling?'rotate(10deg)':'none'}
-  ];
-  return arenaAnimation(sprite,frames,reduced?230:motion.impact).then(()=>sprite.remove());
+ const element=!!visual.element;
+ const tile=(element?arenaElementArt[visual.element]:arenaAttackArt[visual.motif])??0;
+ const preparedArt=ability||loss>0?arenaImpactSprite(element,tile):null;
+ const illustratedImpact=async position=>{
+  const texture=preparedArt??arenaImpactSprite(element,tile);
+  if(!texture)return;
+  const ratio=texture.height/texture.width;
+  const sweep=['fire','void','wind','arcane'].includes(visual.element);
+  const rise=['ice','earth','light','mist'].includes(visual.element)||!element;
+  const water=visual.element==='water',lightning=visual.element==='lightning';
+  const angle=sweep?Math.min(20,motion.turn*.28):water?11:0;
+  const x=water?13:sweep?8:0;
+  const y=rise?-13:lightning?10:-5;
+  // Leave room for both layers at their widest point, including tilt and follow-through.
+  const tilt=Math.sin(angle*Math.PI/180);
+  const halfWidth=.59*(1+ratio*tilt),halfHeight=.59*(ratio+tilt);
+  const xMargin=x+2,yMargin=15;
+  const offsetLimit=Math.min(36,board.height*.12);
+  const targetRoom=Math.min(position.y,board.height-position.y)+offsetLimit;
+  const width=Math.min(215,board.width*.49,(board.width/2-xMargin)/halfWidth,
+   (Math.min(board.height/2,targetRoom)-yMargin)/halfHeight);
+  if(width<=0)return;
+  const height=width*ratio;
+  const xPad=halfWidth*width+xMargin,yPad=halfHeight*width+yMargin;
+  const sprite=spawn('illustrated',{
+   x:Math.max(xPad,Math.min(board.width-xPad,position.x)),
+   y:Math.max(yPad,Math.min(board.height-yPad,position.y))
+  });
+  Object.assign(sprite.style,{width:width+'px',height:height+'px'});
+  const layer=className=>{
+   const art=texture.cloneNode();
+   art.className=className;
+   art.getContext('2d').drawImage(texture,0,0);
+   sprite.append(art);
+   return art;
+  };
+  try{
+   const art=layer('arena-impact-art');
+   if(reduced){
+    await arenaAnimation(art,[{opacity:.93},{opacity:.93,offset:.65},{opacity:0}],230);
+    return;
+   }
+   const front=layer('arena-impact-art arena-impact-front');
+   front.dataset.flow=sweep||water?'sweep':lightning?'bolt':'rise';
+   await Promise.all([
+    arenaAnimation(art,[
+     {opacity:0,transform:`translate(${-x}px,${lightning?-13:8}px) rotate(${-angle}deg) scale(${lightning ? .44 : .68},${rise ? .46 : 1.05})`,easing:'cubic-bezier(.14,.85,.32,1)'},
+     {opacity:1,transform:'translate(0,0) rotate(0deg) scale(1.03)',offset:.25,easing:'ease-out'},
+     {opacity:.86,transform:`translate(${x*.45}px,${y*.4}px) rotate(${angle*.44}deg) scale(1.08,1.04)`,offset:.57},
+     {opacity:0,transform:`translate(${x}px,${y}px) rotate(${angle}deg) scale(1.12,1.15)`}
+    ],motion.impact,'linear'),
+    arenaAnimation(front,[
+     {opacity:0,transform:`translate(${-x*.5}px,${lightning?-13:5}px) rotate(${-angle*.65}deg) scale(.91,.84)`},
+     {opacity:lightning ? .98 : .78,transform:'translate(0,0) rotate(0deg) scale(1.02)',offset:.26,easing:'ease-out'},
+     {opacity:0,transform:`translate(${x}px,${y}px) rotate(${angle}deg) scale(1.18,1.17)`}
+    ],motion.impact*.87,'linear')
+   ]);
+  }finally{sprite.remove();}
  };
  const from=center(actor),to=center(rival);
  const updateFighter=(fighter,card)=>{

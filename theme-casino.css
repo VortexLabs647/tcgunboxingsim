@@ -2922,7 +2922,7 @@ body :is(.card-browser .item-card,.rock-lineup .item-card) { border: 1px solid #
 .card-training { margin-top:12px; }
 .card-training button { min-height:44px; }
 
-.arena-match { max-width:545px; }
+.arena-match { max-width:545px; touch-action:manipulation; }
 .arena-board {
   --arena-violet:#eab0ff;
   --arena-mint:#87f9d6;
@@ -3657,12 +3657,24 @@ body .results-screen[data-rock-match="true"] { grid-template-rows:auto auto minm
 
 
 .arena-effect--illustrated {
-  width:clamp(112px,36vw,210px);
-  aspect-ratio:306 / 390;
-  background:url('arena-attacks.webp') var(--sprite-x) var(--sprite-y) / 507% auto no-repeat;
-  mix-blend-mode:screen;
-  mask-image:radial-gradient(ellipse at center,#000 49%,#000 58%,transparent 74%);
+  z-index:1;
 }
+.arena-impact-art {
+  position:absolute;
+  inset:0;
+  display:block;
+  width:100%;
+  height:100%;
+  opacity:0;
+}
+.arena-impact-front {
+  mix-blend-mode:screen;
+  mask-image:linear-gradient(#000 20%,transparent 85%);
+}
+.arena-impact-front[data-flow="sweep"] {
+  mask-image:linear-gradient(135deg,transparent 12%,#000 39% 60%,transparent 84%);
+}
+.arena-impact-front[data-flow="bolt"] { mask-image:linear-gradient(#000 12%,transparent 88%); }
 .arena-effect--damage,.arena-effect--charge { z-index:2; }
 .arena-mode-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-block:8px 12px; }
 :root body .arena-mode-tabs button[aria-pressed="true"] {
@@ -3681,12 +3693,7 @@ body .results-screen[data-rock-match="true"] { grid-template-rows:auto auto minm
 .arena-effect[data-element="wind"] { --element-color:#d2e5ff; }
 .arena-effect[data-element="arcane"] { --element-color:#fa8aff; }
 .arena-effect[data-element] { --effect-color:var(--element-color); }
-.arena-effect--illustrated[data-element] {
-  width:clamp(120px,40vw,228px);
-  aspect-ratio:306 / 403;
-  background-image:url('arena-elements.webp');
-  mask-image:radial-gradient(ellipse at center,#000 55%,#000e 63%,transparent 76%);
-}
+.arena-effect--illustrated[data-element] { mix-blend-mode:screen; }
 
 .arena-levels {
   overflow:hidden;
