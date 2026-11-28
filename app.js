@@ -897,14 +897,13 @@ function campaignRank(){
 function campaignShield(rank){
  return `<span class="campaign-shield" aria-hidden="true"><span>RANK</span><b>${rank}</b></span>`;
 }
-let arenaArtPreload;
+let arenaPickaxe;
 function arenaView(){
- arenaArtPreload??=['arena-attacks.webp','arena-elements.webp','levels-pickaxe.webp'].map(src=>{
-  const image=new Image();
-  image.src=src;
-  image.decode?.().catch(()=>{});
-  return image;
- });
+ if(!arenaPickaxe){
+  arenaPickaxe=new Image();
+  arenaPickaxe.src='levels-pickaxe.webp';
+  arenaPickaxe.decode?.().catch(()=>{});
+ }
  if(onlineRoom?.waiting)return `<section class="arena content-card">
   <h1>Private room</h1><p>Share this code with your opponent. They’ll need ${onlineRoom.match.teams[0].length} ${onlineRoom.match.teams[0].length===1?'card':'cards'}.</p>
   <input class="room-code" readonly aria-label="Room code" value="${escape(onlineRoom.joinCode||onlineRoom.code)}">
@@ -1223,63 +1222,19 @@ async function animateRockKnockout(fighter,effects,reduced){
   ]);
  }finally{stage.remove();}
 }
-const arenaAttackArt={
- boulder:0,ribbon:1,fracture:2,bulwark:3,prism:4,ring:5,shard:6,comet:7,volley:8,renew:9,meteor:0
-};
-const arenaElementArt={fire:0,ice:1,lightning:2,mist:3,earth:4,void:5,light:6,water:7,wind:8,arcane:9};
-const arenaSprites=new Map();
-function arenaImpactSprite(element,tile){
- const key=Number(element)*10+tile;
- if(arenaSprites.has(key))return arenaSprites.get(key);
- const image=arenaArtPreload?.[Number(element)];
- if(!image?.naturalWidth)return null;
- const cellWidth=image.naturalWidth/5,cellHeight=image.naturalHeight/2;
- const inset=element?0:7;
- const canvas=document.createElement('canvas');
- canvas.width=192;
- canvas.height=Math.round(canvas.width*(cellHeight-2*inset)/(cellWidth-2*inset));
- const {width,height}=canvas;
- const context=canvas.getContext('2d');
- context.drawImage(image,tile%5*cellWidth+inset,Math.floor(tile/5)*cellHeight+inset,
-  cellWidth-2*inset,cellHeight-2*inset,0,0,width,height);
- const pixels=context.getImageData(0,0,width,height);
- let left=width,top=height,right=0,bottom=0;
- // Lift out the charcoal backing and feather only the seams between atlas cells.
- const floor=element?7:32;
- const feather=element?15:5;
- for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-  const offset=4*(y*width+x);
-  const brightness=Math.max(pixels.data[offset],pixels.data[offset+1],pixels.data[offset+2]);
-  const edge=Math.min(x,y,width-1-x,height-1-y);
-  const fade=Math.min(1,edge/feather);
-  const alpha=fade*fade*(3-2*fade)*Math.max(0,Math.min(1,(brightness-floor)/26));
-  pixels.data[offset+3]=255*alpha;
-  if(alpha>0){
-   left=Math.min(left,x); right=Math.max(right,x);
-   top=Math.min(top,y); bottom=Math.max(bottom,y);
-  }
- }
- context.putImageData(pixels,0,0);
- const sprite=document.createElement('canvas');
- sprite.width=right-left+1;
- sprite.height=bottom-top+1;
- sprite.getContext('2d').drawImage(canvas,-left,-top);
- arenaSprites.set(key,sprite);
- return sprite;
-}
 const arenaMotion={
- fire:{bend:40,turn:32,flight:335,impact:470},
- ice:{bend:16,turn:8,flight:290,impact:510},
- lightning:{bend:22,turn:0,flight:230,impact:390},
- mist:{bend:52,turn:24,flight:400,impact:555},
- earth:{bend:32,turn:58,flight:340,impact:510},
- void:{bend:48,turn:105,flight:390,impact:540},
- light:{bend:12,turn:12,flight:285,impact:470},
- water:{bend:43,turn:19,flight:365,impact:530},
- wind:{bend:53,turn:82,flight:365,impact:505},
- arcane:{bend:36,turn:68,flight:345,impact:515}
+ fire:{bend:40,turn:32,flight:335},
+ ice:{bend:16,turn:8,flight:290},
+ lightning:{bend:22,turn:0,flight:230},
+ mist:{bend:52,turn:24,flight:400},
+ earth:{bend:32,turn:58,flight:340},
+ void:{bend:48,turn:105,flight:390},
+ light:{bend:12,turn:12,flight:285},
+ water:{bend:43,turn:19,flight:365},
+ wind:{bend:53,turn:82,flight:365},
+ arcane:{bend:36,turn:68,flight:345}
 };
-const rockMotion={bend:26,turn:40,flight:295,impact:460};
+const rockMotion={bend:26,turn:40,flight:295};
 async function animateArenaMove(before,after){
  if(view!=='battle'||document.hidden||after?.revision!==before?.revision+1||before.winner!==null)return;
  const effects=$('.arena-effects');
@@ -1320,66 +1275,14 @@ async function animateArenaMove(before,after){
   effects.append(effect);
   return effect;
  };
- const element=!!visual.element;
- const tile=(element?arenaElementArt[visual.element]:arenaAttackArt[visual.motif])??0;
- const preparedArt=ability||loss>0?arenaImpactSprite(element,tile):null;
- const illustratedImpact=async position=>{
-  const texture=preparedArt??arenaImpactSprite(element,tile);
-  if(!texture)return;
-  const ratio=texture.height/texture.width;
-  const sweep=['fire','void','wind','arcane'].includes(visual.element);
-  const rise=['ice','earth','light','mist'].includes(visual.element)||!element;
-  const water=visual.element==='water',lightning=visual.element==='lightning';
-  const angle=sweep?Math.min(20,motion.turn*.28):water?11:0;
-  const x=water?13:sweep?8:0;
-  const y=rise?-13:lightning?10:-5;
-  // Leave room for both layers at their widest point, including tilt and follow-through.
-  const tilt=Math.sin(angle*Math.PI/180);
-  const halfWidth=.59*(1+ratio*tilt),halfHeight=.59*(ratio+tilt);
-  const xMargin=x+2,yMargin=15;
-  const offsetLimit=Math.min(36,board.height*.12);
-  const targetRoom=Math.min(position.y,board.height-position.y)+offsetLimit;
-  const width=Math.min(215,board.width*.49,(board.width/2-xMargin)/halfWidth,
-   (Math.min(board.height/2,targetRoom)-yMargin)/halfHeight);
-  if(width<=0)return;
-  const height=width*ratio;
-  const xPad=halfWidth*width+xMargin,yPad=halfHeight*width+yMargin;
-  const sprite=spawn('illustrated',{
-   x:Math.max(xPad,Math.min(board.width-xPad,position.x)),
-   y:Math.max(yPad,Math.min(board.height-yPad,position.y))
-  });
-  Object.assign(sprite.style,{width:width+'px',height:height+'px'});
-  const layer=className=>{
-   const art=texture.cloneNode();
-   art.className=className;
-   art.getContext('2d').drawImage(texture,0,0);
-   sprite.append(art);
-   return art;
-  };
-  try{
-   const art=layer('arena-impact-art');
-   if(reduced){
-    await arenaAnimation(art,[{opacity:.93},{opacity:.93,offset:.65},{opacity:0}],230);
-    return;
-   }
-   const front=layer('arena-impact-art arena-impact-front');
-   front.dataset.flow=sweep||water?'sweep':lightning?'bolt':'rise';
-   await Promise.all([
-    arenaAnimation(art,[
-     {opacity:0,transform:`translate(${-x}px,${lightning?-13:8}px) rotate(${-angle}deg) scale(${lightning ? .44 : .68},${rise ? .46 : 1.05})`,easing:'cubic-bezier(.14,.85,.32,1)'},
-     {opacity:1,transform:'translate(0,0) rotate(0deg) scale(1.03)',offset:.25,easing:'ease-out'},
-     {opacity:.86,transform:`translate(${x*.45}px,${y*.4}px) rotate(${angle*.44}deg) scale(1.08,1.04)`,offset:.57},
-     {opacity:0,transform:`translate(${x}px,${y}px) rotate(${angle}deg) scale(1.12,1.15)`}
-    ],motion.impact,'linear'),
-    arenaAnimation(front,[
-     {opacity:0,transform:`translate(${-x*.5}px,${lightning?-13:5}px) rotate(${-angle*.65}deg) scale(.91,.84)`},
-     {opacity:lightning ? .98 : .78,transform:'translate(0,0) rotate(0deg) scale(1.02)',offset:.26,easing:'ease-out'},
-     {opacity:0,transform:`translate(${x}px,${y}px) rotate(${angle}deg) scale(1.18,1.17)`}
-    ],motion.impact*.87,'linear')
-   ]);
-  }finally{sprite.remove();}
- };
  const from=center(actor),to=center(rival);
+ const hitArt=(fighter,guarded=false)=>{
+  const card=$('.cartoon-card',fighter)??fighter;
+  return window.ArenaImpact?.play(effects,{
+   ...center(card),cardWidth:card.offsetWidth,element:visual.element,motif:visual.motif,
+   special:!!ability,guarded,reduced,direction:Math.sign(to.y-from.y)
+  });
+ };
  const updateFighter=(fighter,card)=>{
   const team=fighter.closest('.arena-team');
   $('progress',team).value=card.hp;
@@ -1395,7 +1298,7 @@ async function animateArenaMove(before,after){
   await Promise.all([
    arenaAnimation(charge,reduced?[{opacity:1},{opacity:1}]:[{opacity:0,scale:.82},{opacity:1,scale:1,offset:.3},{opacity:0,scale:1.08}],reduced?175:225),
    aura&&arenaAnimation(aura,[{opacity:0,scale:.6},{opacity:.6,offset:.4},{opacity:0,scale:1.18}],225),
-   loss===0&&illustratedImpact(from)
+   loss===0&&hitArt(actor)
   ]);
   charge.remove();
   aura?.remove();
@@ -1447,10 +1350,7 @@ async function animateArenaMove(before,after){
   updateFighter(rival,nextTarget);
   sound('arena-hit');
   const damage=spawn('damage',to,`−${loss}`);
-  const impact=spawn(target.guard&&ability?.id!=='fracture'?'shield':'burst',to);
-  const shocks=reduced?[]:Array.from({length:compact?1:2},()=>spawn('shock-ring',to));
-  const sparkCount=compact?(remaining?5:7):(remaining?8:10);
-  const sparks=reduced?[]:Array.from({length:sparkCount},(_,index)=>spawn(index%3===0?'shard':'spark',to));
+  const attackEffect=hitArt(rival,target.guard&&ability?.id!=='fracture');
   const recoil=arenaAnimation(rival,reduced?[{opacity:1},{opacity:1}]:[
    {transform:'translateY(0) rotate(0deg)',easing:'ease-out'},
    {transform:`translateY(${direction*9}px) rotate(${direction*5}deg)`,offset:.27,easing:'ease-in-out'},
@@ -1460,24 +1360,9 @@ async function animateArenaMove(before,after){
   await Promise.all([
    recoil.then(()=>remaining===0&&effects.isConnected&&animateRockKnockout(rival,effects,reduced)),
    arenaAnimation(damage,reduced?[{opacity:1},{opacity:1}]:[{opacity:1,transform:'translateY(3px) scale(.85)'},{opacity:1,transform:'translateY(-22px) scale(1.13)',offset:.45},{opacity:0,transform:'translateY(-46px)'}],reduced?260:430),
-   ...shocks.map((ring,index)=>arenaAnimation(ring,[
-    {opacity:0,scale:.22},{opacity:.8,scale:.45,offset:.22+index*.08},{opacity:0,scale:1.8+index*.54}
-   ],330+index*105)),
-   ...sparks.map((spark,index)=>{
-    const angle=index/sparks.length*2*Math.PI+visual.hue*Math.PI/180;
-    const radius=visual.spread+(remaining?8:22)+index%3*7;
-    const dx=Math.cos(angle)*radius,dy=Math.sin(angle)*radius;
-    return arenaAnimation(spark,[{opacity:1,transform:'none'},
-     {opacity:1,transform:`translate(${dx*.55}px,${dy*.76-12}px) rotate(55deg)`,offset:.42},
-     {opacity:0,transform:`translate(${dx}px,${dy+15}px) rotate(${100+index*14}deg)`}
-    ],motion.impact-58+index%3*18);
-   }),
-   illustratedImpact(to),
-   arenaAnimation(impact,reduced?[{opacity:.8},{opacity:0}]:[{opacity:1,scale:.38},{opacity:0,scale:1.5,rotate:'28deg'}],reduced?180:340)
+   attackEffect
   ]);
   damage.remove();
-  impact.remove();
-  [...sparks,...shocks].forEach(effect=>effect.remove());
  }else if(guarded||switched){
   sound('arena-guard');
   const effect=spawn(guarded?'shield':'swap',from,guarded?'GUARD':'SWITCH');

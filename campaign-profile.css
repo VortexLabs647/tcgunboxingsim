@@ -807,25 +807,21 @@ body .opening-screen.spinning.second-chance-screen {
 .campaign-team-dialog > form { padding:6px 8px; }
 .campaign-team-dialog > form button { width:100%; }
 body #app .arena-lobby .campaign-team-setup { margin:0; padding:4px 8px; }
-.arena-effect--windup,.arena-effect--shock-ring {
+.arena-effect--windup {
   width:clamp(53px,15vw,91px);
   aspect-ratio:1;
-  border:3px solid var(--effect-color,#8af4db);
+  border:3px dashed var(--effect-color,#9fdfef);
   border-radius:50%;
   box-shadow:inset 0 0 11px var(--effect-color,#9fdfef),0 0 12px var(--effect-color,#9fdfef);
-}
-.arena-effect--windup {
-  border:3px dashed var(--effect-color,#9fdfef);
   background:radial-gradient(transparent 34%,color-mix(in srgb,var(--effect-color,#e1b6f1) 35%,transparent));
 }
-.arena-effect--tracer,.arena-effect--shard {
-  width:9px;
-  aspect-ratio:1;
+.arena-effect--tracer {
+  width:8px;
+  aspect-ratio:.63;
+  border-radius:60%;
   background:linear-gradient(145deg,#fff9d8 12%,var(--effect-color,#ed9cfa) 56%,#6b438c);
   clip-path:polygon(48% 0,85% 29%,100% 59%,53% 100%,8% 72%,0 45%);
 }
-.arena-effect--tracer { width:8px; aspect-ratio:.63; border-radius:60%; }
-.arena-effect--shard { width:12px; }
 .arena-effect--tracer[data-element="fire"] { border-radius:65% 25% 56% 65%; background:linear-gradient(#fff3a1,#fca057 40%,#d94d55); }
 .arena-effect--tracer[data-element="water"] { border-radius:62% 45% 55% 66%; background:linear-gradient(#effaff,#65d8ff,#638de9); }
 .arena-effect--tracer[data-element="lightning"] { clip-path:polygon(77% 0,100% 8%,66% 41%,91% 48%,21% 100%,43% 52%,0 51%); }
@@ -993,5 +989,5 @@ body #app .campaign-team-dialog .team-option { min-height:88px; overflow:hidden;
 }
 @media(max-width:600px) {
   .arena-effect--shot { filter:none; }
-  .arena-effect--windup,.arena-effect--shock-ring { box-shadow:0 0 8px var(--effect-color,#9fdfef); }
+  .arena-effect--windup { box-shadow:0 0 8px var(--effect-color,#9fdfef); }
 }
